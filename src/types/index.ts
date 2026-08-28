@@ -1,4 +1,14 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type Gender = 'male' | 'female';
+export type UnitSystem = 'metric' | 'imperial';
+
+export interface UserProfile {
+  gender: Gender;
+  age: number;
+  weightKg: number; // stored in kg
+  heightCm: number; // stored in cm
+  unitSystem: UnitSystem;
+}
 
 export interface FoodItem {
   id: string;
@@ -29,8 +39,9 @@ export interface MealRecord {
 
 export interface DailyActivity {
   date: string; // YYYY-MM-DD
-  caloriesBurned: number; // kcal burned entered by user or tracker
-  carbsBurned?: number; // optional grams
+  activeCaloriesBurned: number; // exercise / workout calories entered by user
+  baseBmrCalories: number; // resting BMR base calories
+  totalCaloriesBurned: number; // baseBmrCalories + activeCaloriesBurned
   notes?: string;
   lastUpdated: string;
 }
@@ -50,6 +61,7 @@ export interface AppSettings {
   storageLocation: StorageLocation;
   storagePromptDismissed: boolean;
   googleAccessToken?: string;
+  profile: UserProfile;
   goals: UserGoals;
 }
 
@@ -63,8 +75,7 @@ export interface DailySummary {
     protein: number;
     fat: number;
   };
-  netCalories: number; // Calories Consumed - Calories Burned
-  netCarbs?: number;
+  netCalories: number; // Calories Consumed - Total Calories Burned
 }
 
 export interface GeminiAnalysisResult {

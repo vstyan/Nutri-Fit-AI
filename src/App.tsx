@@ -23,16 +23,21 @@ import {
   saveActivityForDate,
   DEFAULT_SETTINGS
 } from './services/storageService';
+import { calculateBMR } from './utils/bmrCalculator';
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [meals, setMeals] = useState<MealRecord[]>([]);
-  const [activity, setActivity] = useState<DailyActivity>({
-    date: selectedDate,
-    caloriesBurned: 0,
-    carbsBurned: 0,
-    lastUpdated: new Date().toISOString()
+  const [activity, setActivity] = useState<DailyActivity>(() => {
+    const base = calculateBMR(DEFAULT_SETTINGS.profile);
+    return {
+      date: selectedDate,
+      activeCaloriesBurned: 0,
+      baseBmrCalories: base,
+      totalCaloriesBurned: base,
+      lastUpdated: new Date().toISOString()
+    };
   });
 
   const [historyData, setHistoryData] = useState<Array<{
@@ -64,7 +69,7 @@ export function App() {
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
     const dayMeals = await getMealsForDate(date, currentSettings);
-    const dayActivity = await getActivityForDate(date);
+    const dayActivity = await getActivityForDate(date, currentSettings);
     setMeals(dayMeals);
     setActivity(dayActivity);
 
@@ -84,7 +89,7 @@ export function App() {
       const dStr = d.toISOString().split('T')[0];
       
       const mList = await getMealsForDate(dStr, currentSettings);
-      const act = await getActivityForDate(dStr);
+      const act = await getActivityForDate(dStr, currentSettings);
 
       const cIn = Math.round(mList.reduce((s, m) => s + (m.totalCarbs || 0), 0) * 10) / 10;
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
@@ -92,9 +97,9 @@ export function App() {
       past7.push({
         date: dStr,
         carbsIntake: cIn,
-        carbsBurned: act.carbsBurned || 0,
+        carbsBurned: 0,
         caloriesIntake: calIn,
-        caloriesBurned: act.caloriesBurned || 0
+        caloriesBurned: act.totalCaloriesBurned || 1700
       });
     }
 
@@ -105,7 +110,7 @@ export function App() {
     loadDayData(selectedDate, settings);
   }, [selectedDate, settings, loadDayData]);
 
-  // Handle Photo Analysis Completion
+  // Handle Photo or Text Analysis Completion
   const handleAnalysisComplete = (photoUrl: string, result: GeminiAnalysisResult) => {
     setReviewPhotoUrl(photoUrl);
     setReviewResult(result);
@@ -128,11 +133,14 @@ export function App() {
     loadDayData(selectedDate, settings);
   };
 
-  // Update directly entered Calories Burned
-  const handleUpdateCaloriesBurned = async (kcal: number) => {
+  // Update directly entered Active Exercise Calories
+  const handleUpdateActiveBurn = async (activeKcal: number) => {
+    const baseBmr = calculateBMR(settings.profile);
     const updatedActivity: DailyActivity = {
       ...activity,
-      caloriesBurned: kcal,
+      activeCaloriesBurned: activeKcal,
+      baseBmrCalories: baseBmr,
+      totalCaloriesBurned: baseBmr + activeKcal,
       lastUpdated: new Date().toISOString()
     };
     setActivity(updatedActivity);
@@ -144,6 +152,7 @@ export function App() {
   const handleSaveSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
     await saveAppSettings(newSettings);
+    loadDayData(selectedDate, newSettings);
   };
 
   // Select storage location from prompt
@@ -171,7 +180,7 @@ export function App() {
     meals,
     activity,
     totals,
-    netCalories: totals.calories - (activity.caloriesBurned || 0)
+    netCalories: totals.calories - (activity.totalCaloriesBurned || 1700)
   };
 
   return (
@@ -193,11 +202,12 @@ export function App() {
           historyData={historyData}
           onOpenCapture={() => setIsCaptureOpen(true)}
           onDeleteMeal={handleDeleteMeal}
-          onUpdateCaloriesBurned={handleUpdateCaloriesBurned}
+          onUpdateActiveBurn={handleUpdateActiveBurn}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       </main>
 
-      {/* Camera Capture Modal */}
+      {/* Camera / Text Capture Modal */}
       <CameraCapture
         isOpen={isCaptureOpen}
         geminiApiKey={settings.geminiApiKey}
@@ -220,7 +230,7 @@ export function App() {
         />
       )}
 
-      {/* Settings Modal */}
+      {/* Settings & Profile Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         settings={settings}

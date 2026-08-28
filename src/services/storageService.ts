@@ -1,15 +1,25 @@
 import { get, set } from 'idb-keyval';
-import { AppSettings, MealRecord, DailyActivity } from '../types';
+import { AppSettings, MealRecord, DailyActivity, UserProfile } from '../types';
+import { calculateBMR } from '../utils/bmrCalculator';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
 
-const SETTINGS_KEY = 'nutrifit_settings_v3';
+const SETTINGS_KEY = 'nutrifit_settings_v4';
 const MEALS_PREFIX = 'nutrifit_meals_';
 const ACTIVITY_PREFIX = 'nutrifit_activity_';
+
+export const DEFAULT_PROFILE: UserProfile = {
+  gender: 'male',
+  age: 32,
+  weightKg: 75, // ~165 lbs
+  heightCm: 175, // ~5'9"
+  unitSystem: 'imperial'
+};
 
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
   storageLocation: 'local_indexeddb',
   storagePromptDismissed: false,
+  profile: DEFAULT_PROFILE,
   goals: {
     dailyCaloriesTarget: 2000,
     dailyCarbsTarget: 200,
@@ -20,18 +30,27 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export async function getAppSettings(): Promise<AppSettings> {
   try {
-    // 1. Try instant synchronous localStorage first
-    const localSaved = localStorage.getItem(SETTINGS_KEY);
-    if (localSaved) {
-      const parsed = JSON.parse(localSaved);
-      return { ...DEFAULT_SETTINGS, ...parsed, goals: { ...DEFAULT_SETTINGS.goals, ...parsed.goals } };
+    const localStr = localStorage.getItem(SETTINGS_KEY);
+    if (localStr) {
+      const parsed = JSON.parse(localStr);
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
+        goals: { ...DEFAULT_SETTINGS.goals, ...(parsed.goals || {}) }
+      };
     }
 
-    // 2. Fallback to IndexedDB
     const idbSaved = await get<AppSettings>(SETTINGS_KEY);
     if (idbSaved) {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(idbSaved));
-      return { ...DEFAULT_SETTINGS, ...idbSaved, goals: { ...DEFAULT_SETTINGS.goals, ...idbSaved.goals } };
+      const merged = {
+        ...DEFAULT_SETTINGS,
+        ...idbSaved,
+        profile: { ...DEFAULT_PROFILE, ...(idbSaved.profile || {}) },
+        goals: { ...DEFAULT_SETTINGS.goals, ...(idbSaved.goals || {}) }
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+      return merged;
     }
   } catch (e) {
     console.error('Error loading settings:', e);
@@ -41,11 +60,10 @@ export async function getAppSettings(): Promise<AppSettings> {
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
   try {
-    // Save to both localStorage (synchronous & reliable) and IndexedDB
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     await set(SETTINGS_KEY, settings);
   } catch (e) {
-    console.error('Error saving settings locally:', e);
+    console.error('Error saving settings:', e);
   }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
@@ -143,24 +161,47 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
   }
 }
 
-export async function getActivityForDate(date: string): Promise<DailyActivity> {
+export async function getActivityForDate(date: string, settings: AppSettings): Promise<DailyActivity> {
   const localKey = `${ACTIVITY_PREFIX}${date}`;
+  const baseBmr = calculateBMR(settings.profile);
+
   try {
     const localStr = localStorage.getItem(localKey);
-    if (localStr) return JSON.parse(localStr);
-    const saved = await get<DailyActivity>(localKey);
+    if (localStr) {
+      const parsed = JSON.parse(localStr);
+      const active = Number(parsed.activeCaloriesBurned ?? parsed.caloriesBurned) || 0;
+      return {
+        date,
+        activeCaloriesBurned: active,
+        baseBmrCalories: baseBmr,
+        totalCaloriesBurned: baseBmr + active,
+        notes: parsed.notes,
+        lastUpdated: parsed.lastUpdated || new Date().toISOString()
+      };
+    }
+    const saved = await get<any>(localKey);
     if (saved) {
-      localStorage.setItem(localKey, JSON.stringify(saved));
-      return saved;
+      const active = Number(saved.activeCaloriesBurned ?? saved.caloriesBurned) || 0;
+      const act: DailyActivity = {
+        date,
+        activeCaloriesBurned: active,
+        baseBmrCalories: baseBmr,
+        totalCaloriesBurned: baseBmr + active,
+        notes: saved.notes,
+        lastUpdated: saved.lastUpdated || new Date().toISOString()
+      };
+      localStorage.setItem(localKey, JSON.stringify(act));
+      return act;
     }
   } catch (e) {
-    console.error('Error fetching activity from storage:', e);
+    console.error('Error fetching activity:', e);
   }
 
   return {
     date,
-    caloriesBurned: 0,
-    carbsBurned: 0,
+    activeCaloriesBurned: 0,
+    baseBmrCalories: baseBmr,
+    totalCaloriesBurned: baseBmr,
     lastUpdated: new Date().toISOString()
   };
 }
@@ -184,7 +225,7 @@ export async function exportAllDataAsJson(): Promise<string> {
   const exportData: Record<string, any> = {
     settings,
     exportDate: new Date().toISOString(),
-    version: '3.0.0'
+    version: '4.0.0'
   };
   return JSON.stringify(exportData, null, 2);
 }
