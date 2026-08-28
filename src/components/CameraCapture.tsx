@@ -7,7 +7,8 @@ import {
   Sparkles, 
   Loader2, 
   FileText,
-  AlertCircle
+  AlertCircle,
+  Image as ImageIcon
 } from 'lucide-react';
 import { analyzeFoodImage } from '../services/geminiService';
 import { GeminiAnalysisResult } from '../types';
@@ -33,28 +34,36 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   // Initialize camera stream
   useEffect(() => {
     let activeStream: MediaStream | null = null;
 
     if (isOpen && !capturedImage) {
-      navigator.mediaDevices?.getUserMedia({
-        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
-      })
-      .then(stream => {
-        activeStream = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          setStreamActive(true);
-        }
-      })
-      .catch(err => {
-        console.warn('Camera stream not available, falling back to file input:', err);
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        })
+        .then(stream => {
+          activeStream = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().then(() => {
+              setStreamActive(true);
+            }).catch(() => {
+              setStreamActive(false);
+            });
+          }
+        })
+        .catch(err => {
+          console.log('Live WebRTC stream not active (will use native phone camera):', err);
+          setStreamActive(false);
+        });
+      } else {
         setStreamActive(false);
-      });
+      }
     }
 
     return () => {
@@ -97,18 +106,30 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   };
 
   const handleCaptureFrame = async () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (streamActive && videoRef.current && videoRef.current.videoWidth > 0) {
+      try {
+        const video = videoRef.current;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const optimized = await resizeAndConvertImage(rawDataUrl);
+          setCapturedImage(optimized);
+          return;
+        }
+      } catch (e) {
+        console.warn('Frame capture failed, opening camera input:', e);
+      }
+    }
+    // Fallback to opening phone's native camera
+    cameraInputRef.current?.click();
+  };
 
-    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    const optimized = await resizeAndConvertImage(rawDataUrl);
-    setCapturedImage(optimized);
+  const handleOpenGallery = () => {
+    galleryInputRef.current?.click();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +144,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       }
     };
     reader.readAsDataURL(file);
+    // Reset input so same photo can be re-selected if desired
+    e.target.value = '';
   };
 
   const handleAnalyze = async () => {
@@ -161,7 +184,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
               <Camera className="w-5 h-5" />
             </div>
-            <h2 className="text-base font-bold text-white">Capture Food Photo</h2>
+            <h2 className="text-base font-bold text-white">Log Food Photo</h2>
           </div>
           <button
             onClick={onClose}
@@ -172,12 +195,12 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         </div>
 
         {/* Viewfinder / Image Display */}
-        <div className="relative bg-black flex-1 min-h-[320px] max-h-[440px] flex items-center justify-center overflow-hidden">
+        <div className="relative bg-black flex-1 min-h-[300px] max-h-[420px] flex items-center justify-center overflow-hidden">
           {capturedImage ? (
             <img
               src={capturedImage}
               alt="Captured meal"
-              className="w-full h-full object-contain max-h-[440px]"
+              className="w-full h-full object-contain max-h-[420px]"
             />
           ) : streamActive ? (
             <video
@@ -188,26 +211,36 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="text-center p-6 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-400 border border-slate-700">
+            <div className="text-center p-6 space-y-4 max-w-xs">
+              <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-cyan-400 border border-slate-700">
                 <Camera className="w-8 h-8" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-200">Camera access ready</p>
-                <p className="text-xs text-slate-400 mt-1">Take a photo or choose an existing picture from your phone gallery</p>
+                <p className="text-sm font-bold text-white">Ready to snap or upload</p>
+                <p className="text-xs text-slate-400 mt-1">Take a new photo with your phone camera or select from your photo gallery</p>
               </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-2 transition"
-              >
-                <Upload className="w-4 h-4" />
-                <span>Upload from Gallery</span>
-              </button>
+              <div className="flex justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCaptureFrame}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Take Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenGallery}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition border border-slate-700"
+                >
+                  <ImageIcon className="w-4 h-4 text-emerald-400" />
+                  <span>Gallery</span>
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Camera controls overlay when stream is active and not captured */}
+          {/* Camera switch button when stream is active */}
           {streamActive && !capturedImage && (
             <div className="absolute top-3 right-3 flex space-x-2">
               <button
@@ -220,12 +253,21 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             </div>
           )}
 
-          {/* Hidden File Input */}
+          {/* Hidden Native Camera Input (Forces Camera) */}
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+
+          {/* Hidden Gallery Input (Forces Photo Library / Album Picker) */}
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
             className="hidden"
             onChange={handleFileUpload}
           />
@@ -248,7 +290,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               type="text"
               value={userNotes}
               onChange={e => setUserNotes(e.target.value)}
-              placeholder="Optional notes (e.g., olive oil dressing, 2 slices)"
+              placeholder="Optional notes (e.g. almond milk, no croutons)"
               className="bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none w-full"
             />
           </div>
@@ -277,7 +319,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 fill-current" />
-                      <span>Analyze Food & Macros</span>
+                      <span>Analyze Food & Calories</span>
                     </>
                   )}
                 </button>
@@ -286,10 +328,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5"
+                  onClick={handleOpenGallery}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-slate-700"
                 >
-                  <Upload className="w-4 h-4" />
+                  <ImageIcon className="w-4 h-4 text-emerald-400" />
                   <span>Gallery</span>
                 </button>
                 <button
