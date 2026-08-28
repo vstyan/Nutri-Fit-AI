@@ -132,7 +132,9 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
           <input
             type="number"
             step="0.1"
-            value={inputWeight}
+            value={inputWeight === '0' ? '' : inputWeight}
+            placeholder="0"
+            onFocus={e => e.target.select()}
             onChange={e => setInputWeight(e.target.value)}
             className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg text-white font-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
           />

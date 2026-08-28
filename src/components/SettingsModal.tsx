@@ -1,32 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Save, 
   Key, 
-  Cloud, 
-  HardDrive, 
+  ExternalLink, 
   Target, 
-  Download, 
-  Upload,
-  ExternalLink,
-  CheckCircle2,
-  AlertCircle,
+  ShieldCheck, 
+  Check, 
+  Cloud, 
+  Database,
   User,
   Flame,
-  Trash2,
+  Download,
+  Upload,
   AlertTriangle,
-  RefreshCw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
-import { AppSettings, Gender, UserProfile } from '../types';
-import { calculateBMR, kgToLbs, lbsToKg, cmToFeetInches, feetInchesToCm } from '../utils/bmrCalculator';
-import { exportAllDataAsJson, importBackupJson, clearAllAppData } from '../services/storageService';
-
-declare const google: any;
+import { AppSettings, Gender, UnitSystem } from '../types';
+import { 
+  calculateBMR, 
+  kgToLbs, 
+  lbsToKg, 
+  cmToFeetInches, 
+  feetInchesToCm 
+} from '../utils/bmrCalculator';
+import { 
+  exportAllDataAsJson, 
+  importBackupJson, 
+  clearAllAppData 
+} from '../services/storageService';
 
 interface SettingsModalProps {
   isOpen: boolean;
   settings: AppSettings;
-  onSaveSettings: (newSettings: AppSettings) => void;
+  onSaveSettings: (settings: AppSettings) => void;
   onClose: () => void;
 }
 
@@ -36,30 +43,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveSettings,
   onClose
 }) => {
-  const [formData, setFormData] = useState<AppSettings>({ ...settings });
+  const [formData, setFormData] = useState<AppSettings>(settings);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
-  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
-  const importFileRef = useRef<HTMLInputElement | null>(null);
-
-  // Imperial display states
+  // Imperial unit helper states
   const [weightLbs, setWeightLbs] = useState<number>(() => kgToLbs(settings.profile.weightKg || 75));
   const [heightFt, setHeightFt] = useState<number>(() => cmToFeetInches(settings.profile.heightCm || 175).feet);
   const [heightIn, setHeightIn] = useState<number>(() => cmToFeetInches(settings.profile.heightCm || 175).inches);
 
-  // Sync internal state when settings are loaded or modal opens
+  // Backup and clear modal states
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
+
+  // Sync formData whenever settings changes or modal opens
   useEffect(() => {
     if (isOpen) {
-      setFormData({ ...settings });
+      setFormData(settings);
       setWeightLbs(kgToLbs(settings.profile.weightKg || 75));
-      const fi = cmToFeetInches(settings.profile.heightCm || 175);
-      setHeightFt(fi.feet);
-      setHeightIn(fi.inches);
+      const { feet, inches } = cmToFeetInches(settings.profile.heightCm || 175);
+      setHeightFt(feet);
+      setHeightIn(inches);
       setImportStatus(null);
+      setShowClearConfirm(false);
+      setClearSuccessMessage(false);
     }
   }, [isOpen, settings]);
 
@@ -67,7 +75,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const currentBMR = calculateBMR(formData.profile);
 
-  const handleProfileChange = (field: keyof UserProfile, value: any) => {
+  const handleProfileChange = (field: keyof typeof formData.profile, value: any) => {
     setFormData(prev => ({
       ...prev,
       profile: {
@@ -77,22 +85,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }));
   };
 
-  const handleWeightLbsChange = (lbs: number) => {
-    setWeightLbs(lbs);
-    handleProfileChange('weightKg', lbsToKg(lbs));
-  };
-
-  const handleHeightFtChange = (ft: number) => {
-    setHeightFt(ft);
-    handleProfileChange('heightCm', feetInchesToCm(ft, heightIn));
-  };
-
-  const handleHeightInChange = (inch: number) => {
-    setHeightIn(inch);
-    handleProfileChange('heightCm', feetInchesToCm(heightFt, inch));
-  };
-
-  const handleGoalChange = (field: keyof AppSettings['goals'], value: number) => {
+  const handleGoalChange = (field: keyof typeof formData.goals, value: number) => {
     setFormData(prev => ({
       ...prev,
       goals: {
@@ -102,41 +95,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }));
   };
 
-  const handleGoogleLogin = () => {
-    if (!formData.googleClientId) {
-      setGoogleAuthError('Please enter your Google OAuth Client ID first.');
-      return;
-    }
+  // Imperial weight handler (converts lbs -> kg for storage)
+  const handleWeightLbsChange = (lbs: number) => {
+    setWeightLbs(lbs);
+    handleProfileChange('weightKg', lbsToKg(lbs));
+  };
 
-    try {
-      if (typeof google === 'undefined' || !google.accounts?.oauth2) {
-        setGoogleAuthError('Google Identity Services SDK is still loading. Check your internet connection.');
-        return;
-      }
+  // Imperial height handler (converts ft+in -> cm for storage)
+  const handleHeightFtChange = (ft: number) => {
+    setHeightFt(ft);
+    handleProfileChange('heightCm', feetInchesToCm(ft, heightIn));
+  };
 
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: formData.googleClientId,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: (tokenResponse: any) => {
-          if (tokenResponse.error) {
-            setGoogleAuthError(`Google Sign-In error: ${tokenResponse.error_description || tokenResponse.error}`);
-            return;
-          }
-          if (tokenResponse.access_token) {
-            setFormData(prev => ({
-              ...prev,
-              googleAccessToken: tokenResponse.access_token,
-              storageLocation: 'google_drive'
-            }));
-            setGoogleAuthError(null);
-          }
-        }
-      });
-
-      client.requestAccessToken();
-    } catch (e: any) {
-      setGoogleAuthError(e.message || 'Failed to initialize Google OAuth client.');
-    }
+  const handleHeightInChange = (inch: number) => {
+    setHeightIn(inch);
+    handleProfileChange('heightCm', feetInchesToCm(heightFt, inch));
   };
 
   const handleExportBackup = async () => {
@@ -245,7 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Your age, weight, and height are used to calculate your natural <strong>Basal Metabolic Rate (BMR)</strong>—the base calories burned automatically every day at rest.
+              Your age, weight, and height calculate your <strong>Basal Metabolic Rate (BMR)</strong>—the natural base calories burned automatically every day at rest.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
@@ -267,8 +240,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <label className="text-[10px] text-slate-400 block mb-1 font-semibold">Age (years)</label>
                 <input
                   type="number"
-                  value={formData.profile.age}
-                  onChange={e => handleProfileChange('age', parseInt(e.target.value) || 0)}
+                  value={formData.profile.age === 0 ? '' : formData.profile.age}
+                  placeholder="30"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleProfileChange('age', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
@@ -279,8 +254,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="text-[10px] text-slate-400 block mb-1 font-semibold">Weight (lbs)</label>
                   <input
                     type="number"
-                    value={weightLbs}
-                    onChange={e => handleWeightLbsChange(parseFloat(e.target.value) || 0)}
+                    step="0.1"
+                    value={weightLbs === 0 ? '' : weightLbs}
+                    placeholder="165"
+                    onFocus={e => e.target.select()}
+                    onChange={e => handleWeightLbsChange(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
                   />
                 </div>
@@ -289,8 +267,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="text-[10px] text-slate-400 block mb-1 font-semibold">Weight (kg)</label>
                   <input
                     type="number"
-                    value={formData.profile.weightKg}
-                    onChange={e => handleProfileChange('weightKg', parseFloat(e.target.value) || 0)}
+                    step="0.1"
+                    value={formData.profile.weightKg === 0 ? '' : formData.profile.weightKg}
+                    placeholder="75"
+                    onFocus={e => e.target.select()}
+                    onChange={e => handleProfileChange('weightKg', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
                   />
                 </div>
@@ -303,16 +284,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="flex gap-1">
                     <input
                       type="number"
-                      value={heightFt}
-                      onChange={e => handleHeightFtChange(parseInt(e.target.value) || 0)}
-                      placeholder="ft"
+                      value={heightFt === 0 ? '' : heightFt}
+                      placeholder="5"
+                      onFocus={e => e.target.select()}
+                      onChange={e => handleHeightFtChange(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                       className="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-1.5 text-xs text-white font-bold text-center"
                     />
                     <input
                       type="number"
-                      value={heightIn}
-                      onChange={e => handleHeightInChange(parseInt(e.target.value) || 0)}
-                      placeholder="in"
+                      value={heightIn === 0 ? '' : heightIn}
+                      placeholder="9"
+                      onFocus={e => e.target.select()}
+                      onChange={e => handleHeightInChange(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                       className="w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-1.5 py-1.5 text-xs text-white font-bold text-center"
                     />
                   </div>
@@ -322,8 +305,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="text-[10px] text-slate-400 block mb-1 font-semibold">Height (cm)</label>
                   <input
                     type="number"
-                    value={formData.profile.heightCm}
-                    onChange={e => handleProfileChange('heightCm', parseInt(e.target.value) || 0)}
+                    value={formData.profile.heightCm === 0 ? '' : formData.profile.heightCm}
+                    placeholder="175"
+                    onFocus={e => e.target.select()}
+                    onChange={e => handleProfileChange('heightCm', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
                   />
                 </div>
@@ -354,41 +339,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Target className="w-4 h-4" />
               <span>Daily Target Goals</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               <div>
                 <span className="text-[10px] text-emerald-400 font-semibold block mb-1">Calories (kcal)</span>
                 <input
                   type="number"
-                  value={formData.goals.dailyCaloriesTarget}
-                  onChange={e => handleGoalChange('dailyCaloriesTarget', parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
+                  value={formData.goals.dailyCaloriesTarget === 0 ? '' : formData.goals.dailyCaloriesTarget}
+                  placeholder="2000"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyCaloriesTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
               <div>
                 <span className="text-[10px] text-sky-400 font-semibold block mb-1">Carbs (g)</span>
                 <input
                   type="number"
-                  value={formData.goals.dailyCarbsTarget}
-                  onChange={e => handleGoalChange('dailyCarbsTarget', parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
+                  value={formData.goals.dailyCarbsTarget === 0 ? '' : formData.goals.dailyCarbsTarget}
+                  placeholder="200"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyCarbsTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-indigo-400 font-semibold block mb-1">Fiber (g)</span>
+                <input
+                  type="number"
+                  value={formData.goals.dailyFiberTarget === 0 ? '' : (formData.goals.dailyFiberTarget || 30)}
+                  placeholder="30"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyFiberTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
               <div>
                 <span className="text-[10px] text-rose-400 font-semibold block mb-1">Protein (g)</span>
                 <input
                   type="number"
-                  value={formData.goals.dailyProteinTarget}
-                  onChange={e => handleGoalChange('dailyProteinTarget', parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
+                  value={formData.goals.dailyProteinTarget === 0 ? '' : formData.goals.dailyProteinTarget}
+                  placeholder="140"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyProteinTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
               <div>
                 <span className="text-[10px] text-amber-400 font-semibold block mb-1">Fat (g)</span>
                 <input
                   type="number"
-                  value={formData.goals.dailyFatTarget}
-                  onChange={e => handleGoalChange('dailyFatTarget', parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
+                  value={formData.goals.dailyFatTarget === 0 ? '' : formData.goals.dailyFatTarget}
+                  placeholder="65"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyFatTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
             </div>
@@ -431,159 +435,145 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, storageLocation: 'local_indexeddb' }))}
-                className={`p-3 rounded-xl border text-left transition ${
+                className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition ${
                   formData.storageLocation === 'local_indexeddb'
-                    ? 'bg-cyan-950/40 border-cyan-500 ring-1 ring-cyan-500'
-                    : 'bg-slate-800/60 border-slate-700 hover:bg-slate-800'
+                    ? 'border-cyan-500 bg-cyan-500/10'
+                    : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
                 }`}
               >
-                <div className="flex items-center space-x-2">
-                  <HardDrive className="w-4 h-4 text-indigo-400" />
-                  <span className="font-semibold text-xs text-white">Local Device</span>
+                <div className="flex items-center justify-between mb-2">
+                  <Database className={`w-5 h-5 ${formData.storageLocation === 'local_indexeddb' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  {formData.storageLocation === 'local_indexeddb' && (
+                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">100% offline & private in browser IndexedDB</p>
+                <div>
+                  <div className="text-xs font-bold text-white">Local Device</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Private on this phone/browser</div>
+                </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, storageLocation: 'google_drive' }))}
-                className={`p-3 rounded-xl border text-left transition ${
+                className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition ${
                   formData.storageLocation === 'google_drive'
-                    ? 'bg-cyan-950/40 border-cyan-500 ring-1 ring-cyan-500'
-                    : 'bg-slate-800/60 border-slate-700 hover:bg-slate-800'
+                    ? 'border-cyan-500 bg-cyan-500/10'
+                    : 'border-slate-700 bg-slate-800/50 hover:bg-slate-800'
                 }`}
               >
-                <div className="flex items-center space-x-2">
-                  <Cloud className="w-4 h-4 text-emerald-400" />
-                  <span className="font-semibold text-xs text-white">Google Drive</span>
+                <div className="flex items-center justify-between mb-2">
+                  <Cloud className={`w-5 h-5 ${formData.storageLocation === 'google_drive' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  {formData.storageLocation === 'google_drive' && (
+                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Dedicated folder in your personal Drive</p>
+                <div>
+                  <div className="text-xs font-bold text-white">Google Drive</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Sync across all devices</div>
+                </div>
               </button>
             </div>
           </div>
 
-          {/* Optional Google Drive OAuth config */}
-          {formData.storageLocation === 'google_drive' && (
-            <div className="space-y-3 bg-slate-800/40 border border-slate-700/60 rounded-xl p-4">
-              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Cloud className="w-4 h-4" />
-                <span>Google Drive Connection</span>
-              </label>
-              <div>
-                <label className="text-[11px] text-slate-300 block mb-1">Google OAuth 2.0 Client ID (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.googleClientId || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, googleClientId: e.target.value }))}
-                  placeholder="xxxxxx.apps.googleusercontent.com"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono placeholder-slate-500"
-                />
-              </div>
+          {/* 5. Backup, Restore & Clear Data Management */}
+          <div className="space-y-3 pt-2 border-t border-slate-800">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Data Backup & Management</span>
+            </label>
 
-              {googleAuthError && (
-                <div className="text-xs text-rose-400 flex items-center gap-1.5 bg-rose-950/40 p-2 rounded-lg border border-rose-500/30">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{googleAuthError}</span>
-                </div>
-              )}
-
-              <div className="pt-1 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 shadow"
-                >
-                  <Cloud className="w-3.5 h-3.5" />
-                  <span>{formData.googleAccessToken ? 'Re-authenticate' : 'Connect Google Drive'}</span>
-                </button>
-
-                {formData.googleAccessToken && (
-                  <span className="text-xs text-emerald-400 flex items-center gap-1 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Drive Connected</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 5. Backup Export, Restore & Reset */}
-          <div className="pt-3 border-t border-slate-800 space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Export Backup */}
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5"
+              >
+                <Download className="w-4 h-4 text-cyan-400 shrink-0" />
                 <div>
-                  <span className="text-xs font-bold text-slate-200 block">Backup & Restore</span>
-                  <span className="text-[11px] text-slate-400">Save all food records or restore from a JSON backup file.</span>
+                  <div className="text-xs font-bold">Export Backup</div>
+                  <div className="text-[10px] text-slate-400">Save full JSON file</div>
                 </div>
-              </div>
+              </button>
 
-              <div className="flex flex-wrap gap-2 pt-1">
-                {/* Export Button */}
-                <button
-                  type="button"
-                  onClick={handleExportBackup}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700 shadow"
-                >
-                  <Download className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Export Backup (.json)</span>
-                </button>
-
-                {/* Import Button */}
-                <button
-                  type="button"
-                  onClick={() => importFileRef.current?.click()}
-                  disabled={isImporting}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700 shadow disabled:opacity-50"
-                >
-                  <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{isImporting ? 'Importing...' : 'Restore Backup (.json)'}</span>
-                </button>
-
+              {/* Import Restore */}
+              <label className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5 cursor-pointer">
+                <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold">Restore Backup</div>
+                  <div className="text-[10px] text-slate-400">Upload .json backup</div>
+                </div>
                 <input
-                  ref={importFileRef}
                   type="file"
                   accept=".json,application/json"
                   className="hidden"
                   onChange={handleImportFileSelected}
                 />
-              </div>
-
-              {/* Import status message */}
-              {importStatus && (
-                <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
-                  importStatus.type === 'success'
-                    ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
-                    : 'bg-rose-950/60 border border-rose-500/40 text-rose-300'
-                }`}>
-                  {importStatus.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                  )}
-                  <span>{importStatus.message}</span>
-                </div>
-              )}
+              </label>
             </div>
 
-            {/* Danger Zone: Clear Data */}
-            <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Reset & Clear All Records</span>
-                </span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">Deletes all logged meals & activity history.</span>
+            {/* Import Status Alert */}
+            {importStatus && (
+              <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
+                importStatus.type === 'success'
+                  ? 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-300'
+                  : 'bg-rose-950/60 border border-rose-500/30 text-rose-300'
+              }`}>
+                {importStatus.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                <span>{importStatus.message}</span>
               </div>
+            )}
+
+            {/* Clear All App Data Trigger */}
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={() => setShowClearConfirm(true)}
-                className="px-3 py-1.5 bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-300 rounded-lg text-xs font-bold transition shadow"
+                className="w-full py-2.5 px-3 bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:border-rose-500/40 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition"
               >
-                Clear Data...
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Clear & Reset All App Data...</span>
               </button>
             </div>
           </div>
         </form>
+
+        {/* Clear Data Confirmation Modal Overlay */}
+        {showClearConfirm && (
+          <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md p-6 flex flex-col justify-center items-center text-center space-y-4 animate-in fade-in duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5 max-w-sm">
+              <h3 className="text-base font-bold text-white">Reset All App Data?</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                This will delete all logged meals, photos, weights, and daily exercise histories from your device storage.
+              </p>
+              <p className="text-[11px] text-amber-400/90 pt-1 font-medium">
+                💡 Tip: You can download an Export Backup first so you never lose your history.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteClearAll}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-rose-600/30"
+              >
+                Yes, Reset Data
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
@@ -601,80 +591,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             {saveSuccess ? (
               <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                <Check className="w-4 h-4" />
                 <span>Saved!</span>
               </>
             ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>Save Settings</span>
-              </>
+              <span>Save Settings</span>
             )}
           </button>
         </div>
       </div>
-
-      {/* Safety Confirmation Modal for Clear Data */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-rose-500/50 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/30">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Clear All App Data?</h3>
-                <p className="text-xs text-slate-400">Permanently erase food logs & history</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              This will permanently delete all your logged meals, photos, and exercise history. Your Gemini API key and profile settings will be preserved.
-            </p>
-
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-medium">Download backup first:</span>
-              <button
-                type="button"
-                onClick={handleExportBackup}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 rounded-lg transition inline-flex items-center space-x-1"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Save Backup (.json)</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExecuteClearAll}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-rose-600/30"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Yes, Delete All Data</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Clear Success Feedback */}
-      {clearSuccessMessage && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
-          <div className="bg-slate-900 border border-emerald-500/50 p-5 rounded-2xl text-center space-y-2 max-w-xs shadow-2xl">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-            <h3 className="text-sm font-bold text-white">Data Cleared</h3>
-            <p className="text-xs text-slate-400">Reloading clean application...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

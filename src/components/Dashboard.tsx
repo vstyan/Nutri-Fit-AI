@@ -243,9 +243,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="relative flex-1 w-full">
               <input
                 type="number"
-                value={inputActiveKcal}
-                onChange={e => setInputActiveKcal(e.target.value)}
+                value={inputActiveKcal === '0' ? '' : inputActiveKcal}
                 placeholder="e.g. 450 (walking, workout, running)"
+                onFocus={e => e.target.select()}
+                onChange={e => setInputActiveKcal(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
               />
               <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">active kcal</span>

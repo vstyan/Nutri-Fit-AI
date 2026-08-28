@@ -162,6 +162,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                   <input
                     type="text"
                     value={title}
+                    onFocus={e => e.target.select()}
                     onChange={e => setTitle(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition"
                   />
@@ -283,6 +284,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                       <input
                         type="text"
                         value={item.name}
+                        onFocus={e => e.target.select()}
                         onChange={e => handleUpdateItem(item.id, 'name', e.target.value)}
                         placeholder="Item name"
                         className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-medium flex-1"
@@ -290,6 +292,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                       <input
                         type="text"
                         value={item.portion}
+                        onFocus={e => e.target.select()}
                         onChange={e => handleUpdateItem(item.id, 'portion', e.target.value)}
                         placeholder="Portion (e.g. 150g)"
                         className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 w-28 text-center"
@@ -308,8 +311,10 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         <span className="text-[10px] text-sky-400 font-medium block">Carbs (g)</span>
                         <input
                           type="number"
-                          value={item.carbs}
-                          onChange={e => handleUpdateItem(item.id, 'carbs', parseFloat(e.target.value) || 0)}
+                          value={item.carbs === 0 ? '' : item.carbs}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'carbs', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
@@ -317,8 +322,10 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         <span className="text-[10px] text-indigo-400 font-medium block">Fiber (g)</span>
                         <input
                           type="number"
-                          value={item.fiber}
-                          onChange={e => handleUpdateItem(item.id, 'fiber', parseFloat(e.target.value) || 0)}
+                          value={item.fiber === 0 ? '' : item.fiber}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'fiber', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
@@ -326,8 +333,10 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         <span className="text-[10px] text-rose-400 font-medium block">Protein (g)</span>
                         <input
                           type="number"
-                          value={item.protein}
-                          onChange={e => handleUpdateItem(item.id, 'protein', parseFloat(e.target.value) || 0)}
+                          value={item.protein === 0 ? '' : item.protein}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'protein', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
@@ -335,8 +344,10 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         <span className="text-[10px] text-amber-400 font-medium block">Fat (g)</span>
                         <input
                           type="number"
-                          value={item.fat}
-                          onChange={e => handleUpdateItem(item.id, 'fat', parseFloat(e.target.value) || 0)}
+                          value={item.fat === 0 ? '' : item.fat}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'fat', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
@@ -344,8 +355,10 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         <span className="text-[10px] text-emerald-400 font-medium block">Calories</span>
                         <input
                           type="number"
-                          value={item.calories}
-                          onChange={e => handleUpdateItem(item.id, 'calories', parseFloat(e.target.value) || 0)}
+                          value={item.calories === 0 ? '' : item.calories}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'calories', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
