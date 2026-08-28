@@ -100,9 +100,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const fatCalories = Math.round(totals.fat * 9);
 
   return (
-    <div className="space-y-5 pb-24 max-w-4xl mx-auto px-4 pt-4">
+    <div className="space-y-5 pb-28 max-w-4xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
       {/* 1. Hero Card: Calories In vs. Total Calories Burned */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl">
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
@@ -115,45 +115,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 my-5">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 my-4 sm:my-5">
           {/* Calories Consumed */}
-          <div className="bg-slate-950/60 border border-sky-500/20 rounded-2xl p-3.5 text-center">
-            <div className="text-[11px] font-semibold text-sky-400 uppercase tracking-wider">Calories In</div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-1">
-              {totals.calories} <span className="text-xs font-normal text-slate-400">kcal</span>
+          <div className="bg-slate-950/60 border border-sky-500/20 rounded-2xl p-3 sm:p-3.5 text-center">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-sky-400 uppercase tracking-wider">Calories In</div>
+            <div className="text-xl sm:text-3xl font-black text-white mt-1">
+              {totals.calories} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">Target: {goals.dailyCaloriesTarget} kcal</div>
+            <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Target: {goals.dailyCaloriesTarget}</div>
           </div>
 
           {/* Total Calories Burned */}
-          <div className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3.5 text-center">
-            <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Total Burned</div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-1">
-              {totalBurned} <span className="text-xs font-normal text-slate-400">kcal</span>
+          <div className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Total Burned</div>
+            <div className="text-xl sm:text-3xl font-black text-white mt-1">
+              {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[10px] text-emerald-400 mt-1">{baseBmr} base + {activeKcalValue} active</div>
+            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5">{baseBmr} base + {activeKcalValue} act</div>
           </div>
 
           {/* Net Balance */}
-          <div className={`border rounded-2xl p-3.5 text-center ${
+          <div className={`border rounded-2xl p-3 sm:p-3.5 text-center ${
             isCaloricDeficit 
               ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' 
               : 'bg-amber-950/30 border-amber-500/40 text-amber-300'
           }`}>
-            <div className="text-[11px] font-semibold uppercase tracking-wider">Net Balance</div>
-            <div className="text-2xl sm:text-3xl font-black text-white mt-1 flex items-center justify-center gap-0.5">
-              {netCalories > 0 ? `+${netCalories}` : netCalories} <span className="text-xs font-normal text-slate-400">kcal</span>
+            <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Net Balance</div>
+            <div className="text-xl sm:text-3xl font-black text-white mt-1 flex items-center justify-center gap-0.5">
+              {netCalories > 0 ? `+${netCalories}` : netCalories} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[10px] font-medium mt-1 flex items-center justify-center gap-1">
+            <div className="text-[9px] sm:text-[10px] font-medium mt-0.5 flex items-center justify-center gap-1">
               {isCaloricDeficit ? (
                 <>
                   <TrendingDown className="w-3 h-3 text-emerald-400" />
-                  <span>Caloric Deficit</span>
+                  <span>Deficit</span>
                 </>
               ) : (
                 <>
                   <TrendingUp className="w-3 h-3 text-amber-400" />
-                  <span>Caloric Surplus</span>
+                  <span>Surplus</span>
                 </>
               )}
             </div>
@@ -382,8 +382,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         isImperial={settings.profile.unitSystem === 'imperial'}
       />
 
-      {/* 7. Floating Action Button on Mobile */}
-      <div className="fixed bottom-6 right-6 z-40">
+      {/* 7. Floating Action Button on Mobile with iOS Home Bar Safe Inset */}
+      <div 
+        className="fixed z-40"
+        style={{
+          bottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px))',
+          right: 'max(20px, calc(env(safe-area-inset-right, 0px) + 16px))'
+        }}
+      >
         <button
           onClick={onOpenCapture}
           className="p-4 bg-gradient-to-tr from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 font-bold rounded-2xl shadow-2xl shadow-cyan-500/40 transition hover:scale-105 active:scale-95 flex items-center space-x-2"
