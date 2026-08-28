@@ -9,8 +9,8 @@ import {
   ChevronDown, 
   ChevronUp, 
   Zap, 
-  ShieldCheck,
-  Utensils
+  Wheat,
+  Star
 } from 'lucide-react';
 import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
 
@@ -34,6 +34,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const [title, setTitle] = useState(initialResult.title);
   const [mealType, setMealType] = useState<MealType>(initialResult.mealType || 'lunch');
   const [notes, setNotes] = useState(initialResult.dietaryNotes || '');
+  const [isFavorite, setIsFavorite] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [items, setItems] = useState<FoodItem[]>(
     initialResult.items.map((item, idx) => ({
@@ -42,6 +43,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       portion: item.portion,
       grams: item.grams,
       carbs: item.carbs,
+      fiber: item.fiber || 0,
       protein: item.protein,
       fat: item.fat,
       calories: item.calories,
@@ -53,6 +55,8 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
 
   // Calculate live totals
   const totalCarbs = Math.round(items.reduce((sum, item) => sum + (Number(item.carbs) || 0), 0) * 10) / 10;
+  const totalFiber = Math.round(items.reduce((sum, item) => sum + (Number(item.fiber) || 0), 0) * 10) / 10;
+  const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
   const totalProtein = Math.round(items.reduce((sum, item) => sum + (Number(item.protein) || 0), 0) * 10) / 10;
   const totalFat = Math.round(items.reduce((sum, item) => sum + (Number(item.fat) || 0), 0) * 10) / 10;
   const totalCalories = Math.round(items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0));
@@ -62,8 +66,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       prev.map(it => {
         if (it.id !== id) return it;
         const updated = { ...it, [field]: value };
-        // Recalculate calories if macros changed
-        if (['carbs', 'protein', 'fat'].includes(field)) {
+        if (['carbs', 'protein', 'fat', 'fiber'].includes(field)) {
           const c = Number(field === 'carbs' ? value : it.carbs) || 0;
           const p = Number(field === 'protein' ? value : it.protein) || 0;
           const f = Number(field === 'fat' ? value : it.fat) || 0;
@@ -81,6 +84,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       portion: '1 serving',
       grams: 100,
       carbs: 10,
+      fiber: 2,
       protein: 5,
       fat: 2,
       calories: 78,
@@ -103,10 +107,13 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       notes,
       items,
       totalCarbs,
+      totalFiber,
+      netCarbs,
       totalProtein,
       totalFat,
       totalCalories,
-      photoUrl
+      photoUrl,
+      isFavorite
     };
     onSave(meal);
   };
@@ -122,7 +129,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white leading-tight">Meal Analysis Review</h2>
-              <p className="text-xs text-slate-400">Gemini Vision Nutrition Estimate</p>
+              <p className="text-xs text-slate-400">Gemini AI Nutrition & Macro Breakdown</p>
             </div>
           </div>
           <button
@@ -137,20 +144,40 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1">
           {/* Meal Photo & Title */}
           <div className="flex flex-col sm:flex-row gap-4 items-start">
-            {photoUrl && (
+            {photoUrl ? (
               <div className="w-full sm:w-32 h-32 rounded-xl overflow-hidden border border-slate-700 shrink-0 relative bg-slate-950">
                 <img src={photoUrl} alt="Meal" className="w-full h-full object-cover" />
               </div>
+            ) : (
+              <div className="w-full sm:w-28 h-28 rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center text-cyan-400 shrink-0">
+                <Sparkles className="w-8 h-8" />
+                <span className="text-[10px] text-slate-400 mt-1 font-semibold">Text/Voice Log</span>
+              </div>
             )}
+
             <div className="flex-1 space-y-2.5 w-full">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Meal Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition"
-                />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Meal Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFavorite(!isFavorite)}
+                  title={isFavorite ? 'Saved as Favorite' : 'Save as Favorite'}
+                  className={`p-2 rounded-xl border transition mt-4 ${
+                    isFavorite 
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' 
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-amber-400'
+                  }`}
+                >
+                  <Star className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+                </button>
               </div>
 
               <div>
@@ -175,23 +202,42 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
             </div>
           </div>
 
-          {/* Macro Quick Cards */}
-          <div className="grid grid-cols-4 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-            <div className="text-center p-2 rounded-lg bg-sky-950/40 border border-sky-500/20">
-              <div className="text-[11px] font-medium text-sky-400">Carbs</div>
-              <div className="text-lg font-bold text-white mt-0.5">{totalCarbs}<span className="text-xs font-normal text-slate-400">g</span></div>
+          {/* Macro Quick Cards with Fiber & Net Carbs */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+              <div className="text-center p-2 rounded-lg bg-sky-950/40 border border-sky-500/20">
+                <div className="text-[10px] font-medium text-sky-400">Total Carbs</div>
+                <div className="text-base font-bold text-white mt-0.5">{totalCarbs}<span className="text-[10px] font-normal text-slate-400">g</span></div>
+              </div>
+
+              <div className="text-center p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/20">
+                <div className="text-[10px] font-medium text-indigo-400">Fiber</div>
+                <div className="text-base font-bold text-white mt-0.5">{totalFiber}<span className="text-[10px] font-normal text-slate-400">g</span></div>
+              </div>
+
+              <div className="text-center p-2 rounded-lg bg-cyan-950/40 border border-cyan-500/20">
+                <div className="text-[10px] font-medium text-cyan-300">Net Carbs</div>
+                <div className="text-base font-extrabold text-cyan-300 mt-0.5">{netCarbs}<span className="text-[10px] font-normal text-slate-400">g</span></div>
+              </div>
+
+              <div className="text-center p-2 rounded-lg bg-rose-950/40 border border-rose-500/20">
+                <div className="text-[10px] font-medium text-rose-400">Protein</div>
+                <div className="text-base font-bold text-white mt-0.5">{totalProtein}<span className="text-[10px] font-normal text-slate-400">g</span></div>
+              </div>
+
+              <div className="text-center p-2 rounded-lg bg-amber-950/40 border border-amber-500/20">
+                <div className="text-[10px] font-medium text-amber-400">Fat</div>
+                <div className="text-base font-bold text-white mt-0.5">{totalFat}<span className="text-[10px] font-normal text-slate-400">g</span></div>
+              </div>
+
+              <div className="text-center p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20">
+                <div className="text-[10px] font-medium text-emerald-400">Calories</div>
+                <div className="text-base font-bold text-white mt-0.5">{totalCalories}<span className="text-[10px] font-normal text-slate-400">kcal</span></div>
+              </div>
             </div>
-            <div className="text-center p-2 rounded-lg bg-rose-950/40 border border-rose-500/20">
-              <div className="text-[11px] font-medium text-rose-400">Protein</div>
-              <div className="text-lg font-bold text-white mt-0.5">{totalProtein}<span className="text-xs font-normal text-slate-400">g</span></div>
-            </div>
-            <div className="text-center p-2 rounded-lg bg-amber-950/40 border border-amber-500/20">
-              <div className="text-[11px] font-medium text-amber-400">Fat</div>
-              <div className="text-lg font-bold text-white mt-0.5">{totalFat}<span className="text-xs font-normal text-slate-400">g</span></div>
-            </div>
-            <div className="text-center p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/20">
-              <div className="text-[11px] font-medium text-emerald-400">Calories</div>
-              <div className="text-lg font-bold text-white mt-0.5">{totalCalories}<span className="text-xs font-normal text-slate-400">kcal</span></div>
+
+            <div className="text-[11px] text-slate-400 text-right px-1">
+              Net Carbs = Total Carbs ({totalCarbs}g) - Fiber ({totalFiber}g) = <strong className="text-cyan-300">{netCarbs}g</strong>
             </div>
           </div>
 
@@ -202,8 +248,8 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                 <Zap className="w-5 h-5 fill-current" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-white">Looks good?</div>
-                <div className="text-xs text-emerald-300">Instant 1-tap save with AI estimates</div>
+                <div className="text-sm font-semibold text-white">Looks accurate?</div>
+                <div className="text-xs text-emerald-300">1-tap save with AI macro estimations</div>
               </div>
             </div>
             <button
@@ -257,14 +303,23 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="grid grid-cols-5 gap-1.5 text-center text-xs">
                       <div>
                         <span className="text-[10px] text-sky-400 font-medium block">Carbs (g)</span>
                         <input
                           type="number"
                           value={item.carbs}
                           onChange={e => handleUpdateItem(item.id, 'carbs', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-center text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-indigo-400 font-medium block">Fiber (g)</span>
+                        <input
+                          type="number"
+                          value={item.fiber}
+                          onChange={e => handleUpdateItem(item.id, 'fiber', parseFloat(e.target.value) || 0)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
                       <div>
@@ -273,7 +328,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                           type="number"
                           value={item.protein}
                           onChange={e => handleUpdateItem(item.id, 'protein', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-center text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
                       <div>
@@ -282,7 +337,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                           type="number"
                           value={item.fat}
                           onChange={e => handleUpdateItem(item.id, 'fat', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-center text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
                       <div>
@@ -291,7 +346,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                           type="number"
                           value={item.calories}
                           onChange={e => handleUpdateItem(item.id, 'calories', parseFloat(e.target.value) || 0)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-center text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
                         />
                       </div>
                     </div>

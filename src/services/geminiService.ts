@@ -22,22 +22,24 @@ const NUTRITION_RESPONSE_SCHEMA = {
           name: { type: 'STRING', description: 'Name of the ingredient/component' },
           portion: { type: 'STRING', description: 'Estimated portion description e.g. 1 bowl, 200g' },
           grams: { type: 'NUMBER', description: 'Estimated weight in grams' },
-          carbs: { type: 'NUMBER', description: 'Carbohydrates in grams' },
+          carbs: { type: 'NUMBER', description: 'Total Carbohydrates in grams' },
+          fiber: { type: 'NUMBER', description: 'Dietary fiber in grams' },
           protein: { type: 'NUMBER', description: 'Protein in grams' },
           fat: { type: 'NUMBER', description: 'Fat in grams' },
           calories: { type: 'NUMBER', description: 'Calories in kcal' },
           confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] }
         },
-        required: ['name', 'portion', 'grams', 'carbs', 'protein', 'fat', 'calories']
+        required: ['name', 'portion', 'grams', 'carbs', 'fiber', 'protein', 'fat', 'calories']
       }
     },
-    totalCarbs: { type: 'NUMBER', description: 'Sum of carbohydrates in grams' },
+    totalCarbs: { type: 'NUMBER', description: 'Sum of total carbohydrates in grams' },
+    totalFiber: { type: 'NUMBER', description: 'Sum of dietary fiber in grams' },
     totalProtein: { type: 'NUMBER', description: 'Sum of protein in grams' },
     totalFat: { type: 'NUMBER', description: 'Sum of fat in grams' },
     totalCalories: { type: 'NUMBER', description: 'Total calories in kcal' },
     dietaryNotes: { type: 'STRING', description: 'Brief health or nutrition note' }
   },
-  required: ['title', 'mealType', 'items', 'totalCarbs', 'totalProtein', 'totalFat', 'totalCalories']
+  required: ['title', 'mealType', 'items', 'totalCarbs', 'totalFiber', 'totalProtein', 'totalFat', 'totalCalories']
 };
 
 export async function analyzeFoodImage(
@@ -60,8 +62,8 @@ export async function analyzeFoodImage(
 Analyze the provided food photo with high precision:
 1. Identify all visible dishes and components.
 2. Estimate the realistic portion size and weight in grams for each item.
-3. Calculate the macronutrients for each component: Carbohydrates (g), Protein (g), Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Calories = 4*Carbs + 4*Protein + 9*Fat approximately, adjusted for dietary fiber).
+3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Fat (g), and Total Calories (kcal).
+4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Protein, Fat, Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack) based on the food type.
 ${userNotes ? `User context/notes: "${userNotes}"` : ''}
 
@@ -88,7 +90,14 @@ Respond strictly in valid JSON matching the requested schema.`;
     }
   };
 
-  return callGeminiWithFallbacks(requestBody, apiKey);
+  const result = await callGeminiWithFallbacks(requestBody, apiKey);
+  const totalFiber = Number(result.totalFiber) || 0;
+  const netCarbs = Math.max(0, Math.round(((result.totalCarbs || 0) - totalFiber) * 10) / 10);
+  return {
+    ...result,
+    totalFiber,
+    netCarbs
+  };
 }
 
 export async function analyzeFoodText(
@@ -100,13 +109,13 @@ export async function analyzeFoodText(
   }
 
   const systemInstruction = `You are an expert nutritionist and dietary calculator.
-The user describes a meal they ate without a photo:
+The user describes a meal they ate (or transcribed from voice):
 "${textDescription}"
 
 1. Identify all ingredients, dishes, and portion descriptions mentioned.
 2. Estimate the realistic weight in grams and portions for each component.
-3. Calculate the macronutrients for each component: Carbohydrates (g), Protein (g), Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Calories = 4*Carbs + 4*Protein + 9*Fat approximately).
+3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Fat (g), and Total Calories (kcal).
+4. Sum the totals accurately (Total Carbs, Total Fiber, Net Carbs, Total Protein, Total Fat, Total Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack).
 
 Respond strictly in valid JSON matching the requested schema.`;
@@ -124,7 +133,14 @@ Respond strictly in valid JSON matching the requested schema.`;
     }
   };
 
-  return callGeminiWithFallbacks(requestBody, apiKey);
+  const result = await callGeminiWithFallbacks(requestBody, apiKey);
+  const totalFiber = Number(result.totalFiber) || 0;
+  const netCarbs = Math.max(0, Math.round(((result.totalCarbs || 0) - totalFiber) * 10) / 10);
+  return {
+    ...result,
+    totalFiber,
+    netCarbs
+  };
 }
 
 async function callGeminiWithFallbacks(requestBody: any, apiKey: string): Promise<GeminiAnalysisResult> {

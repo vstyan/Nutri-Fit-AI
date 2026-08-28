@@ -10,12 +10,21 @@ export interface UserProfile {
   unitSystem: UnitSystem;
 }
 
+export interface WeightRecord {
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+  weightLbs: number;
+  timestamp: string;
+  notes?: string;
+}
+
 export interface FoodItem {
   id: string;
   name: string;
   portion: string;
   grams: number;
   carbs: number;
+  fiber: number; // dietary fiber in grams
   protein: number;
   fat: number;
   calories: number;
@@ -31,10 +40,13 @@ export interface MealRecord {
   notes?: string;
   items: FoodItem[];
   totalCarbs: number;
+  totalFiber: number; // dietary fiber in grams
+  netCarbs: number; // totalCarbs - totalFiber (min 0)
   totalProtein: number;
   totalFat: number;
   totalCalories: number;
   photoUrl?: string; // base64
+  isFavorite?: boolean;
 }
 
 export interface DailyActivity {
@@ -49,6 +61,7 @@ export interface DailyActivity {
 export interface UserGoals {
   dailyCaloriesTarget: number; // kcal
   dailyCarbsTarget: number; // g
+  dailyFiberTarget: number; // g
   dailyProteinTarget: number; // g
   dailyFatTarget: number; // g
 }
@@ -69,9 +82,12 @@ export interface DailySummary {
   date: string;
   meals: MealRecord[];
   activity: DailyActivity;
+  weightRecord?: WeightRecord;
   totals: {
     calories: number;
     carbs: number;
+    fiber: number;
+    netCarbs: number;
     protein: number;
     fat: number;
   };
@@ -86,12 +102,15 @@ export interface GeminiAnalysisResult {
     portion: string;
     grams: number;
     carbs: number;
+    fiber?: number;
     protein: number;
     fat: number;
     calories: number;
     confidence: 'high' | 'medium' | 'low';
   }>;
   totalCarbs: number;
+  totalFiber?: number;
+  netCarbs?: number;
   totalProtein: number;
   totalFat: number;
   totalCalories: number;

@@ -7,15 +7,18 @@ import {
   TrendingUp, 
   Check, 
   PieChart,
-  Activity,
-  Plus
+  Wheat,
+  Scale
 } from 'lucide-react';
 import { 
   DailySummary, 
-  AppSettings 
+  AppSettings,
+  MealRecord,
+  WeightRecord
 } from '../types';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
+import { WeightTrackerCard } from './WeightTrackerCard';
 
 interface DashboardProps {
   summary: DailySummary;
@@ -23,13 +26,21 @@ interface DashboardProps {
   historyData: Array<{
     date: string;
     carbsIntake: number;
+    fiberIntake?: number;
+    netCarbsIntake?: number;
     carbsBurned: number;
     caloriesIntake: number;
     caloriesBurned: number;
   }>;
+  weightHistory: WeightRecord[];
+  favoriteMeals: MealRecord[];
+  yesterdayMeals: MealRecord[];
   onOpenCapture: () => void;
   onDeleteMeal: (mealId: string) => void;
+  onToggleFavorite: (mealId: string) => void;
+  onCopyMealToToday: (meal: MealRecord) => void;
   onUpdateActiveBurn: (activeKcal: number) => void;
+  onSaveWeight: (weight: WeightRecord) => void;
   onOpenSettings: () => void;
 }
 
@@ -37,9 +48,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   summary,
   settings,
   historyData,
+  weightHistory,
+  favoriteMeals,
+  yesterdayMeals,
   onOpenCapture,
   onDeleteMeal,
+  onToggleFavorite,
+  onCopyMealToToday,
   onUpdateActiveBurn,
+  onSaveWeight,
   onOpenSettings
 }) => {
   const { totals, activity } = summary;
@@ -50,7 +67,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
   const [isSavedRecently, setIsSavedRecently] = useState(false);
 
-  // Sync local input state when date/activity changes
   useEffect(() => {
     setInputActiveKcal(activity.activeCaloriesBurned > 0 ? String(activity.activeCaloriesBurned) : '');
   }, [activity.activeCaloriesBurned, summary.date]);
@@ -75,6 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const calPercent = Math.min(Math.round((totals.calories / (goals.dailyCaloriesTarget || 2000)) * 100), 150);
   const carbPercent = Math.min(Math.round((totals.carbs / (goals.dailyCarbsTarget || 200)) * 100), 150);
+  const fiberPercent = Math.min(Math.round(((totals.fiber || 0) / (goals.dailyFiberTarget || 30)) * 100), 150);
   const proteinPercent = Math.min(Math.round((totals.protein / (goals.dailyProteinTarget || 140)) * 100), 150);
   const fatPercent = Math.min(Math.round((totals.fat / (goals.dailyFatTarget || 65)) * 100), 150);
 
@@ -84,7 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-5 pb-24 max-w-4xl mx-auto px-4 pt-4">
-      {/* 1. Hero Card: Calories In vs. Calories Burned */}
+      {/* 1. Hero Card: Calories In vs. Total Calories Burned */}
       <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -162,7 +179,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. Enhanced Exercise & Active Burn Logger Card */}
+      {/* 2. Weight Scale & Rolling Trend Tracker Card */}
+      <WeightTrackerCard
+        currentDate={summary.date}
+        weightRecord={summary.weightRecord}
+        settings={settings}
+        weightHistory={weightHistory}
+        onSaveWeight={onSaveWeight}
+      />
+
+      {/* 3. Daily Exercise & Energy Burn Breakdown Card */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-2">
@@ -171,7 +197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Daily Energy Burn Breakdown</h3>
-              <p className="text-xs text-slate-400">Natural BMR baseline + additional workout/activity burn</p>
+              <p className="text-xs text-slate-400">Natural BMR baseline + workout/activity burn</p>
             </div>
           </div>
 
@@ -264,7 +290,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. Nutrition & Macro Target Progress Bars */}
+      {/* 4. Nutrition, Fiber & Net Carbs Progress Bars */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
@@ -274,24 +300,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="text-xs text-slate-400">{totals.calories} / {goals.dailyCaloriesTarget} kcal</span>
         </div>
         
-        <div className="grid sm:grid-cols-3 gap-4 pt-1">
-          {/* Carbs */}
-          <div className="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800 space-y-2">
+        <div className="grid sm:grid-cols-4 gap-3 pt-1">
+          {/* Net Carbs & Total Carbs */}
+          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs font-medium">
-              <span className="text-sky-400 font-bold">Carbohydrates</span>
-              <span className="text-slate-300">{totals.carbs}g / {goals.dailyCarbsTarget}g</span>
+              <span className="text-cyan-300 font-bold">Net Carbs</span>
+              <span className="text-slate-300">{totals.netCarbs}g</span>
             </div>
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-sky-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, carbPercent)}%` }} />
+              <div className="h-full bg-cyan-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, carbPercent)}%` }} />
             </div>
-            <div className="text-[11px] text-slate-400 flex justify-between">
-              <span>{carbPercent}% of goal</span>
+            <div className="text-[10px] text-slate-400 flex justify-between">
+              <span>{totals.carbs}g Total Carbs</span>
               <span>{carbCalories} kcal</span>
             </div>
           </div>
 
+          {/* Fiber */}
+          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex justify-between text-xs font-medium">
+              <span className="text-indigo-400 font-bold">Dietary Fiber</span>
+              <span className="text-slate-300">{totals.fiber}g / {goals.dailyFiberTarget || 30}g</span>
+            </div>
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-indigo-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, fiberPercent)}%` }} />
+            </div>
+            <div className="text-[10px] text-slate-400 flex justify-between">
+              <span>{fiberPercent}% of target</span>
+              <span>Gut Health</span>
+            </div>
+          </div>
+
           {/* Protein */}
-          <div className="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800 space-y-2">
+          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs font-medium">
               <span className="text-rose-400 font-bold">Protein</span>
               <span className="text-slate-300">{totals.protein}g / {goals.dailyProteinTarget}g</span>
@@ -299,14 +340,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-rose-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, proteinPercent)}%` }} />
             </div>
-            <div className="text-[11px] text-slate-400 flex justify-between">
+            <div className="text-[10px] text-slate-400 flex justify-between">
               <span>{proteinPercent}% of goal</span>
               <span>{proteinCalories} kcal</span>
             </div>
           </div>
 
           {/* Fat */}
-          <div className="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800 space-y-2">
+          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
             <div className="flex justify-between text-xs font-medium">
               <span className="text-amber-400 font-bold">Fat</span>
               <span className="text-slate-300">{totals.fat}g / {goals.dailyFatTarget}g</span>
@@ -314,7 +355,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, fatPercent)}%` }} />
             </div>
-            <div className="text-[11px] text-slate-400 flex justify-between">
+            <div className="text-[10px] text-slate-400 flex justify-between">
               <span>{fatPercent}% of goal</span>
               <span>{fatCalories} kcal</span>
             </div>
@@ -322,19 +363,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. Meals Timeline */}
+      {/* 5. Meals Timeline with Quick Favorites */}
       <MealHistory
         meals={summary.meals}
+        favoriteMeals={favoriteMeals}
+        yesterdayMeals={yesterdayMeals}
         onDeleteMeal={onDeleteMeal}
+        onToggleFavorite={onToggleFavorite}
+        onCopyMealToToday={onCopyMealToToday}
         onOpenCapture={onOpenCapture}
       />
 
-      {/* 5. Weekly Comparison Chart */}
+      {/* 6. Historical Comparison Charts (Calories, Net Carbs, Weight) */}
       <HistoryCharts
         historyData={historyData}
+        weightHistory={weightHistory}
+        isImperial={settings.profile.unitSystem === 'imperial'}
       />
 
-      {/* 6. Sticky Floating Photo Button on Mobile */}
+      {/* 7. Floating Action Button on Mobile */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={onOpenCapture}

@@ -1,11 +1,12 @@
 import { get, set, entries, clear as clearIdb } from 'idb-keyval';
-import { AppSettings, MealRecord, DailyActivity, UserProfile } from '../types';
+import { AppSettings, MealRecord, DailyActivity, UserProfile, WeightRecord } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
 
 const SETTINGS_KEY = 'nutrifit_settings_v4';
 const MEALS_PREFIX = 'nutrifit_meals_';
 const ACTIVITY_PREFIX = 'nutrifit_activity_';
+const WEIGHT_PREFIX = 'nutrifit_weight_';
 
 export const DEFAULT_PROFILE: UserProfile = {
   gender: 'male',
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   goals: {
     dailyCaloriesTarget: 2000,
     dailyCarbsTarget: 200,
+    dailyFiberTarget: 30,
     dailyProteinTarget: 140,
     dailyFatTarget: 65,
   }
@@ -34,6 +36,7 @@ export interface FullBackupData {
   settings: AppSettings;
   mealsByDate: Record<string, MealRecord[]>;
   activityByDate: Record<string, DailyActivity>;
+  weightByDate?: Record<string, WeightRecord>;
 }
 
 export interface ImportResult {
@@ -127,7 +130,11 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
     }
   }
 
-  return localMeals;
+  return localMeals.map(m => ({
+    ...m,
+    totalFiber: Number(m.totalFiber) || 0,
+    netCarbs: m.netCarbs !== undefined ? m.netCarbs : Math.max(0, Math.round(((m.totalCarbs || 0) - (Number(m.totalFiber) || 0)) * 10) / 10)
+  }));
 }
 
 export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise<void> {
@@ -174,6 +181,40 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
       console.warn('Could not sync meal deletion to Google Drive:', e);
     }
   }
+}
+
+export async function toggleFavoriteMeal(mealId: string, date: string, settings: AppSettings): Promise<MealRecord | null> {
+  const meals = await getMealsForDate(date, settings);
+  const target = meals.find(m => m.id === mealId);
+  if (!target) return null;
+
+  const updated: MealRecord = {
+    ...target,
+    isFavorite: !target.isFavorite
+  };
+  await saveMeal(updated, settings);
+  return updated;
+}
+
+export async function getAllFavoriteMeals(): Promise<MealRecord[]> {
+  const favorites: MealRecord[] = [];
+  const seenIds = new Set<string>();
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(MEALS_PREFIX)) {
+      try {
+        const list: MealRecord[] = JSON.parse(localStorage.getItem(key) || '[]');
+        for (const m of list) {
+          if (m.isFavorite && !seenIds.has(m.id)) {
+            favorites.push(m);
+            seenIds.add(m.id);
+          }
+        }
+      } catch {}
+    }
+  }
+  return favorites;
 }
 
 export async function getActivityForDate(date: string, settings: AppSettings): Promise<DailyActivity> {
@@ -235,12 +276,59 @@ export async function saveActivityForDate(activity: DailyActivity, settings: App
   }
 }
 
+// Weight scale tracking
+export async function getWeightForDate(date: string): Promise<WeightRecord | null> {
+  const key = `${WEIGHT_PREFIX}${date}`;
+  try {
+    const localStr = localStorage.getItem(key);
+    if (localStr) return JSON.parse(localStr);
+    const saved = await get<WeightRecord>(key);
+    if (saved) {
+      localStorage.setItem(key, JSON.stringify(saved));
+      return saved;
+    }
+  } catch (e) {
+    console.error('Error fetching weight:', e);
+  }
+  return null;
+}
+
+export async function saveWeightForDate(weight: WeightRecord, settings: AppSettings): Promise<void> {
+  const key = `${WEIGHT_PREFIX}${weight.date}`;
+  localStorage.setItem(key, JSON.stringify(weight));
+  await set(key, weight);
+
+  if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
+    try {
+      await saveJsonToDrive(`weight-${weight.date}.json`, weight, settings.googleAccessToken);
+    } catch (e) {
+      console.warn('Could not sync weight to Google Drive:', e);
+    }
+  }
+}
+
+export async function getWeightHistory(days = 14): Promise<WeightRecord[]> {
+  const list: WeightRecord[] = [];
+  const today = new Date();
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dStr = d.toISOString().split('T')[0];
+    const rec = await getWeightForDate(dStr);
+    if (rec) {
+      list.push(rec);
+    }
+  }
+  return list;
+}
+
 export async function exportAllDataAsJson(): Promise<string> {
   const settings = await getAppSettings();
   const mealsByDate: Record<string, MealRecord[]> = {};
   const activityByDate: Record<string, DailyActivity> = {};
+  const weightByDate: Record<string, WeightRecord> = {};
 
-  // 1. Gather all meal and activity keys from localStorage
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (!key) continue;
@@ -254,10 +342,14 @@ export async function exportAllDataAsJson(): Promise<string> {
       try {
         activityByDate[date] = JSON.parse(localStorage.getItem(key) || '{}');
       } catch {}
+    } else if (key.startsWith(WEIGHT_PREFIX)) {
+      const date = key.replace(WEIGHT_PREFIX, '');
+      try {
+        weightByDate[date] = JSON.parse(localStorage.getItem(key) || '{}');
+      } catch {}
     }
   }
 
-  // 2. Cross-check with IndexedDB
   try {
     const idbEntries = await entries();
     for (const [key, value] of idbEntries) {
@@ -272,6 +364,11 @@ export async function exportAllDataAsJson(): Promise<string> {
         if (!activityByDate[date]) {
           activityByDate[date] = value as DailyActivity;
         }
+      } else if (kStr.startsWith(WEIGHT_PREFIX)) {
+        const date = kStr.replace(WEIGHT_PREFIX, '');
+        if (!weightByDate[date]) {
+          weightByDate[date] = value as WeightRecord;
+        }
       }
     }
   } catch (e) {
@@ -279,11 +376,12 @@ export async function exportAllDataAsJson(): Promise<string> {
   }
 
   const exportData: FullBackupData = {
-    version: '4.0.0',
+    version: '5.0.0',
     exportDate: new Date().toISOString(),
     settings,
     mealsByDate,
-    activityByDate
+    activityByDate,
+    weightByDate
   };
 
   return JSON.stringify(exportData, null, 2);
@@ -300,7 +398,6 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
     let mealCount = 0;
     const restoredDates = new Set<string>();
 
-    // 1. Restore settings if present
     if (data.settings) {
       await saveAppSettings({
         ...DEFAULT_SETTINGS,
@@ -310,7 +407,6 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
       });
     }
 
-    // 2. Restore meals
     if (data.mealsByDate && typeof data.mealsByDate === 'object') {
       for (const [date, mealList] of Object.entries(data.mealsByDate)) {
         if (Array.isArray(mealList) && mealList.length > 0) {
@@ -323,13 +419,23 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
       }
     }
 
-    // 3. Restore activity
     if (data.activityByDate && typeof data.activityByDate === 'object') {
       for (const [date, activityObj] of Object.entries(data.activityByDate)) {
         if (activityObj && typeof activityObj === 'object') {
           const key = `${ACTIVITY_PREFIX}${date}`;
           localStorage.setItem(key, JSON.stringify(activityObj));
           await set(key, activityObj);
+          restoredDates.add(date);
+        }
+      }
+    }
+
+    if (data.weightByDate && typeof data.weightByDate === 'object') {
+      for (const [date, weightObj] of Object.entries(data.weightByDate)) {
+        if (weightObj && typeof weightObj === 'object') {
+          const key = `${WEIGHT_PREFIX}${date}`;
+          localStorage.setItem(key, JSON.stringify(weightObj));
+          await set(key, weightObj);
           restoredDates.add(date);
         }
       }
@@ -350,18 +456,16 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
 export async function clearAllAppData(keepSettings = true): Promise<void> {
   const currentSettings = await getAppSettings();
 
-  // Clear localStorage keys
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && (k.startsWith('nutrifit_') || k.startsWith(MEALS_PREFIX) || k.startsWith(ACTIVITY_PREFIX))) {
+    if (k && (k.startsWith('nutrifit_') || k.startsWith(MEALS_PREFIX) || k.startsWith(ACTIVITY_PREFIX) || k.startsWith(WEIGHT_PREFIX))) {
       if (keepSettings && k === SETTINGS_KEY) continue;
       keysToRemove.push(k);
     }
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
-  // Clear IndexedDB
   try {
     await clearIdb();
     if (keepSettings) {

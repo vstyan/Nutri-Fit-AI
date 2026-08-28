@@ -9,11 +9,15 @@ import {
   AlertCircle,
   Image as ImageIcon,
   PenTool,
-  Send,
-  Lightbulb
+  Mic,
+  MicOff,
+  Lightbulb,
+  Radio
 } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 import { GeminiAnalysisResult } from '../types';
+
+declare const window: any;
 
 interface CameraCaptureProps {
   isOpen: boolean;
@@ -36,7 +40,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   onAnalysisComplete,
   onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<'photo' | 'text'>('photo');
+  const [activeTab, setActiveTab] = useState<'photo' | 'text' | 'voice'>('photo');
   const [streamActive, setStreamActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [textDescription, setTextDescription] = useState('');
@@ -45,9 +49,57 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [userNotes, setUserNotes] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
+  // Voice recording states
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript + ' ';
+        }
+        setTextDescription(transcript.trim());
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error !== 'no-speech') {
+          setErrorMessage(`Microphone error: ${event.error}. You can also type your meal.`);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    } else {
+      setSpeechSupported(false);
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
 
   // Initialize camera stream when in photo tab
   useEffect(() => {
@@ -86,6 +138,29 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   }, [isOpen, activeTab, capturedImage, facingMode]);
 
   if (!isOpen) return null;
+
+  const toggleVoiceRecording = () => {
+    if (!recognitionRef.current) {
+      setErrorMessage('Speech recognition is not supported in this browser. Please type your meal description.');
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    } else {
+      setErrorMessage(null);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err: any) {
+        console.warn('Recognition start error:', err);
+        setErrorMessage('Could not activate microphone. Check browser mic permissions.');
+      }
+    }
+  };
 
   const resizeAndConvertImage = (dataUrl: string, maxDim = 1200): Promise<string> => {
     return new Promise((resolve) => {
@@ -180,9 +255,16 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     }
   };
 
-  const handleAnalyzeText = async () => {
+  const handleAnalyzeTextOrVoice = async () => {
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    }
+
     if (!textDescription.trim()) {
-      setErrorMessage('Please enter a description of the meal you ate.');
+      setErrorMessage('Please enter or speak a description of the meal you ate.');
       return;
     }
 
@@ -222,39 +304,68 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             <h2 className="text-base font-bold text-white">Log Meal with AI</h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (isListening && recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch {}
+              }
+              onClose();
+            }}
             className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Switcher */}
+        {/* 3 Tabs: Photo, Voice, Describe */}
         <div className="p-2 bg-slate-950/80 border-b border-slate-800 flex gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={() => { setActiveTab('photo'); setErrorMessage(null); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
+            onClick={() => { 
+              if (isListening) toggleVoiceRecording();
+              setActiveTab('photo'); 
+              setErrorMessage(null); 
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
               activeTab === 'photo'
                 ? 'bg-cyan-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <Camera className="w-4 h-4" />
-            <span>Photo / Camera</span>
+            <Camera className="w-3.5 h-3.5" />
+            <span>Photo</span>
           </button>
 
           <button
             type="button"
-            onClick={() => { setActiveTab('text'); setErrorMessage(null); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
+            onClick={() => { 
+              setActiveTab('voice'); 
+              setErrorMessage(null); 
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+              activeTab === 'voice'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>Voice Mic</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { 
+              if (isListening) toggleVoiceRecording();
+              setActiveTab('text'); 
+              setErrorMessage(null); 
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
               activeTab === 'text'
                 ? 'bg-cyan-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            <PenTool className="w-4 h-4" />
-            <span>Describe Meal (Text)</span>
+            <PenTool className="w-3.5 h-3.5" />
+            <span>Describe (Text)</span>
           </button>
         </div>
 
@@ -283,7 +394,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                   </div>
                   <div>
                     <p className="text-sm font-bold text-white">Camera ready</p>
-                    <p className="text-xs text-slate-400 mt-1">Take a new photo or select an existing picture from your gallery</p>
+                    <p className="text-xs text-slate-400 mt-1">Take a photo or pick from your phone gallery</p>
                   </div>
                   <div className="flex justify-center gap-2 pt-1">
                     <button
@@ -306,7 +417,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                 </div>
               )}
 
-              {/* Camera switch button when stream is active */}
               {streamActive && !capturedImage && (
                 <div className="absolute top-3 right-3 flex space-x-2">
                   <button
@@ -319,7 +429,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                 </div>
               )}
 
-              {/* Hidden Native Camera Input */}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -329,7 +438,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                 onChange={handleFileUpload}
               />
 
-              {/* Hidden Gallery Input (No capture attribute) */}
               <input
                 ref={galleryInputRef}
                 type="file"
@@ -339,7 +447,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               />
             </div>
 
-            {/* Error Message */}
             {errorMessage && (
               <div className="p-3 bg-rose-950/60 border-t border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -347,7 +454,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               </div>
             )}
 
-            {/* Bottom Action Bar */}
             <div className="p-4 bg-slate-900 border-t border-slate-800 space-y-3 shrink-0">
               <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
                 <FileText className="w-4 h-4 text-slate-400 shrink-0" />
@@ -384,7 +490,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                       ) : (
                         <>
                           <Sparkles className="w-4 h-4 fill-current" />
-                          <span>Analyze Food & Calories</span>
+                          <span>Analyze Food & Macros</span>
                         </>
                       )}
                     </button>
@@ -414,7 +520,101 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           </>
         )}
 
-        {/* Tab 2: Text Description Mode */}
+        {/* Tab 2: Voice-to-Meal Logging Mode */}
+        {activeTab === 'voice' && (
+          <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-5 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="text-center space-y-2">
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  {isListening && (
+                    <div className="absolute inset-0 rounded-full bg-purple-500/30 animate-ping" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggleVoiceRecording}
+                    className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition shadow-2xl ${
+                      isListening
+                        ? 'bg-rose-600 hover:bg-rose-500 text-white ring-4 ring-rose-500/40'
+                        : 'bg-gradient-to-tr from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white ring-4 ring-purple-500/30'
+                    }`}
+                  >
+                    {isListening ? (
+                      <Radio className="w-10 h-10 animate-pulse" />
+                    ) : (
+                      <Mic className="w-9 h-9" />
+                    )}
+                  </button>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {isListening ? 'Listening... Speak now' : 'Tap Microphone to Speak'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isListening
+                      ? 'Say ingredients, dishes, and portion sizes naturally'
+                      : 'e.g. "I had a bowl of Greek yogurt with honey and almonds"'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Real-time Voice Transcript Box */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 min-h-[100px] flex flex-col justify-between">
+                <div className="text-xs text-slate-400 font-semibold mb-1 flex items-center justify-between">
+                  <span>Speech Transcript:</span>
+                  {textDescription && (
+                    <button
+                      type="button"
+                      onClick={() => setTextDescription('')}
+                      className="text-[10px] text-slate-500 hover:text-slate-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-white min-h-[50px]">
+                  {textDescription ? (
+                    textDescription
+                  ) : (
+                    <span className="text-slate-600 italic">Your spoken meal will appear here...</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="p-3 bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs rounded-xl flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">{errorMessage}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleAnalyzeTextOrVoice}
+                disabled={isAnalyzing || !textDescription.trim()}
+                className="w-full py-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-purple-500/20 flex items-center justify-center space-x-2 disabled:opacity-60"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Gemini AI is analyzing voice meal...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 fill-current" />
+                    <span>Estimate Nutrition from Voice</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Text Description Mode */}
         {activeTab === 'text' && (
           <div className="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4">
             <div className="space-y-2">
@@ -464,7 +664,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={handleAnalyzeText}
+                onClick={handleAnalyzeTextOrVoice}
                 disabled={isAnalyzing || !textDescription.trim()}
                 className="w-full py-3 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm rounded-xl transition shadow-lg shadow-cyan-500/20 flex items-center justify-center space-x-2 disabled:opacity-60"
               >
