@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 flex items-center justify-center text-slate-950 shadow-md shadow-cyan-500/20 font-black text-sm">
             N
           </div>
-          <div className="hidden xs:block">
+          <div>
             <h1 className="text-sm sm:text-base font-extrabold text-white tracking-tight">
               NutriFit<span className="text-cyan-400 font-normal"> AI</span>
             </h1>
