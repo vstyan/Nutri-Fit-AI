@@ -20,18 +20,34 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export async function getAppSettings(): Promise<AppSettings> {
   try {
-    const saved = await get<AppSettings>(SETTINGS_KEY);
-    if (saved) {
-      return { ...DEFAULT_SETTINGS, ...saved, goals: { ...DEFAULT_SETTINGS.goals, ...saved.goals } };
+    // 1. Try instant synchronous localStorage first
+    const localSaved = localStorage.getItem(SETTINGS_KEY);
+    if (localSaved) {
+      const parsed = JSON.parse(localSaved);
+      return { ...DEFAULT_SETTINGS, ...parsed, goals: { ...DEFAULT_SETTINGS.goals, ...parsed.goals } };
+    }
+
+    // 2. Fallback to IndexedDB
+    const idbSaved = await get<AppSettings>(SETTINGS_KEY);
+    if (idbSaved) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(idbSaved));
+      return { ...DEFAULT_SETTINGS, ...idbSaved, goals: { ...DEFAULT_SETTINGS.goals, ...idbSaved.goals } };
     }
   } catch (e) {
-    console.error('Error loading settings from IndexedDB:', e);
+    console.error('Error loading settings:', e);
   }
   return DEFAULT_SETTINGS;
 }
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
-  await set(SETTINGS_KEY, settings);
+  try {
+    // Save to both localStorage (synchronous & reliable) and IndexedDB
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    await set(SETTINGS_KEY, settings);
+  } catch (e) {
+    console.error('Error saving settings locally:', e);
+  }
+
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
     try {
       await saveJsonToDrive('app-settings.json', settings, settings.googleAccessToken);
@@ -46,9 +62,17 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
   let localMeals: MealRecord[] = [];
 
   try {
-    localMeals = (await get<MealRecord[]>(localKey)) || [];
+    const localStr = localStorage.getItem(localKey);
+    if (localStr) {
+      localMeals = JSON.parse(localStr);
+    } else {
+      localMeals = (await get<MealRecord[]>(localKey)) || [];
+      if (localMeals.length > 0) {
+        localStorage.setItem(localKey, JSON.stringify(localMeals));
+      }
+    }
   } catch (e) {
-    console.error('Error fetching meals from IndexedDB:', e);
+    console.error('Error fetching meals from storage:', e);
   }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
@@ -61,6 +85,7 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
             combined.push(lm);
           }
         }
+        localStorage.setItem(localKey, JSON.stringify(combined));
         await set(localKey, combined);
         return combined;
       }
@@ -74,9 +99,16 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
 
 export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise<void> {
   const localKey = `${MEALS_PREFIX}${meal.date}`;
-  const existing = (await get<MealRecord[]>(localKey)) || [];
-  const updated = existing.filter(m => m.id !== meal.id).concat(meal);
+  let existing: MealRecord[] = [];
+  try {
+    const localStr = localStorage.getItem(localKey);
+    existing = localStr ? JSON.parse(localStr) : ((await get<MealRecord[]>(localKey)) || []);
+  } catch {
+    existing = [];
+  }
 
+  const updated = existing.filter(m => m.id !== meal.id).concat(meal);
+  localStorage.setItem(localKey, JSON.stringify(updated));
   await set(localKey, updated);
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
@@ -90,9 +122,16 @@ export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise
 
 export async function deleteMeal(mealId: string, date: string, settings: AppSettings): Promise<void> {
   const localKey = `${MEALS_PREFIX}${date}`;
-  const existing = (await get<MealRecord[]>(localKey)) || [];
-  const updated = existing.filter(m => m.id !== mealId);
+  let existing: MealRecord[] = [];
+  try {
+    const localStr = localStorage.getItem(localKey);
+    existing = localStr ? JSON.parse(localStr) : ((await get<MealRecord[]>(localKey)) || []);
+  } catch {
+    existing = [];
+  }
 
+  const updated = existing.filter(m => m.id !== mealId);
+  localStorage.setItem(localKey, JSON.stringify(updated));
   await set(localKey, updated);
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
@@ -107,10 +146,15 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
 export async function getActivityForDate(date: string): Promise<DailyActivity> {
   const localKey = `${ACTIVITY_PREFIX}${date}`;
   try {
+    const localStr = localStorage.getItem(localKey);
+    if (localStr) return JSON.parse(localStr);
     const saved = await get<DailyActivity>(localKey);
-    if (saved) return saved;
+    if (saved) {
+      localStorage.setItem(localKey, JSON.stringify(saved));
+      return saved;
+    }
   } catch (e) {
-    console.error('Error fetching activity from IndexedDB:', e);
+    console.error('Error fetching activity from storage:', e);
   }
 
   return {
@@ -123,6 +167,7 @@ export async function getActivityForDate(date: string): Promise<DailyActivity> {
 
 export async function saveActivityForDate(activity: DailyActivity, settings: AppSettings): Promise<void> {
   const localKey = `${ACTIVITY_PREFIX}${activity.date}`;
+  localStorage.setItem(localKey, JSON.stringify(activity));
   await set(localKey, activity);
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Save, 
@@ -32,6 +32,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [formData, setFormData] = useState<AppSettings>({ ...settings });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
+
+  // Sync internal state when settings are loaded or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({ ...settings });
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
 
@@ -240,6 +247,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div>
+                <span className="text-[10px] text-emerald-400 font-semibold block mb-1">Calories (kcal)</span>
+                <input
+                  type="number"
+                  value={formData.goals.dailyCaloriesTarget}
+                  onChange={e => handleGoalChange('dailyCaloriesTarget', parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
+                />
+              </div>
+              <div>
                 <span className="text-[10px] text-sky-400 font-semibold block mb-1">Carbs (g)</span>
                 <input
                   type="number"
@@ -263,15 +279,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="number"
                   value={formData.goals.dailyFatTarget}
                   onChange={e => handleGoalChange('dailyFatTarget', parseInt(e.target.value) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
-                />
-              </div>
-              <div>
-                <span className="text-[10px] text-emerald-400 font-semibold block mb-1">Calories (kcal)</span>
-                <input
-                  type="number"
-                  value={formData.goals.dailyCaloriesTarget}
-                  onChange={e => handleGoalChange('dailyCaloriesTarget', parseInt(e.target.value) || 0)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>
