@@ -1,4 +1,4 @@
-import { get, set } from 'idb-keyval';
+import { get, set, clear as clearIdb } from 'idb-keyval';
 import { AppSettings, MealRecord, DailyActivity, UserProfile } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
@@ -228,4 +228,29 @@ export async function exportAllDataAsJson(): Promise<string> {
     version: '4.0.0'
   };
   return JSON.stringify(exportData, null, 2);
+}
+
+export async function clearAllAppData(keepSettings = true): Promise<void> {
+  const currentSettings = await getAppSettings();
+
+  // Clear localStorage keys
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('nutrifit_') || k.startsWith(MEALS_PREFIX) || k.startsWith(ACTIVITY_PREFIX))) {
+      if (keepSettings && k === SETTINGS_KEY) continue;
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear IndexedDB
+  try {
+    await clearIdb();
+    if (keepSettings) {
+      await saveAppSettings(currentSettings);
+    }
+  } catch (e) {
+    console.error('Error clearing IndexedDB:', e);
+  }
 }

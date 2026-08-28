@@ -12,11 +12,12 @@ import {
   AlertCircle,
   User,
   Flame,
-  Scale
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
-import { AppSettings, Gender, UnitSystem, UserProfile } from '../types';
+import { AppSettings, Gender, UserProfile } from '../types';
 import { calculateBMR, kgToLbs, lbsToKg, cmToFeetInches, feetInchesToCm } from '../utils/bmrCalculator';
-import { exportAllDataAsJson } from '../services/storageService';
+import { exportAllDataAsJson, clearAllAppData } from '../services/storageService';
 
 declare const google: any;
 
@@ -36,6 +37,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [formData, setFormData] = useState<AppSettings>({ ...settings });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
 
   // Imperial display states
   const [weightLbs, setWeightLbs] = useState<number>(() => kgToLbs(settings.profile.weightKg || 75));
@@ -138,6 +141,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     a.download = `nutrifit-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExecuteClearAll = async () => {
+    await clearAllAppData(true); // Keep API key & profile settings
+    setShowClearConfirm(false);
+    setClearSuccessMessage(true);
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -456,17 +468,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* Backup & Export */}
-          <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-slate-400">Offline JSON Backup</span>
-            <button
-              type="button"
-              onClick={handleExportBackup}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export JSON Backup</span>
-            </button>
+          {/* 5. Backup Export & Reset Data */}
+          <div className="pt-3 border-t border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-slate-200 block">Offline Data Backup</span>
+                <span className="text-[11px] text-slate-400">Save a copy of your meal records to your device.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700"
+              >
+                <Download className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Export Backup (.json)</span>
+              </button>
+            </div>
+
+            {/* Danger Zone: Clear Data */}
+            <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Reset & Clear All Records</span>
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">Deletes all logged meals & activity history.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(true)}
+                className="px-3 py-1.5 bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-300 rounded-lg text-xs font-bold transition shadow"
+              >
+                Clear Data...
+              </button>
+            </div>
           </div>
         </form>
 
@@ -498,6 +533,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Safety Confirmation Modal for Clear Data */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-rose-500/50 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/30">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Clear All App Data?</h3>
+                <p className="text-xs text-slate-400">Permanently erase food logs & history</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              This will permanently delete all your logged meals, photos, and exercise history. Your Gemini API key and profile settings will be preserved.
+            </p>
+
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-medium">Download backup first:</span>
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 rounded-lg transition inline-flex items-center space-x-1"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Backup (.json)</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteClearAll}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-lg shadow-rose-600/30"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete All Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Success Feedback */}
+      {clearSuccessMessage && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80">
+          <div className="bg-slate-900 border border-emerald-500/50 p-5 rounded-2xl text-center space-y-2 max-w-xs shadow-2xl">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+            <h3 className="text-sm font-bold text-white">Data Cleared</h3>
+            <p className="text-xs text-slate-400">Reloading clean application...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
