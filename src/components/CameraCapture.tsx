@@ -10,9 +10,9 @@ import {
   Image as ImageIcon,
   PenTool,
   Mic,
-  MicOff,
   Lightbulb,
-  Radio
+  Radio,
+  Square
 } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 import { GeminiAnalysisResult } from '../types';
@@ -49,16 +49,16 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [userNotes, setUserNotes] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
-  // Voice recording states
+  // Voice recording states & refs
   const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
   const recognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef<string>('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize Web Speech API
+  // Initialize Web Speech API with non-duplicating resultIndex handler
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -68,17 +68,27 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       recognition.lang = 'en-US';
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript + ' ';
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          const transcriptChunk = res[0]?.transcript || '';
+          if (res.isFinal) {
+            finalTranscriptRef.current += transcriptChunk + ' ';
+          } else {
+            interim += transcriptChunk;
+          }
         }
-        setTextDescription(transcript.trim());
+
+        const combined = (finalTranscriptRef.current + interim)
+          .replace(/\s+/g, ' ')
+          .trim();
+        setTextDescription(combined);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         if (event.error !== 'no-speech') {
-          setErrorMessage(`Microphone error: ${event.error}. You can also type your meal.`);
+          setErrorMessage(`Microphone status: ${event.error}. You can also type your meal.`);
         }
         setIsListening(false);
       };
@@ -88,8 +98,6 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       };
 
       recognitionRef.current = recognition;
-    } else {
-      setSpeechSupported(false);
     }
 
     return () => {
@@ -152,12 +160,14 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       setIsListening(false);
     } else {
       setErrorMessage(null);
+      // Preserve existing text as initial baseline
+      finalTranscriptRef.current = textDescription ? textDescription.trim() + ' ' : '';
       try {
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err: any) {
         console.warn('Recognition start error:', err);
-        setErrorMessage('Could not activate microphone. Check browser mic permissions.');
+        setIsListening(true);
       }
     }
   };
@@ -539,7 +549,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                     }`}
                   >
                     {isListening ? (
-                      <Radio className="w-10 h-10 animate-pulse" />
+                      <Square className="w-8 h-8 fill-current" />
                     ) : (
                       <Mic className="w-9 h-9" />
                     )}
@@ -548,12 +558,12 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    {isListening ? 'Listening... Speak now' : 'Tap Microphone to Speak'}
+                    {isListening ? 'Listening... (Tap red square when done)' : 'Tap Microphone to Speak'}
                   </h3>
                   <p className="text-xs text-slate-400">
                     {isListening
-                      ? 'Say ingredients, dishes, and portion sizes naturally'
-                      : 'e.g. "I had a bowl of Greek yogurt with honey and almonds"'}
+                      ? 'Say ingredients and portions naturally'
+                      : 'e.g. "I had a bowl of Greek yogurt with honey and blueberries"'}
                   </p>
                 </div>
               </div>
@@ -565,7 +575,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                   {textDescription && (
                     <button
                       type="button"
-                      onClick={() => setTextDescription('')}
+                      onClick={() => {
+                        finalTranscriptRef.current = '';
+                        setTextDescription('');
+                      }}
                       className="text-[10px] text-slate-500 hover:text-slate-300"
                     >
                       Clear
@@ -623,7 +636,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               </label>
               <textarea
                 value={textDescription}
-                onChange={e => setTextDescription(e.target.value)}
+                onChange={e => {
+                  setTextDescription(e.target.value);
+                  finalTranscriptRef.current = e.target.value;
+                }}
                 placeholder="e.g. 2 slices of pepperoni pizza, 1 side garden salad with ranch dressing, and 1 can of diet coke..."
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition resize-none"
@@ -644,7 +660,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setTextDescription(ex)}
+                    onClick={() => {
+                      setTextDescription(ex);
+                      finalTranscriptRef.current = ex;
+                    }}
                     className="text-[11px] bg-slate-800/80 hover:bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 text-left transition"
                   >
                     {ex}
