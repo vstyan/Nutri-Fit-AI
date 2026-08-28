@@ -1,4 +1,4 @@
-import { get, set, clear as clearIdb } from 'idb-keyval';
+import { get, set, entries, clear as clearIdb } from 'idb-keyval';
 import { AppSettings, MealRecord, DailyActivity, UserProfile } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
@@ -27,6 +27,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dailyFatTarget: 65,
   }
 };
+
+export interface FullBackupData {
+  version: string;
+  exportDate: string;
+  settings: AppSettings;
+  mealsByDate: Record<string, MealRecord[]>;
+  activityByDate: Record<string, DailyActivity>;
+}
+
+export interface ImportResult {
+  success: boolean;
+  message: string;
+  mealCount: number;
+  dayCount: number;
+}
 
 export async function getAppSettings(): Promise<AppSettings> {
   try {
@@ -222,12 +237,114 @@ export async function saveActivityForDate(activity: DailyActivity, settings: App
 
 export async function exportAllDataAsJson(): Promise<string> {
   const settings = await getAppSettings();
-  const exportData: Record<string, any> = {
-    settings,
+  const mealsByDate: Record<string, MealRecord[]> = {};
+  const activityByDate: Record<string, DailyActivity> = {};
+
+  // 1. Gather all meal and activity keys from localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (key.startsWith(MEALS_PREFIX)) {
+      const date = key.replace(MEALS_PREFIX, '');
+      try {
+        mealsByDate[date] = JSON.parse(localStorage.getItem(key) || '[]');
+      } catch {}
+    } else if (key.startsWith(ACTIVITY_PREFIX)) {
+      const date = key.replace(ACTIVITY_PREFIX, '');
+      try {
+        activityByDate[date] = JSON.parse(localStorage.getItem(key) || '{}');
+      } catch {}
+    }
+  }
+
+  // 2. Cross-check with IndexedDB
+  try {
+    const idbEntries = await entries();
+    for (const [key, value] of idbEntries) {
+      const kStr = String(key);
+      if (kStr.startsWith(MEALS_PREFIX)) {
+        const date = kStr.replace(MEALS_PREFIX, '');
+        if (!mealsByDate[date] || mealsByDate[date].length === 0) {
+          mealsByDate[date] = value as MealRecord[];
+        }
+      } else if (kStr.startsWith(ACTIVITY_PREFIX)) {
+        const date = kStr.replace(ACTIVITY_PREFIX, '');
+        if (!activityByDate[date]) {
+          activityByDate[date] = value as DailyActivity;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read all IDB entries for export:', e);
+  }
+
+  const exportData: FullBackupData = {
+    version: '4.0.0',
     exportDate: new Date().toISOString(),
-    version: '4.0.0'
+    settings,
+    mealsByDate,
+    activityByDate
   };
+
   return JSON.stringify(exportData, null, 2);
+}
+
+export async function importBackupJson(jsonString: string): Promise<ImportResult> {
+  try {
+    const data = JSON.parse(jsonString);
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid JSON format: file does not contain a valid JSON object.');
+    }
+
+    let mealCount = 0;
+    const restoredDates = new Set<string>();
+
+    // 1. Restore settings if present
+    if (data.settings) {
+      await saveAppSettings({
+        ...DEFAULT_SETTINGS,
+        ...data.settings,
+        profile: { ...DEFAULT_PROFILE, ...(data.settings.profile || {}) },
+        goals: { ...DEFAULT_SETTINGS.goals, ...(data.settings.goals || {}) }
+      });
+    }
+
+    // 2. Restore meals
+    if (data.mealsByDate && typeof data.mealsByDate === 'object') {
+      for (const [date, mealList] of Object.entries(data.mealsByDate)) {
+        if (Array.isArray(mealList) && mealList.length > 0) {
+          const key = `${MEALS_PREFIX}${date}`;
+          localStorage.setItem(key, JSON.stringify(mealList));
+          await set(key, mealList);
+          mealCount += mealList.length;
+          restoredDates.add(date);
+        }
+      }
+    }
+
+    // 3. Restore activity
+    if (data.activityByDate && typeof data.activityByDate === 'object') {
+      for (const [date, activityObj] of Object.entries(data.activityByDate)) {
+        if (activityObj && typeof activityObj === 'object') {
+          const key = `${ACTIVITY_PREFIX}${date}`;
+          localStorage.setItem(key, JSON.stringify(activityObj));
+          await set(key, activityObj);
+          restoredDates.add(date);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Successfully restored ${mealCount} meal(s) across ${restoredDates.size} day(s)!`,
+      mealCount,
+      dayCount: restoredDates.size
+    };
+  } catch (err: any) {
+    console.error('Error importing backup:', err);
+    throw new Error(err.message || 'Failed to parse and import backup file.');
+  }
 }
 
 export async function clearAllAppData(keepSettings = true): Promise<void> {

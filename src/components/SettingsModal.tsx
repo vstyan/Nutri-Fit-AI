@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Save, 
@@ -7,17 +7,19 @@ import {
   HardDrive, 
   Target, 
   Download, 
+  Upload,
   ExternalLink,
   CheckCircle2,
   AlertCircle,
   User,
   Flame,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { AppSettings, Gender, UserProfile } from '../types';
 import { calculateBMR, kgToLbs, lbsToKg, cmToFeetInches, feetInchesToCm } from '../utils/bmrCalculator';
-import { exportAllDataAsJson, clearAllAppData } from '../services/storageService';
+import { exportAllDataAsJson, importBackupJson, clearAllAppData } from '../services/storageService';
 
 declare const google: any;
 
@@ -39,6 +41,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [googleAuthError, setGoogleAuthError] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const importFileRef = useRef<HTMLInputElement | null>(null);
 
   // Imperial display states
   const [weightLbs, setWeightLbs] = useState<number>(() => kgToLbs(settings.profile.weightKg || 75));
@@ -53,6 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const fi = cmToFeetInches(settings.profile.heightCm || 175);
       setHeightFt(fi.feet);
       setHeightIn(fi.inches);
+      setImportStatus(null);
     }
   }, [isOpen, settings]);
 
@@ -141,6 +148,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     a.download = `nutrifit-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleImportFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportStatus(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const res = await importBackupJson(text);
+        setImportStatus({
+          type: 'success',
+          message: res.message
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } catch (err: any) {
+        setImportStatus({
+          type: 'error',
+          message: err.message || 'Failed to import backup file. Please ensure it is a valid NutriFit JSON backup.'
+        });
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleExecuteClearAll = async () => {
@@ -468,21 +507,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* 5. Backup Export & Reset Data */}
+          {/* 5. Backup Export, Restore & Reset */}
           <div className="pt-3 border-t border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-200 block">Offline Data Backup</span>
-                <span className="text-[11px] text-slate-400">Save a copy of your meal records to your device.</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-200 block">Backup & Restore</span>
+                  <span className="text-[11px] text-slate-400">Save all food records or restore from a JSON backup file.</span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleExportBackup}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700"
-              >
-                <Download className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Export Backup (.json)</span>
-              </button>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {/* Export Button */}
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700 shadow"
+                >
+                  <Download className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Export Backup (.json)</span>
+                </button>
+
+                {/* Import Button */}
+                <button
+                  type="button"
+                  onClick={() => importFileRef.current?.click()}
+                  disabled={isImporting}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition border border-slate-700 shadow disabled:opacity-50"
+                >
+                  <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{isImporting ? 'Importing...' : 'Restore Backup (.json)'}</span>
+                </button>
+
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={handleImportFileSelected}
+                />
+              </div>
+
+              {/* Import status message */}
+              {importStatus && (
+                <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
+                  importStatus.type === 'success'
+                    ? 'bg-emerald-950/60 border border-emerald-500/40 text-emerald-300'
+                    : 'bg-rose-950/60 border border-rose-500/40 text-rose-300'
+                }`}>
+                  {importStatus.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  )}
+                  <span>{importStatus.message}</span>
+                </div>
+              )}
             </div>
 
             {/* Danger Zone: Clear Data */}
@@ -560,7 +640,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 rounded-lg transition inline-flex items-center space-x-1"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Backup (.json)</span>
+                <span>Save Backup (.json)</span>
               </button>
             </div>
 
