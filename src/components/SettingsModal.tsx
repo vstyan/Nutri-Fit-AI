@@ -594,8 +594,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Sparkles className="w-4 h-4 text-cyan-400" />
                   App Updates & Version
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                  v1.1.0
+                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                  v1.1.1
                 </span>
               </label>
 
