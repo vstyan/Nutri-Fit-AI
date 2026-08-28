@@ -5,6 +5,7 @@ import { CameraCapture } from './components/CameraCapture';
 import { MealReviewModal } from './components/MealReviewModal';
 import { SettingsModal } from './components/SettingsModal';
 import { StoragePromptModal } from './components/StoragePromptModal';
+import { UpdatePrompt } from './components/UpdatePrompt';
 import { 
   AppSettings, 
   MealRecord, 
@@ -328,6 +329,9 @@ export function App() {
         onSelect={handleSelectStorageLocation}
         onClose={() => setIsStoragePromptOpen(false)}
       />
+
+      {/* PWA Update Notification Prompt */}
+      <UpdatePrompt />
     </div>
   );
 }

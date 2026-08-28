@@ -14,7 +14,9 @@ import {
   Upload,
   AlertTriangle,
   RotateCcw,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { AppSettings, Gender, UnitSystem } from '../types';
 import { 
@@ -57,6 +59,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
 
+  // App update checking states
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
+
   // Sync formData whenever settings changes or modal opens
   useEffect(() => {
     if (isOpen) {
@@ -68,10 +74,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setImportStatus(null);
       setShowClearConfirm(false);
       setClearSuccessMessage(false);
+      setUpdateStatus('idle');
+      setIsCheckingUpdate(false);
     }
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
+
+  const handleCheckForUpdates = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateStatus('checking');
+
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.update();
+        setTimeout(() => {
+          setIsCheckingUpdate(false);
+          if (registration.waiting) {
+            setUpdateStatus('available');
+          } else {
+            setUpdateStatus('latest');
+          }
+        }, 1000);
+      } catch (err) {
+        console.warn('Update check failed:', err);
+        setIsCheckingUpdate(false);
+        setUpdateStatus('error');
+      }
+    } else {
+      setTimeout(() => {
+        setIsCheckingUpdate(false);
+        setUpdateStatus('latest');
+      }, 800);
+    }
+  };
+
+  const handleApplyUpdateNow = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        window.location.reload();
+      });
+    } else {
+      window.location.reload();
+    }
+  };
 
   const currentBMR = calculateBMR(formData.profile);
 
@@ -535,6 +585,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Clear & Reset All App Data...</span>
               </button>
+            </div>
+
+            {/* App Updates & Version */}
+            <div className="space-y-3 pt-3 border-t border-slate-800">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  App Updates & Version
+                </span>
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                  v1.1.0
+                </span>
+              </label>
+
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>NutriFit AI PWA</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Offline-capable with 1-click update notifications
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCheckForUpdates}
+                  disabled={isCheckingUpdate}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl border border-slate-700 text-xs font-semibold transition flex items-center space-x-1.5 shrink-0 self-stretch sm:self-auto justify-center cursor-pointer"
+                >
+                  {isCheckingUpdate ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                      <span>Checking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Check for Updates</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {updateStatus === 'latest' && (
+                <div className="p-2.5 rounded-xl text-xs flex items-center space-x-2 bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 animate-in fade-in">
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>You are running the latest version of NutriFit AI.</span>
+                </div>
+              )}
+
+              {updateStatus === 'available' && (
+                <div className="p-3 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 animate-in fade-in">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 shrink-0 text-cyan-400" />
+                    <span className="font-medium">A new version is available!</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyUpdateNow}
+                    className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs transition shadow shrink-0"
+                  >
+                    Refresh Now
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </form>
