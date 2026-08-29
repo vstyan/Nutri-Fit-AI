@@ -129,8 +129,17 @@ export function App() {
   };
 
   // Google Fit Sync Calories for a Date
-  const handleSyncGoogleFit = useCallback(async (date: string = selectedDate, currentSettings: AppSettings = settings) => {
-    if (!currentSettings.googleFitConnected || !currentSettings.googleFitAccessToken) return;
+  const handleSyncGoogleFit = useCallback(async (
+    date: string = selectedDate, 
+    currentSettings: AppSettings = settings,
+    isManual: boolean = false
+  ) => {
+    if (!currentSettings.googleFitConnected || !currentSettings.googleFitAccessToken) {
+      if (isManual) {
+        alert('Google Fit is not connected. Please click Connect Google Fit first.');
+      }
+      return;
+    }
     setIsSyncingGoogleFit(true);
     try {
       const fitResult = await fetchGoogleFitCalories(date, currentSettings.googleFitAccessToken);
@@ -158,9 +167,16 @@ export function App() {
         };
         await saveAppSettings(updatedSettings);
         setSettings(updatedSettings);
+
+        if (isManual) {
+          console.log(`Google Fit synced successfully: ${fitResult.totalCalories} kcal`);
+        }
       }
     } catch (err: any) {
-      console.warn('Google Fit sync error:', err);
+      console.error('Google Fit sync error:', err);
+      if (isManual || err.message?.includes('Fitness API')) {
+        alert(`Google Fit Sync Notice: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setIsSyncingGoogleFit(false);
     }
@@ -428,7 +444,7 @@ export function App() {
           onSaveWeight={handleSaveWeight}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onConnectGoogleFit={handleConnectGoogleFit}
-          onSyncGoogleFit={() => handleSyncGoogleFit(selectedDate, settings)}
+          onSyncGoogleFit={() => handleSyncGoogleFit(selectedDate, settings, true)}
         />
       </main>
 
