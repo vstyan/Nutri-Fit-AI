@@ -116,7 +116,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-xs text-slate-400">
                 {includeResting 
                   ? 'Food Intake vs. Total Daily Burn (Base BMR + Exercise)' 
-                  : 'Food Intake vs. Daily Exercise Burn'}
+                  : 'Food Intake vs. Total Daily Burn (Rest + Exercise)'}
               </p>
             </div>
           </div>
@@ -135,13 +135,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Total Calories Burned */}
           <div className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center">
             <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
-              {includeResting ? 'Total Burned' : 'Exercise Burn'}
+              Total Burned
             </div>
             <div className="text-xl sm:text-3xl font-black text-white mt-1">
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
             <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5">
-              {includeResting ? `${baseBmr} base + ${activeKcalValue} act` : 'Active workout burn'}
+              {includeResting ? `${baseBmr} base + ${activeKcalValue} act` : 'Rest + exercise (tracker)'}
             </div>
           </div>
 
@@ -175,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between text-xs text-slate-300 font-medium">
             <span>Intake: {totals.calories} kcal</span>
-            <span>{includeResting ? `Total Burned: ${totalBurned} kcal` : `Exercise Burned: ${totalBurned} kcal`}</span>
+            <span>Total Burned: {totalBurned} kcal</span>
           </div>
           <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden flex">
             <div
@@ -208,12 +208,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">
-                {includeResting ? 'Daily Energy Burn Breakdown' : 'Daily Exercise Burn'}
+                {includeResting ? 'Daily Energy Burn Breakdown' : 'Rest + Exercise Burn'}
               </h3>
               <p className="text-xs text-slate-400">
                 {includeResting 
                   ? 'Natural BMR baseline + workout/activity burn' 
-                  : 'Workout & active calories burned'}
+                  : 'Combined resting and active calories (e.g. from Google Fit)'}
               </p>
             </div>
           </div>
@@ -223,52 +223,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={onOpenSettings}
               className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
             >
-              {includeResting ? `Edit Profile (BMR: ${baseBmr} kcal)` : 'Settings (Resting BMR: Off)'}
+              {includeResting ? `Edit Profile (BMR: ${baseBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
             </button>
           </div>
         </div>
 
-        {/* Base BMR vs Active Equation Display */}
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 block">
-              {includeResting ? '1. Natural Base (BMR)' : '1. Base Resting'}
-            </span>
-            <span className="font-bold text-amber-400 text-sm mt-0.5 block">
-              {includeResting ? `${baseBmr} kcal` : 'Excluded'}
-            </span>
-            <span className="text-[9px] text-slate-500">
-              {includeResting ? 'Auto from profile' : 'Turned off in settings'}
-            </span>
-          </div>
+        {/* Burn Display: 3-column breakdown if BMR included, single entry if Exclude / In Fitness Tracker */}
+        {includeResting ? (
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block">1. Natural Base (BMR)</span>
+              <span className="font-bold text-amber-400 text-sm mt-0.5 block">{baseBmr} kcal</span>
+              <span className="text-[9px] text-slate-500">Auto from profile</span>
+            </div>
 
-          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 block">
-              {includeResting ? '2. Exercise / Steps' : '2. Exercise Burn'}
-            </span>
-            <span className="font-bold text-emerald-400 text-sm mt-0.5 block">
-              {includeResting ? `+{activeKcalValue} kcal` : `${activeKcalValue} kcal`}
-            </span>
-            <span className="text-[9px] text-slate-500">
-              Entered by you
-            </span>
-          </div>
+            <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block">2. Exercise / Steps</span>
+              <span className="font-bold text-emerald-400 text-sm mt-0.5 block">+{activeKcalValue} kcal</span>
+              <span className="text-[9px] text-slate-500">Entered by you</span>
+            </div>
 
-          <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
-            <span className="text-[10px] text-emerald-300 block">
-              {includeResting ? '3. Total Burned' : '3. Total Exercise'}
-            </span>
-            <span className="font-extrabold text-white text-sm mt-0.5 block">{totalBurned} kcal</span>
-            <span className="text-[9px] text-emerald-400">
-              {includeResting ? 'Sum for today' : 'Active burn total'}
-            </span>
+            <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
+              <span className="text-[10px] text-emerald-300 block">3. Total Burned</span>
+              <span className="font-extrabold text-white text-sm mt-0.5 block">{totalBurned} kcal</span>
+              <span className="text-[9px] text-emerald-400">Sum for today</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-slate-950/60 border border-emerald-500/20 rounded-xl p-3.5 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/20">
+                <Flame className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">Rest + Exercise Burned</span>
+                <span className="text-[11px] text-slate-400">Total daily burn from Google Fit / fitness tracker</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xl font-extrabold text-emerald-400 block">
+                {totalBurned} <span className="text-xs font-normal text-slate-400">kcal</span>
+              </span>
+              <span className="text-[10px] text-emerald-400/80">Single total logged</span>
+            </div>
+          </div>
+        )}
 
-        {/* Input Field for Active Workout Burn */}
+        {/* Input Field for Workout / Tracker Burn */}
         <div className="space-y-2 pt-1">
           <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Workout / Exercise Burn:'}</span>
+            <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Rest + Workout Burn:'}</span>
             <span className="text-[11px] text-slate-400">
               {includeResting ? `Total Daily: ${totalBurned} kcal` : `Total: ${totalBurned} kcal`}
             </span>
@@ -279,13 +283,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <input
                 type="number"
                 value={inputActiveKcal === '0' ? '' : inputActiveKcal}
-                placeholder="e.g. 450 (walking, workout, running)"
+                placeholder={includeResting ? "e.g. 450 (walking, workout, running)" : "e.g. 2400 (from Google Fit total burn)"}
                 onFocus={e => e.target.select()}
                 onChange={e => setInputActiveKcal(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
               />
               <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">
-                {includeResting ? 'active kcal' : 'exercise kcal'}
+                {includeResting ? 'active kcal' : 'total kcal'}
               </span>
             </div>
 
@@ -305,7 +309,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>{includeResting ? 'Save Daily Burn' : 'Save Exercise'}</span>
+                  <span>{includeResting ? 'Save Daily Burn' : 'Save Rest + Workout Burn'}</span>
                 </>
               )}
             </button>
@@ -314,14 +318,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Quick presets */}
           <div className="flex items-center space-x-1.5 pt-1 overflow-x-auto">
             <span className="text-[11px] text-slate-400 mr-1 shrink-0">Quick add:</span>
-            {[200, 350, 500, 700, 900].map(val => (
+            {(includeResting ? [200, 350, 500, 700, 900] : [1800, 2100, 2400, 2700, 3000]).map(val => (
               <button
                 key={val}
                 type="button"
                 onClick={() => handlePresetClick(val)}
                 className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700/80 transition shrink-0"
               >
-                +{val} kcal
+                {includeResting ? `+${val} kcal` : `${val} kcal`}
               </button>
             ))}
           </div>
