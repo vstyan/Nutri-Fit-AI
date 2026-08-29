@@ -404,36 +404,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>Calories Burnt at Rest Calculation</span>
                 </label>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Choose whether to include calories burnt at rest in your daily burned totals. Apps like Google Fit and smartwatches may already include resting burn in their calculations.
+                  Choose whether to include calories burnt at rest in your daily burned totals. Apps like Google Fit and smartwatches already calculate resting burn in their totals.
                 </p>
               </div>
+
+              {settings.googleFitConnected && (
+                <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-emerald-300 text-[11px] flex items-center space-x-2">
+                  <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>
+                    <strong>Google Fit Active:</strong> Resting calories are automatically tracked by Google Fit in your daily total to avoid double counting.
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, includeRestingCalories: true }))}
+                  disabled={settings.googleFitConnected}
+                  onClick={() => !settings.googleFitConnected && setFormData(prev => ({ ...prev, includeRestingCalories: true }))}
                   className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
-                    formData.includeRestingCalories !== false
+                    settings.googleFitConnected
+                      ? 'opacity-40 cursor-not-allowed bg-slate-950/40 border-slate-800 text-slate-500'
+                      : formData.includeRestingCalories !== false
                       ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50'
                       : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-bold ${formData.includeRestingCalories !== false ? 'text-amber-400' : 'text-slate-300'}`}>
+                    <span className={`text-xs font-bold ${!settings.googleFitConnected && formData.includeRestingCalories !== false ? 'text-amber-400' : 'text-slate-400'}`}>
                       Include at Rest (Default)
                     </span>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      formData.includeRestingCalories !== false
-                        ? 'border-amber-400 bg-amber-400'
-                        : 'border-slate-600'
-                    }`}>
-                      {formData.includeRestingCalories !== false && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                      )}
-                    </div>
+                    {settings.googleFitConnected ? (
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        Disabled
+                      </span>
+                    ) : (
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        formData.includeRestingCalories !== false
+                          ? 'border-amber-400 bg-amber-400'
+                          : 'border-slate-600'
+                      }`}>
+                        {formData.includeRestingCalories !== false && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-400 leading-normal">
-                    App adds calculated BMR ({currentBMR} kcal) to any logged workouts or steps.
+                    {settings.googleFitConnected
+                      ? 'Disabled to prevent double-counting. Google Fit already tracks resting burn.'
+                      : `App adds calculated BMR (${currentBMR} kcal) to any logged workouts or steps.`}
                   </p>
                 </button>
 
@@ -441,27 +461,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, includeRestingCalories: false }))}
                   className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
-                    formData.includeRestingCalories === false
+                    formData.includeRestingCalories === false || settings.googleFitConnected
                       ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
                       : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-bold ${formData.includeRestingCalories === false ? 'text-cyan-400' : 'text-slate-300'}`}>
+                    <span className="text-xs font-bold text-cyan-400">
                       Exclude / In Fitness Tracker
                     </span>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                      formData.includeRestingCalories === false
-                        ? 'border-cyan-400 bg-cyan-400'
-                        : 'border-slate-600'
-                    }`}>
-                      {formData.includeRestingCalories === false && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                      )}
-                    </div>
+                    {settings.googleFitConnected ? (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
+                        Google Fit Active
+                      </span>
+                    ) : (
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        formData.includeRestingCalories === false
+                          ? 'border-cyan-400 bg-cyan-400'
+                          : 'border-slate-600'
+                      }`}>
+                        {formData.includeRestingCalories === false && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-400 leading-normal">
-                    For Google Fit & trackers that already calculate resting burn in their totals.
+                    {settings.googleFitConnected
+                      ? 'Active mode: Your total daily burn syncs live from Google Fit.'
+                      : 'For Google Fit & trackers that already calculate resting burn in their totals.'}
                   </p>
                 </button>
               </div>
@@ -737,7 +765,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.2.0
+                  v1.2.1
                 </span>
               </label>
 

@@ -96,6 +96,7 @@ export function App() {
       const now = Date.now();
       const updatedSettings: AppSettings = {
         ...settings,
+        includeRestingCalories: false,
         googleFitConnected: true,
         googleFitAccessToken: accessToken,
         googleFitTokenExpiry: now + (expiresIn * 1000),
