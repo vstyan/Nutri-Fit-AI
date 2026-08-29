@@ -32,6 +32,7 @@ import {
 } from './services/storageService';
 import { calculateBMR } from './utils/bmrCalculator';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
+import { requestGoogleFitAccessToken, fetchGoogleFitCalories } from './services/googleFitService';
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
@@ -41,6 +42,10 @@ export function App() {
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
   const [favoriteMeals, setFavoriteMeals] = useState<MealRecord[]>([]);
   const [yesterdayMeals, setYesterdayMeals] = useState<MealRecord[]>([]);
+
+  // Google Fit state
+  const [isConnectingGoogleFit, setIsConnectingGoogleFit] = useState(false);
+  const [isSyncingGoogleFit, setIsSyncingGoogleFit] = useState(false);
 
   const [activity, setActivity] = useState<DailyActivity>(() => {
     const includeResting = DEFAULT_SETTINGS.includeRestingCalories !== false;
@@ -83,18 +88,98 @@ export function App() {
     });
   }, []);
 
-  // Listen for window focus / visibility change to automatically advance date if day changed overnight
+  // Google Fit Connect Handler
+  const handleConnectGoogleFit = async () => {
+    setIsConnectingGoogleFit(true);
+    try {
+      const { accessToken, expiresIn } = await requestGoogleFitAccessToken(settings.googleClientId);
+      const now = Date.now();
+      const updatedSettings: AppSettings = {
+        ...settings,
+        googleFitConnected: true,
+        googleFitAccessToken: accessToken,
+        googleFitTokenExpiry: now + (expiresIn * 1000),
+        googleFitLastSync: new Date().toISOString()
+      };
+      await saveAppSettings(updatedSettings);
+      setSettings(updatedSettings);
+
+      // Immediately sync calories from Google Fit for selected date
+      await handleSyncGoogleFit(selectedDate, updatedSettings);
+    } catch (err: any) {
+      console.error('Google Fit connection failed:', err);
+      alert(err.message || 'Failed to connect Google Fit. Please allow the popup and try again.');
+    } finally {
+      setIsConnectingGoogleFit(false);
+    }
+  };
+
+  // Google Fit Disconnect Handler
+  const handleDisconnectGoogleFit = async () => {
+    const updatedSettings: AppSettings = {
+      ...settings,
+      googleFitConnected: false,
+      googleFitAccessToken: undefined,
+      googleFitTokenExpiry: undefined,
+      googleFitLastSync: undefined
+    };
+    await saveAppSettings(updatedSettings);
+    setSettings(updatedSettings);
+  };
+
+  // Google Fit Sync Calories for a Date
+  const handleSyncGoogleFit = useCallback(async (date: string = selectedDate, currentSettings: AppSettings = settings) => {
+    if (!currentSettings.googleFitConnected || !currentSettings.googleFitAccessToken) return;
+    setIsSyncingGoogleFit(true);
+    try {
+      const fitResult = await fetchGoogleFitCalories(date, currentSettings.googleFitAccessToken);
+      if (fitResult) {
+        const includeResting = currentSettings.includeRestingCalories !== false;
+        const profileBmr = calculateBMR(currentSettings.profile);
+        const baseBmr = includeResting ? profileBmr : 0;
+
+        const updatedActivity: DailyActivity = {
+          date,
+          activeCaloriesBurned: fitResult.totalCalories,
+          baseBmrCalories: baseBmr,
+          totalCaloriesBurned: includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories,
+          source: 'google_fit',
+          lastSyncedAt: fitResult.lastSyncedAt,
+          lastUpdated: new Date().toISOString()
+        };
+
+        await saveActivityForDate(updatedActivity, currentSettings);
+        setActivity(updatedActivity);
+
+        const updatedSettings: AppSettings = {
+          ...currentSettings,
+          googleFitLastSync: fitResult.lastSyncedAt
+        };
+        await saveAppSettings(updatedSettings);
+        setSettings(updatedSettings);
+      }
+    } catch (err: any) {
+      console.warn('Google Fit sync error:', err);
+    } finally {
+      setIsSyncingGoogleFit(false);
+    }
+  }, [selectedDate, settings]);
+
+  // Listen for window focus / visibility change to automatically advance date and auto-sync Fit
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const todayStr = getLocalDateString();
         setSelectedDate(prev => {
-          // If viewing yesterday's date, advance to new today
           if (prev === addDaysToDateString(todayStr, -1)) {
             return todayStr;
           }
           return prev;
         });
+
+        if (settings.googleFitConnected && settings.googleFitAccessToken) {
+          handleSyncGoogleFit(selectedDate, settings);
+        }
       }
     };
 
@@ -104,7 +189,14 @@ export function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, []);
+  }, [selectedDate, settings, handleSyncGoogleFit]);
+
+  // Auto-sync Google Fit when date changes if connected
+  useEffect(() => {
+    if (settings.googleFitConnected && settings.googleFitAccessToken) {
+      handleSyncGoogleFit(selectedDate, settings);
+    }
+  }, [selectedDate, settings.googleFitConnected]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
@@ -325,6 +417,7 @@ export function App() {
           weightHistory={weightHistory}
           favoriteMeals={favoriteMeals}
           yesterdayMeals={yesterdayMeals}
+          isSyncingGoogleFit={isSyncingGoogleFit}
           onOpenCapture={() => setIsCaptureOpen(true)}
           onDeleteMeal={handleDeleteMeal}
           onEditMeal={handleEditMeal}
@@ -333,6 +426,8 @@ export function App() {
           onUpdateActiveBurn={handleUpdateActiveBurn}
           onSaveWeight={handleSaveWeight}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onConnectGoogleFit={handleConnectGoogleFit}
+          onSyncGoogleFit={() => handleSyncGoogleFit(selectedDate, settings)}
         />
       </main>
 
@@ -367,8 +462,11 @@ export function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         settings={settings}
+        isConnectingGoogleFit={isConnectingGoogleFit}
         onSaveSettings={handleSaveSettings}
         onClose={() => setIsSettingsOpen(false)}
+        onConnectGoogleFit={handleConnectGoogleFit}
+        onDisconnectGoogleFit={handleDisconnectGoogleFit}
       />
 
       {/* Storage Destination Prompt Modal */}

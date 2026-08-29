@@ -55,6 +55,8 @@ export interface DailyActivity {
   baseBmrCalories: number; // resting BMR base calories
   totalCaloriesBurned: number; // baseBmrCalories + activeCaloriesBurned
   notes?: string;
+  source?: 'manual' | 'google_fit';
+  lastSyncedAt?: string;
   lastUpdated: string;
 }
 
@@ -74,6 +76,10 @@ export interface AppSettings {
   storageLocation: StorageLocation;
   storagePromptDismissed: boolean;
   googleAccessToken?: string;
+  googleFitConnected?: boolean;
+  googleFitAccessToken?: string;
+  googleFitTokenExpiry?: number;
+  googleFitLastSync?: string;
   includeRestingCalories?: boolean;
   profile: UserProfile;
   goals: UserGoals;

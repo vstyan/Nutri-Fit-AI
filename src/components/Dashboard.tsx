@@ -6,9 +6,11 @@ import {
   TrendingDown, 
   TrendingUp, 
   Check, 
-  PieChart,
-  Wheat,
-  Scale
+  PieChart, 
+  Wheat, 
+  Scale, 
+  RefreshCw, 
+  Activity 
 } from 'lucide-react';
 import { 
   DailySummary, 
@@ -36,6 +38,7 @@ interface DashboardProps {
   weightHistory: WeightRecord[];
   favoriteMeals: MealRecord[];
   yesterdayMeals: MealRecord[];
+  isSyncingGoogleFit?: boolean;
   onOpenCapture: () => void;
   onDeleteMeal: (mealId: string) => void;
   onEditMeal: (meal: MealRecord) => void;
@@ -44,6 +47,8 @@ interface DashboardProps {
   onUpdateActiveBurn: (activeKcal: number) => void;
   onSaveWeight: (weight: WeightRecord) => void;
   onOpenSettings: () => void;
+  onConnectGoogleFit?: () => void;
+  onSyncGoogleFit?: () => Promise<void>;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -53,6 +58,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   weightHistory,
   favoriteMeals,
   yesterdayMeals,
+  isSyncingGoogleFit = false,
   onOpenCapture,
   onDeleteMeal,
   onEditMeal,
@@ -60,7 +66,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onCopyMealToToday,
   onUpdateActiveBurn,
   onSaveWeight,
-  onOpenSettings
+  onOpenSettings,
+  onConnectGoogleFit,
+  onSyncGoogleFit
 }) => {
   const { totals, activity } = summary;
   const { goals } = settings;
@@ -230,6 +238,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
+        {/* Google Fit Live Sync Widget */}
+        {settings.googleFitConnected ? (
+          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-semibold text-emerald-300">Google Fit Connected</span>
+              {activity.lastSyncedAt && (
+                <span className="text-[10px] text-slate-400 hidden sm:inline">
+                  • Synced {new Date(activity.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+            {onSyncGoogleFit && (
+              <button
+                type="button"
+                onClick={onSyncGoogleFit}
+                disabled={isSyncingGoogleFit}
+                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 py-1 px-2.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 transition disabled:opacity-50"
+                title="Sync latest calories burned from Google Fit"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{isSyncingGoogleFit ? 'Syncing...' : 'Sync Fit'}</span>
+              </button>
+            )}
+          </div>
+        ) : onConnectGoogleFit ? (
+          <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs text-slate-300">Auto-sync burn from Google Fit?</span>
+            </div>
+            <button
+              type="button"
+              onClick={onConnectGoogleFit}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1 py-1 px-2.5 rounded-lg bg-emerald-950/50 border border-emerald-500/30 hover:bg-emerald-900/50 transition shadow-sm shrink-0"
+            >
+              <span>Connect Google Fit</span>
+            </button>
+          </div>
+        ) : null}
+
         {/* Burn Display: 3-column breakdown if BMR included, single entry if Exclude / In Fitness Tracker */}
         {includeResting ? (
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -242,7 +291,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
               <span className="text-[10px] text-slate-400 block">2. Exercise / Steps</span>
               <span className="font-bold text-emerald-400 text-sm mt-0.5 block">+{activeKcalValue} kcal</span>
-              <span className="text-[9px] text-slate-500">Entered by you</span>
+              <span className="text-[9px] text-slate-500">{activity.source === 'google_fit' ? 'From Google Fit' : 'Entered by you'}</span>
             </div>
 
             <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
@@ -259,14 +308,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-white block">Rest + Exercise Burned</span>
-                <span className="text-[11px] text-slate-400">Total daily burn from Google Fit / fitness tracker</span>
+                <span className="text-[11px] text-slate-400">
+                  {activity.source === 'google_fit' ? 'Auto-synced from Google Fit' : 'Total daily burn from Google Fit / fitness tracker'}
+                </span>
               </div>
             </div>
             <div className="text-right">
               <span className="text-xl font-extrabold text-emerald-400 block">
                 {totalBurned} <span className="text-xs font-normal text-slate-400">kcal</span>
               </span>
-              <span className="text-[10px] text-emerald-400/80">Single total logged</span>
+              <span className="text-[10px] text-emerald-400/80">
+                {activity.source === 'google_fit' ? 'Google Fit live' : 'Single total logged'}
+              </span>
             </div>
           </div>
         )}
