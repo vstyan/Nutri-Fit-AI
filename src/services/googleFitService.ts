@@ -58,7 +58,8 @@ export async function requestGoogleFitAccessToken(
 
 /**
  * Fetches total calories burned for a specific calendar date from Google Fit.
- * Queries total calories expended (com.google.calories.expended) across the full 24-hour day window.
+ * Queries the platform merged stream (derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended)
+ * across the full 24-hour day window to match the exact daily total computed by Google Fit.
  */
 export async function fetchGoogleFitCalories(
   dateStr: string,
@@ -71,7 +72,36 @@ export async function fetchGoogleFitCalories(
   const startTimeMillis = startOfDay.getTime();
   const endTimeMillis = startTimeMillis + 86400000; // Exact midnight at end of day
 
-  const response = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+  const parseCaloriesFromResponse = async (response: Response): Promise<number> => {
+    const data = await response.json();
+    let total = 0;
+
+    if (data.bucket && Array.isArray(data.bucket)) {
+      for (const bucket of data.bucket) {
+        if (bucket.dataset && Array.isArray(bucket.dataset)) {
+          for (const dataset of bucket.dataset) {
+            if (dataset.point && Array.isArray(dataset.point)) {
+              for (const point of dataset.point) {
+                if (point.value && Array.isArray(point.value)) {
+                  for (const val of point.value) {
+                    const num = typeof val.fpVal === 'number' 
+                      ? val.fpVal 
+                      : (typeof val.intVal === 'number' ? val.intVal : 0);
+                    total += num;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return total;
+  };
+
+  // 1. Primary: query platform merged calories stream (combines BMR + activity calories)
+  let totalCalories = 0;
+  const mergedResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -79,7 +109,10 @@ export async function fetchGoogleFitCalories(
     },
     body: JSON.stringify({
       aggregateBy: [
-        { dataTypeName: 'com.google.calories.expended' }
+        {
+          dataTypeName: 'com.google.calories.expended',
+          dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
+        }
       ],
       bucketByTime: { durationMillis: 86400000 },
       startTimeMillis,
@@ -87,36 +120,41 @@ export async function fetchGoogleFitCalories(
     })
   });
 
-  if (response.status === 401) {
+  if (mergedResponse.status === 401) {
     throw new Error('UNAUTHORIZED');
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google Fit API error (${response.status}): ${errorText}`);
+  if (mergedResponse.ok) {
+    totalCalories = await parseCaloriesFromResponse(mergedResponse);
   }
 
-  const data = await response.json();
-  let totalCalories = 0;
+  // 2. Fallback: if merged stream failed or returned 0, query generic dataTypeName
+  if (totalCalories <= 0) {
+    const fallbackResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        aggregateBy: [
+          { dataTypeName: 'com.google.calories.expended' }
+        ],
+        bucketByTime: { durationMillis: 86400000 },
+        startTimeMillis,
+        endTimeMillis
+      })
+    });
 
-  if (data.bucket && Array.isArray(data.bucket)) {
-    for (const bucket of data.bucket) {
-      if (bucket.dataset && Array.isArray(bucket.dataset)) {
-        for (const dataset of bucket.dataset) {
-          if (dataset.point && Array.isArray(dataset.point)) {
-            for (const point of dataset.point) {
-              if (point.value && Array.isArray(point.value)) {
-                for (const val of point.value) {
-                  const num = typeof val.fpVal === 'number' 
-                    ? val.fpVal 
-                    : (typeof val.intVal === 'number' ? val.intVal : 0);
-                  totalCalories += num;
-                }
-              }
-            }
-          }
-        }
-      }
+    if (fallbackResponse.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+
+    if (fallbackResponse.ok) {
+      totalCalories = await parseCaloriesFromResponse(fallbackResponse);
+    } else if (!mergedResponse.ok) {
+      const errorText = await mergedResponse.text();
+      throw new Error(`Google Fit API error (${mergedResponse.status}): ${errorText}`);
     }
   }
 
