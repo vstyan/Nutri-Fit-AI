@@ -8,6 +8,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { AppSettings } from '../types';
+import { getLocalDateString, addDaysToDateString, formatDisplayDate } from '../utils/dateUtils';
 
 interface HeaderProps {
   selectedDate: string;
@@ -24,25 +25,14 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenStorageModal,
 }) => {
-  const currentDate = new Date(selectedDate + 'T00:00:00');
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   const handlePrevDay = () => {
-    const prev = new Date(currentDate);
-    prev.setDate(prev.getDate() - 1);
-    onDateChange(prev.toISOString().split('T')[0]);
+    onDateChange(addDaysToDateString(selectedDate, -1));
   };
 
   const handleNextDay = () => {
-    const next = new Date(currentDate);
-    next.setDate(next.getDate() + 1);
-    onDateChange(next.toISOString().split('T')[0]);
-  };
-
-  const formatDateDisplay = (dateStr: string) => {
-    if (dateStr === todayStr) return 'Today';
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    onDateChange(addDaysToDateString(selectedDate, 1));
   };
 
   return (
@@ -83,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="px-2 sm:px-2.5 py-0.5 text-xs font-semibold text-slate-200 flex items-center space-x-1.5 hover:text-cyan-400 transition"
           >
             <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="whitespace-nowrap">{formatDateDisplay(selectedDate)}</span>
+            <span className="whitespace-nowrap">{formatDisplayDate(selectedDate)}</span>
           </button>
 
           <button

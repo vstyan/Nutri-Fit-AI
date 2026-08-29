@@ -26,6 +26,7 @@ import {
   cmToFeetInches, 
   feetInchesToCm 
 } from '../utils/bmrCalculator';
+import { getLocalDateString } from '../utils/dateUtils';
 import { 
   exportAllDataAsJson, 
   importBackupJson, 
@@ -168,7 +169,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `nutrifit-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `nutrifit-backup-${getLocalDateString()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -672,7 +673,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.1.7
+                  v1.1.8
                 </span>
               </label>
 

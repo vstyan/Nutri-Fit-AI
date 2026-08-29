@@ -31,9 +31,10 @@ import {
   DEFAULT_SETTINGS
 } from './services/storageService';
 import { calculateBMR } from './utils/bmrCalculator';
+import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
 
 export function App() {
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [currentWeight, setCurrentWeight] = useState<WeightRecord | null>(null);
@@ -45,7 +46,7 @@ export function App() {
     const includeResting = DEFAULT_SETTINGS.includeRestingCalories !== false;
     const base = includeResting ? calculateBMR(DEFAULT_SETTINGS.profile) : 0;
     return {
-      date: selectedDate,
+      date: getLocalDateString(),
       activeCaloriesBurned: 0,
       baseBmrCalories: base,
       totalCaloriesBurned: base,
@@ -82,6 +83,29 @@ export function App() {
     });
   }, []);
 
+  // Listen for window focus / visibility change to automatically advance date if day changed overnight
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const todayStr = getLocalDateString();
+        setSelectedDate(prev => {
+          // If viewing yesterday's date, advance to new today
+          if (prev === addDaysToDateString(todayStr, -1)) {
+            return todayStr;
+          }
+          return prev;
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, []);
+
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
     const dayMeals = await getMealsForDate(date, currentSettings);
@@ -91,9 +115,7 @@ export function App() {
     const allFavs = await getAllFavoriteMeals();
 
     // Load yesterday's meals for 1-tap quick copying
-    const dObj = new Date(date + 'T00:00:00');
-    dObj.setDate(dObj.getDate() - 1);
-    const yStr = dObj.toISOString().split('T')[0];
+    const yStr = addDaysToDateString(date, -1);
     const yMeals = await getMealsForDate(yStr, currentSettings);
 
     setMeals(dayMeals);
@@ -114,12 +136,8 @@ export function App() {
       caloriesBurned: number;
     }> = [];
 
-    const baseDate = new Date(date + 'T00:00:00');
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() - i);
-      const dStr = d.toISOString().split('T')[0];
-      
+    const past7Dates = getPastNDaysDateStrings(7, date);
+    for (const dStr of past7Dates) {
       const mList = await getMealsForDate(dStr, currentSettings);
       const act = await getActivityForDate(dStr, currentSettings);
 

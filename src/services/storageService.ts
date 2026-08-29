@@ -1,6 +1,7 @@
 import { get, set, entries, clear as clearIdb } from 'idb-keyval';
 import { AppSettings, MealRecord, DailyActivity, UserProfile, WeightRecord } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
+import { getPastNDaysDateStrings } from '../utils/dateUtils';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
 
 const SETTINGS_KEY = 'nutrifit_settings_v4';
@@ -313,12 +314,9 @@ export async function saveWeightForDate(weight: WeightRecord, settings: AppSetti
 
 export async function getWeightHistory(days = 14): Promise<WeightRecord[]> {
   const list: WeightRecord[] = [];
-  const today = new Date();
+  const dateStrings = getPastNDaysDateStrings(days);
 
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dStr = d.toISOString().split('T')[0];
+  for (const dStr of dateStrings) {
     const rec = await getWeightForDate(dStr);
     if (rec) {
       list.push(rec);
