@@ -324,67 +324,69 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Input Field for Workout / Tracker Burn */}
-        <div className="space-y-2 pt-1">
-          <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Rest + Workout Burn:'}</span>
-            <span className="text-[11px] text-slate-400">
-              {includeResting ? `Total Daily: ${totalBurned} kcal` : `Total: ${totalBurned} kcal`}
-            </span>
-          </label>
-
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="relative flex-1 w-full">
-              <input
-                type="number"
-                value={inputActiveKcal === '0' ? '' : inputActiveKcal}
-                placeholder={includeResting ? "e.g. 450 (walking, workout, running)" : "e.g. 2400 (from Google Fit total burn)"}
-                onFocus={e => e.target.select()}
-                onChange={e => setInputActiveKcal(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
-              />
-              <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">
-                {includeResting ? 'active kcal' : 'total kcal'}
+        {/* Input Field for Workout / Tracker Burn (Hidden when Google Fit is connected) */}
+        {!settings.googleFitConnected && (
+          <div className="space-y-2 pt-1">
+            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+              <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Rest + Workout Burn:'}</span>
+              <span className="text-[11px] text-slate-400">
+                {includeResting ? `Total Daily: ${totalBurned} kcal` : `Total: ${totalBurned} kcal`}
               </span>
+            </label>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="relative flex-1 w-full">
+                <input
+                  type="number"
+                  value={inputActiveKcal === '0' ? '' : inputActiveKcal}
+                  placeholder={includeResting ? "e.g. 450 (walking, workout, running)" : "e.g. 2400 (from Google Fit total burn)"}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setInputActiveKcal(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                />
+                <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">
+                  {includeResting ? 'active kcal' : 'total kcal'}
+                </span>
+              </div>
+
+              <button
+                onClick={() => handleSaveActiveBurn()}
+                className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center space-x-1.5 shadow-lg ${
+                  isSavedRecently 
+                    ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20' 
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+                }`}
+              >
+                {isSavedRecently ? (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>{includeResting ? 'Save Daily Burn' : 'Save Rest + Workout Burn'}</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            <button
-              onClick={() => handleSaveActiveBurn()}
-              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-sm transition flex items-center justify-center space-x-1.5 shadow-lg ${
-                isSavedRecently 
-                  ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20' 
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
-              }`}
-            >
-              {isSavedRecently ? (
-                <>
-                  <Check className="w-4 h-4 stroke-[3]" />
-                  <span>Saved!</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>{includeResting ? 'Save Daily Burn' : 'Save Rest + Workout Burn'}</span>
-                </>
-              )}
-            </button>
+            {/* Quick presets */}
+            <div className="flex items-center space-x-1.5 pt-1 overflow-x-auto">
+              <span className="text-[11px] text-slate-400 mr-1 shrink-0">Quick add:</span>
+              {(includeResting ? [200, 350, 500, 700, 900] : [1800, 2100, 2400, 2700, 3000]).map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => handlePresetClick(val)}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700/80 transition shrink-0"
+                >
+                  {includeResting ? `+${val} kcal` : `${val} kcal`}
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* Quick presets */}
-          <div className="flex items-center space-x-1.5 pt-1 overflow-x-auto">
-            <span className="text-[11px] text-slate-400 mr-1 shrink-0">Quick add:</span>
-            {(includeResting ? [200, 350, 500, 700, 900] : [1800, 2100, 2400, 2700, 3000]).map(val => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => handlePresetClick(val)}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700/80 transition shrink-0"
-              >
-                {includeResting ? `+${val} kcal` : `${val} kcal`}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* 4. Nutrition, Fiber & Net Carbs Progress Bars */}
