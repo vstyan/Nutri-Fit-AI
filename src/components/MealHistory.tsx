@@ -195,122 +195,133 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                 key={meal.id}
                 className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition shadow-md"
               >
-                <div className="p-4 flex items-start justify-between gap-3">
-                  {/* Photo Thumbnail */}
-                  {meal.photoUrl ? (
-                    <button
-                      onClick={() => setSelectedPhoto(meal.photoUrl || null)}
-                      className="w-16 h-16 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-950 relative group cursor-pointer"
-                      title="Click to view photo"
-                    >
-                      <img src={meal.photoUrl} alt={meal.title} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
-                        <ImageIcon className="w-4 h-4" />
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center shrink-0 text-xl">
-                      {MEAL_LABELS[meal.mealType]?.icon || '🍽️'}
-                    </div>
-                  )}
-
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                <div className="p-3.5 sm:p-4 space-y-2.5">
+                  {/* Top Row: Category + Timestamp on Left, Action Toolbar on Right */}
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-800/60 pb-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0">
                         {MEAL_LABELS[meal.mealType]?.label || meal.mealType}
                       </span>
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {timeFormatted}
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 shrink-0 bg-slate-950/60 px-2 py-0.5 rounded-full border border-slate-800/80">
+                        <Clock className="w-3 h-3 text-cyan-400" />
+                        <span>{timeFormatted}</span>
                       </span>
                     </div>
 
-                    <h3 className="font-semibold text-white text-sm mt-1 truncate">{meal.title}</h3>
+                    {/* Action buttons toolbar: neatly grouped pill */}
+                    <div className="flex items-center bg-slate-950/80 border border-slate-800 p-0.5 rounded-xl space-x-0.5 shrink-0 shadow-inner">
+                      <button
+                        onClick={() => onEditMeal(meal)}
+                        className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition"
+                        title="Edit meal & ingredients"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
 
-                    {/* Macros line with Fiber & Net Carbs */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <span className="text-xs font-mono font-semibold text-cyan-300 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20" title={`Total Carbs: ${meal.totalCarbs}g | Fiber: ${meal.totalFiber || 0}g`}>
-                        {netC}g <span className="text-[10px] font-normal text-slate-400">Net C</span>
-                      </span>
-                      {meal.totalFiber !== undefined && meal.totalFiber > 0 && (
-                        <span className="text-xs font-mono font-semibold text-indigo-300 bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-500/20">
-                          {meal.totalFiber}g <span className="text-[10px] font-normal text-slate-400">Fib</span>
-                        </span>
-                      )}
-                      <span className="text-xs font-mono font-semibold text-rose-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20">
-                        {meal.totalProtein}g <span className="text-[10px] font-normal text-slate-400">P</span>
-                      </span>
-                      <span className="text-xs font-mono font-semibold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20">
-                        {meal.totalFat}g <span className="text-[10px] font-normal text-slate-400">F</span>
-                      </span>
-                      <span className="text-xs font-mono font-semibold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20">
-                        {meal.totalCalories} <span className="text-[10px] font-normal text-slate-400">kcal</span>
-                      </span>
+                      <button
+                        onClick={() => onToggleFavorite(meal.id)}
+                        className={`p-1.5 rounded-lg transition ${
+                          meal.isFavorite 
+                            ? 'text-amber-400 bg-amber-500/10' 
+                            : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800'
+                        }`}
+                        title={meal.isFavorite ? 'Unfavorite' : 'Add to Favorites'}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${meal.isFavorite ? 'fill-current' : ''}`} />
+                      </button>
+
+                      <button
+                        onClick={() => onCopyMealToToday(meal)}
+                        className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition"
+                        title="Duplicate meal"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => setExpandedMealId(isExpanded ? null : meal.id)}
+                        className={`p-1.5 rounded-lg transition ${isExpanded ? 'text-cyan-300 bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                        title="View ingredients"
+                      >
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <button
+                        onClick={() => onDeleteMeal(meal.id)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-950/30 transition"
+                        title="Delete meal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Actions: Edit, Favorite, Copy, Expand, Delete */}
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      onClick={() => onEditMeal(meal)}
-                      className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition"
-                      title="Edit meal & ingredients"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                  {/* Main Content: Thumbnail + Title & Macro Badges */}
+                  <div className="flex items-start gap-3">
+                    {/* Photo Thumbnail */}
+                    {meal.photoUrl ? (
+                      <button
+                        onClick={() => setSelectedPhoto(meal.photoUrl || null)}
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-950 relative group cursor-pointer shadow"
+                        title="Click to view photo"
+                      >
+                        <img src={meal.photoUrl} alt={meal.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
+                          <ImageIcon className="w-4 h-4" />
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center shrink-0 text-xl shadow-inner">
+                        {MEAL_LABELS[meal.mealType]?.icon || '🍽️'}
+                      </div>
+                    )}
 
-                    <button
-                      onClick={() => onToggleFavorite(meal.id)}
-                      className={`p-1.5 rounded-lg transition ${
-                        meal.isFavorite 
-                          ? 'text-amber-400 bg-amber-500/10' 
-                          : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800'
-                      }`}
-                      title={meal.isFavorite ? 'Unfavorite' : 'Add to Favorites'}
-                    >
-                      <Star className={`w-4 h-4 ${meal.isFavorite ? 'fill-current' : ''}`} />
-                    </button>
+                    {/* Title & Macros */}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <h3 className="font-bold text-white text-sm leading-snug truncate" title={meal.title}>
+                        {meal.title}
+                      </h3>
 
-                    <button
-                      onClick={() => onCopyMealToToday(meal)}
-                      className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition"
-                      title="Duplicate meal"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={() => setExpandedMealId(isExpanded ? null : meal.id)}
-                      className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-                      title="View ingredients"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-
-                    <button
-                      onClick={() => onDeleteMeal(meal.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition"
-                      title="Delete meal"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      {/* Macros line with Fiber & Net Carbs */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-lg border border-cyan-500/30"
+                          title={`Total Carbs: ${meal.totalCarbs}g | Fiber: ${meal.totalFiber || 0}g`}
+                        >
+                          {netC}g <span className="text-[10px] font-normal text-slate-400">Net C</span>
+                        </span>
+                        {meal.totalFiber !== undefined && meal.totalFiber > 0 && (
+                          <span className="text-xs font-mono font-semibold text-indigo-300 bg-indigo-950/60 px-1.5 py-0.5 rounded-lg border border-indigo-500/30">
+                            {meal.totalFiber}g <span className="text-[10px] font-normal text-slate-400">Fib</span>
+                          </span>
+                        )}
+                        <span className="text-xs font-mono font-semibold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded-lg border border-rose-500/30">
+                          {meal.totalProtein}g <span className="text-[10px] font-normal text-slate-400">P</span>
+                        </span>
+                        <span className="text-xs font-mono font-semibold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                          {meal.totalFat}g <span className="text-[10px] font-normal text-slate-400">F</span>
+                        </span>
+                        <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                          {meal.totalCalories} <span className="text-[10px] font-normal text-slate-400">kcal</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Expanded Food Items List */}
                 {isExpanded && meal.items && meal.items.length > 0 && (
-                  <div className="px-4 pb-4 pt-1 border-t border-slate-800/80 bg-slate-950/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="px-4 pb-3.5 pt-2 border-t border-slate-800/80 bg-slate-950/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         Ingredients & Portions ({meal.items.length})
                       </div>
                       <button
                         type="button"
                         onClick={() => onEditMeal(meal)}
-                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold py-0.5 px-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition"
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold py-1 px-2.5 rounded-lg bg-slate-900 border border-slate-700/80 hover:bg-slate-800 transition"
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-3.5 h-3.5" />
                         <span>Edit Ingredients</span>
                       </button>
                     </div>
@@ -318,7 +329,7 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                       {meal.items.map((item, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-800/60"
+                          className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80"
                         >
                           <div>
                             <span className="font-medium text-slate-200">{item.name}</span>
@@ -331,7 +342,7 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                             )}
                             <span className="text-rose-400">{item.protein}g P</span>
                             <span className="text-amber-400">{item.fat}g F</span>
-                            <span className="text-emerald-400">{item.calories} kcal</span>
+                            <span className="text-emerald-400 font-semibold">{item.calories} kcal</span>
                           </div>
                         </div>
                       ))}
