@@ -212,7 +212,7 @@ export function App() {
         setSettings(updatedSettings);
 
         if (isManual) {
-          console.log(`Google Fit synced successfully: ${fitResult.totalCalories} kcal`);
+          alert(`Google Fit Sync Successful!\n\nRetrieved: ${fitResult.totalCalories} kcal from Google Cloud\n(BMR: ${fitResult.bmrCalories || 0} kcal, Active: ${fitResult.activeCalories || 0} kcal)\n\nNote: If your phone app displays a higher number, pull down to refresh inside the Google Fit phone app to upload the latest local data to Google Cloud.`);
         }
       }
     } catch (err: any) {
