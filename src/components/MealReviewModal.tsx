@@ -10,9 +10,12 @@ import {
   ChevronUp, 
   Zap, 
   Wheat,
-  Star
+  Star,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
+import { analyzeFoodText } from '../services/geminiService';
 
 interface MealReviewModalProps {
   isOpen: boolean;
@@ -20,6 +23,7 @@ interface MealReviewModalProps {
   initialResult?: GeminiAnalysisResult | null;
   editingMeal?: MealRecord | null;
   targetDate: string;
+  geminiApiKey?: string;
   onSave: (meal: MealRecord) => void;
   onCancel: () => void;
 }
@@ -30,6 +34,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   initialResult,
   editingMeal,
   targetDate,
+  geminiApiKey,
   onSave,
   onCancel
 }) => {
@@ -118,6 +123,47 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const totalProtein = Math.round(items.reduce((sum, item) => sum + (Number(item.protein) || 0), 0) * 10) / 10;
   const totalFat = Math.round(items.reduce((sum, item) => sum + (Number(item.fat) || 0), 0) * 10) / 10;
   const totalCalories = Math.round(items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0));
+
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+
+  const handleReanalyzeWithAI = async () => {
+    if (!title.trim()) return;
+    if (!geminiApiKey) {
+      setReanalyzeError('Please enter your Gemini API Key in Settings to re-calculate with AI.');
+      return;
+    }
+    setIsReanalyzing(true);
+    setReanalyzeError(null);
+    try {
+      const descriptionToAnalyze = notes.trim() ? `${title.trim()}, ${notes.trim()}` : title.trim();
+      const result = await analyzeFoodText(descriptionToAnalyze, geminiApiKey);
+      if (result.items && result.items.length > 0) {
+        setItems(
+          result.items.map((item, idx) => ({
+            id: `item-${Date.now()}-${idx}`,
+            name: item.name,
+            portion: item.portion,
+            grams: item.grams,
+            carbs: item.carbs,
+            fiber: item.fiber || 0,
+            protein: item.protein,
+            fat: item.fat,
+            calories: item.calories,
+            confidence: item.confidence
+          }))
+        );
+      }
+      if (result.title) setTitle(result.title);
+      if (result.mealType) setMealType(result.mealType);
+      if (result.dietaryNotes) setNotes(result.dietaryNotes);
+    } catch (err: any) {
+      console.error('Re-estimation error:', err);
+      setReanalyzeError(err.message || 'Failed to re-calculate macros with Gemini AI.');
+    } finally {
+      setIsReanalyzing(false);
+    }
+  };
 
   const handleUpdateItem = (id: string, field: keyof FoodItem, value: any) => {
     setItems(prev =>
@@ -220,12 +266,13 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
             <div className="flex-1 space-y-2.5 w-full">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1">
-                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Meal Title</label>
+                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Meal Title / Description</label>
                   <input
                     type="text"
                     value={title}
                     onFocus={e => e.target.select()}
                     onChange={e => setTitle(e.target.value)}
+                    placeholder="e.g. Protein shake with whey, banana, and peanut butter"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition"
                   />
                 </div>
@@ -242,6 +289,34 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                   <Star className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
                 </button>
               </div>
+
+              {/* 1-Tap AI Recalculate Button */}
+              <button
+                type="button"
+                onClick={handleReanalyzeWithAI}
+                disabled={isReanalyzing || !title.trim()}
+                className="w-full px-3 py-1.5 bg-gradient-to-r from-cyan-950/70 via-slate-900 to-emerald-950/70 hover:from-cyan-900/70 hover:to-emerald-900/70 border border-cyan-500/30 text-cyan-300 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-sm disabled:opacity-50"
+                title="Pass this updated description to Gemini to re-estimate all ingredients, portions, and macros"
+              >
+                {isReanalyzing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Gemini AI is recalculating ingredients & macros...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                    <span>Recalculate Macros with Gemini AI</span>
+                  </>
+                )}
+              </button>
+
+              {reanalyzeError && (
+                <div className="p-2 bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs rounded-xl flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">{reanalyzeError}</span>
+                </div>
+              )}
 
               <div>
                 <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Meal Category</label>

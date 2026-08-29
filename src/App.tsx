@@ -334,6 +334,7 @@ export function App() {
           initialResult={reviewResult}
           editingMeal={editingMeal}
           targetDate={selectedDate}
+          geminiApiKey={settings.geminiApiKey}
           onSave={handleSaveMeal}
           onCancel={() => {
             setIsReviewOpen(false);
