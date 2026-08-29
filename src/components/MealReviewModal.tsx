@@ -16,8 +16,9 @@ import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
 
 interface MealReviewModalProps {
   isOpen: boolean;
-  photoUrl: string;
-  initialResult: GeminiAnalysisResult;
+  photoUrl?: string;
+  initialResult?: GeminiAnalysisResult | null;
+  editingMeal?: MealRecord | null;
   targetDate: string;
   onSave: (meal: MealRecord) => void;
   onCancel: () => void;
@@ -25,33 +26,90 @@ interface MealReviewModalProps {
 
 export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   isOpen,
-  photoUrl,
+  photoUrl = '',
   initialResult,
+  editingMeal,
   targetDate,
   onSave,
   onCancel
 }) => {
-  const [title, setTitle] = useState(initialResult.title);
-  const [mealType, setMealType] = useState<MealType>(initialResult.mealType || 'lunch');
-  const [notes, setNotes] = useState(initialResult.dietaryNotes || '');
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [items, setItems] = useState<FoodItem[]>(
-    initialResult.items.map((item, idx) => ({
-      id: `item-${Date.now()}-${idx}`,
-      name: item.name,
-      portion: item.portion,
-      grams: item.grams,
-      carbs: item.carbs,
-      fiber: item.fiber || 0,
-      protein: item.protein,
-      fat: item.fat,
-      calories: item.calories,
-      confidence: item.confidence
-    }))
-  );
+  const isEditMode = !!editingMeal;
+  const [title, setTitle] = useState(editingMeal?.title || initialResult?.title || '');
+  const [mealType, setMealType] = useState<MealType>(editingMeal?.mealType || initialResult?.mealType || 'lunch');
+  const [notes, setNotes] = useState(editingMeal?.notes || initialResult?.dietaryNotes || '');
+  const [isFavorite, setIsFavorite] = useState(editingMeal?.isFavorite || false);
+  const [isEditing, setIsEditing] = useState(isEditMode);
+  const [items, setItems] = useState<FoodItem[]>(() => {
+    if (editingMeal && editingMeal.items) {
+      return editingMeal.items;
+    }
+    if (initialResult && initialResult.items) {
+      return initialResult.items.map((item, idx) => ({
+        id: `item-${Date.now()}-${idx}`,
+        name: item.name,
+        portion: item.portion,
+        grams: item.grams,
+        carbs: item.carbs,
+        fiber: item.fiber || 0,
+        protein: item.protein,
+        fat: item.fat,
+        calories: item.calories,
+        confidence: item.confidence
+      }));
+    }
+    return [];
+  });
+
+  // Sync state whenever modal opens or props change
+  React.useEffect(() => {
+    if (isOpen) {
+      if (editingMeal) {
+        setTitle(editingMeal.title);
+        setMealType(editingMeal.mealType || 'lunch');
+        setNotes(editingMeal.notes || '');
+        setIsFavorite(!!editingMeal.isFavorite);
+        setIsEditing(true);
+        setItems(
+          (editingMeal.items || []).map((item, idx) => ({
+            id: item.id || `item-${Date.now()}-${idx}`,
+            name: item.name,
+            portion: item.portion || `${item.grams || 100}g`,
+            grams: item.grams || 100,
+            carbs: item.carbs || 0,
+            fiber: item.fiber || 0,
+            protein: item.protein || 0,
+            fat: item.fat || 0,
+            calories: item.calories || 0,
+            confidence: item.confidence || 'high'
+          }))
+        );
+      } else if (initialResult) {
+        setTitle(initialResult.title);
+        setMealType(initialResult.mealType || 'lunch');
+        setNotes(initialResult.dietaryNotes || '');
+        setIsFavorite(false);
+        setIsEditing(false);
+        setItems(
+          initialResult.items.map((item, idx) => ({
+            id: `item-${Date.now()}-${idx}`,
+            name: item.name,
+            portion: item.portion,
+            grams: item.grams,
+            carbs: item.carbs,
+            fiber: item.fiber || 0,
+            protein: item.protein,
+            fat: item.fat,
+            calories: item.calories,
+            confidence: item.confidence
+          }))
+        );
+      }
+    }
+  }, [isOpen, editingMeal, initialResult]);
 
   if (!isOpen) return null;
+
+  const currentPhoto = editingMeal ? (editingMeal.photoUrl || photoUrl) : photoUrl;
 
   // Calculate live totals
   const totalCarbs = Math.round(items.reduce((sum, item) => sum + (Number(item.carbs) || 0), 0) * 10) / 10;
@@ -80,7 +138,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const handleAddItem = () => {
     const newItem: FoodItem = {
       id: `item-${Date.now()}`,
-      name: 'New Item',
+      name: 'New Ingredient',
       portion: '1 serving',
       grams: 100,
       carbs: 10,
@@ -99,11 +157,11 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
 
   const handleQuickSave = () => {
     const meal: MealRecord = {
-      id: `meal-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      date: targetDate,
+      id: editingMeal ? editingMeal.id : `meal-${Date.now()}`,
+      timestamp: editingMeal ? editingMeal.timestamp : new Date().toISOString(),
+      date: editingMeal ? editingMeal.date : targetDate,
       mealType,
-      title,
+      title: title.trim() || (editingMeal ? editingMeal.title : 'Meal Entry'),
       notes,
       items,
       totalCarbs,
@@ -112,7 +170,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       totalProtein,
       totalFat,
       totalCalories,
-      photoUrl,
+      photoUrl: currentPhoto,
       isFavorite
     };
     onSave(meal);
@@ -124,12 +182,16 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 shrink-0">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-gradient-to-tr from-cyan-500 to-emerald-500 rounded-xl text-white">
-              <Sparkles className="w-5 h-5" />
+            <div className={`p-2 rounded-xl text-white ${isEditMode ? 'bg-cyan-600' : 'bg-gradient-to-tr from-cyan-500 to-emerald-500'}`}>
+              {isEditMode ? <Edit3 className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white leading-tight">Meal Analysis Review</h2>
-              <p className="text-xs text-slate-400">Gemini AI Nutrition & Macro Breakdown</p>
+              <h2 className="text-lg font-bold text-white leading-tight">
+                {isEditMode ? 'Edit Meal & Ingredients' : 'Meal Analysis Review'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {isEditMode ? 'Modify ingredients, portions, macros, and meal title' : 'Gemini AI Nutrition & Macro Breakdown'}
+              </p>
             </div>
           </div>
           <button
@@ -249,8 +311,12 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                 <Zap className="w-5 h-5 fill-current" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-white">Looks accurate?</div>
-                <div className="text-xs text-emerald-300">1-tap save with AI macro estimations</div>
+                <div className="text-sm font-semibold text-white">
+                  {isEditMode ? 'Done modifying meal?' : 'Looks accurate?'}
+                </div>
+                <div className="text-xs text-emerald-300">
+                  {isEditMode ? '1-tap save your updated ingredients & macros' : '1-tap save with AI macro estimations'}
+                </div>
               </div>
             </div>
             <button
@@ -258,7 +324,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
               className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5"
             >
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>1-Tap Save</span>
+              <span>{isEditMode ? 'Update Meal' : '1-Tap Save'}</span>
             </button>
           </div>
 
@@ -394,7 +460,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
             className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow flex items-center space-x-1.5"
           >
             <Check className="w-4 h-4" />
-            <span>Save Meal</span>
+            <span>{isEditMode ? 'Save Changes' : 'Save Meal'}</span>
           </button>
         </div>
       </div>

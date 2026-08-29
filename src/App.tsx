@@ -68,6 +68,7 @@ export function App() {
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [reviewPhotoUrl, setReviewPhotoUrl] = useState('');
   const [reviewResult, setReviewResult] = useState<GeminiAnalysisResult | null>(null);
+  const [editingMeal, setEditingMeal] = useState<MealRecord | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoragePromptOpen, setIsStoragePromptOpen] = useState(false);
 
@@ -155,13 +156,22 @@ export function App() {
     setIsReviewOpen(true);
   };
 
-  // Save reviewed meal
+  // Save meal from review or edit
   const handleSaveMeal = async (meal: MealRecord) => {
     await saveMeal(meal, settings);
     setIsReviewOpen(false);
     setReviewResult(null);
     setReviewPhotoUrl('');
+    setEditingMeal(null);
     loadDayData(selectedDate, settings);
+  };
+
+  // Open edit modal for an existing logged meal
+  const handleEditMeal = (meal: MealRecord) => {
+    setEditingMeal(meal);
+    setReviewPhotoUrl(meal.photoUrl || '');
+    setReviewResult(null);
+    setIsReviewOpen(true);
   };
 
   // Delete meal
@@ -299,6 +309,7 @@ export function App() {
           yesterdayMeals={yesterdayMeals}
           onOpenCapture={() => setIsCaptureOpen(true)}
           onDeleteMeal={handleDeleteMeal}
+          onEditMeal={handleEditMeal}
           onToggleFavorite={handleToggleFavorite}
           onCopyMealToToday={handleCopyMealToToday}
           onUpdateActiveBurn={handleUpdateActiveBurn}
@@ -315,17 +326,20 @@ export function App() {
         onClose={() => setIsCaptureOpen(false)}
       />
 
-      {/* Meal Review & 1-Tap Save Modal */}
-      {reviewResult && (
+      {/* Meal Review & Edit Modal */}
+      {(reviewResult || editingMeal) && (
         <MealReviewModal
           isOpen={isReviewOpen}
           photoUrl={reviewPhotoUrl}
           initialResult={reviewResult}
+          editingMeal={editingMeal}
           targetDate={selectedDate}
           onSave={handleSaveMeal}
           onCancel={() => {
             setIsReviewOpen(false);
             setReviewResult(null);
+            setReviewPhotoUrl('');
+            setEditingMeal(null);
           }}
         />
       )}

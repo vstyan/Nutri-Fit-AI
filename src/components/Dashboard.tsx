@@ -38,6 +38,7 @@ interface DashboardProps {
   yesterdayMeals: MealRecord[];
   onOpenCapture: () => void;
   onDeleteMeal: (mealId: string) => void;
+  onEditMeal: (meal: MealRecord) => void;
   onToggleFavorite: (mealId: string) => void;
   onCopyMealToToday: (meal: MealRecord) => void;
   onUpdateActiveBurn: (activeKcal: number) => void;
@@ -54,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   yesterdayMeals,
   onOpenCapture,
   onDeleteMeal,
+  onEditMeal,
   onToggleFavorite,
   onCopyMealToToday,
   onUpdateActiveBurn,
@@ -411,6 +413,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         favoriteMeals={favoriteMeals}
         yesterdayMeals={yesterdayMeals}
         onDeleteMeal={onDeleteMeal}
+        onEditMeal={onEditMeal}
         onToggleFavorite={onToggleFavorite}
         onCopyMealToToday={onCopyMealToToday}
         onOpenCapture={onOpenCapture}

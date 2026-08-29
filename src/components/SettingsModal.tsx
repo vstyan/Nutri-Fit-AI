@@ -672,7 +672,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.1.3
+                  v1.1.4
                 </span>
               </label>
 

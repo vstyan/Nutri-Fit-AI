@@ -11,7 +11,8 @@ import {
   Star,
   Copy,
   Sparkles,
-  Bookmark
+  Bookmark,
+  Edit3
 } from 'lucide-react';
 import { MealRecord, MealType } from '../types';
 
@@ -20,6 +21,7 @@ interface MealHistoryProps {
   favoriteMeals: MealRecord[];
   yesterdayMeals: MealRecord[];
   onDeleteMeal: (mealId: string) => void;
+  onEditMeal: (meal: MealRecord) => void;
   onToggleFavorite: (mealId: string) => void;
   onCopyMealToToday: (meal: MealRecord) => void;
   onOpenCapture: () => void;
@@ -37,6 +39,7 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
   favoriteMeals,
   yesterdayMeals,
   onDeleteMeal,
+  onEditMeal,
   onToggleFavorite,
   onCopyMealToToday,
   onOpenCapture
@@ -247,8 +250,16 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                     </div>
                   </div>
 
-                  {/* Actions: Favorite, Copy, Expand, Delete */}
+                  {/* Actions: Edit, Favorite, Copy, Expand, Delete */}
                   <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => onEditMeal(meal)}
+                      className="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition"
+                      title="Edit meal & ingredients"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => onToggleFavorite(meal.id)}
                       className={`p-1.5 rounded-lg transition ${
@@ -290,8 +301,18 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                 {/* Expanded Food Items List */}
                 {isExpanded && meal.items && meal.items.length > 0 && (
                   <div className="px-4 pb-4 pt-1 border-t border-slate-800/80 bg-slate-950/50">
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                      Ingredients & Portions ({meal.items.length})
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Ingredients & Portions ({meal.items.length})
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onEditMeal(meal)}
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold py-0.5 px-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit Ingredients</span>
+                      </button>
                     </div>
                     <div className="space-y-1.5">
                       {meal.items.map((item, idx) => (
