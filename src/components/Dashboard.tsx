@@ -12,10 +12,11 @@ import {
 } from 'lucide-react';
 import { 
   DailySummary, 
-  AppSettings,
-  MealRecord,
-  WeightRecord
+  AppSettings, 
+  MealRecord, 
+  WeightRecord 
 } from '../types';
+import { calculateBMR } from '../utils/bmrCalculator';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
 import { WeightTrackerCard } from './WeightTrackerCard';
@@ -72,7 +73,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity.activeCaloriesBurned, summary.date]);
 
   const activeKcalValue = Number(inputActiveKcal) || 0;
-  const baseBmr = activity.baseBmrCalories || 1700;
+  const includeResting = settings.includeRestingCalories !== false;
+  const profileBmr = calculateBMR(settings.profile);
+  const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
   const totalBurned = baseBmr + activeKcalValue;
   const netCalories = totals.calories - totalBurned;
   const isCaloricDeficit = netCalories <= 0;
@@ -110,7 +113,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-white">Daily Caloric Balance</h2>
-              <p className="text-xs text-slate-400">Food Intake vs. Total Daily Burn (Base BMR + Exercise)</p>
+              <p className="text-xs text-slate-400">
+                {includeResting 
+                  ? 'Food Intake vs. Total Daily Burn (Base BMR + Exercise)' 
+                  : 'Food Intake vs. Daily Exercise Burn'}
+              </p>
             </div>
           </div>
         </div>
@@ -127,11 +134,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* Total Calories Burned */}
           <div className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Total Burned</div>
+            <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+              {includeResting ? 'Total Burned' : 'Exercise Burn'}
+            </div>
             <div className="text-xl sm:text-3xl font-black text-white mt-1">
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5">{baseBmr} base + {activeKcalValue} act</div>
+            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5">
+              {includeResting ? `${baseBmr} base + ${activeKcalValue} act` : 'Active workout burn'}
+            </div>
           </div>
 
           {/* Net Balance */}
@@ -164,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between text-xs text-slate-300 font-medium">
             <span>Intake: {totals.calories} kcal</span>
-            <span>Total Burned: {totalBurned} kcal</span>
+            <span>{includeResting ? `Total Burned: ${totalBurned} kcal` : `Exercise Burned: ${totalBurned} kcal`}</span>
           </div>
           <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden flex">
             <div
@@ -196,8 +207,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Daily Energy Burn Breakdown</h3>
-              <p className="text-xs text-slate-400">Natural BMR baseline + workout/activity burn</p>
+              <h3 className="text-base font-bold text-white">
+                {includeResting ? 'Daily Energy Burn Breakdown' : 'Daily Exercise Burn'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {includeResting 
+                  ? 'Natural BMR baseline + workout/activity burn' 
+                  : 'Workout & active calories burned'}
+              </p>
             </div>
           </div>
 
@@ -206,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={onOpenSettings}
               className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
             >
-              Edit Profile (BMR: {baseBmr} kcal)
+              {includeResting ? `Edit Profile (BMR: ${baseBmr} kcal)` : 'Settings (Resting BMR: Off)'}
             </button>
           </div>
         </div>
@@ -214,29 +231,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Base BMR vs Active Equation Display */}
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 block">1. Natural Base (BMR)</span>
-            <span className="font-bold text-amber-400 text-sm mt-0.5 block">{baseBmr} kcal</span>
-            <span className="text-[9px] text-slate-500">Auto from profile</span>
+            <span className="text-[10px] text-slate-400 block">
+              {includeResting ? '1. Natural Base (BMR)' : '1. Base Resting'}
+            </span>
+            <span className="font-bold text-amber-400 text-sm mt-0.5 block">
+              {includeResting ? `${baseBmr} kcal` : 'Excluded'}
+            </span>
+            <span className="text-[9px] text-slate-500">
+              {includeResting ? 'Auto from profile' : 'Turned off in settings'}
+            </span>
           </div>
 
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <span className="text-[10px] text-slate-400 block">2. Exercise / Steps</span>
-            <span className="font-bold text-emerald-400 text-sm mt-0.5 block">+{activeKcalValue} kcal</span>
-            <span className="text-[9px] text-slate-500">Entered by you</span>
+            <span className="text-[10px] text-slate-400 block">
+              {includeResting ? '2. Exercise / Steps' : '2. Exercise Burn'}
+            </span>
+            <span className="font-bold text-emerald-400 text-sm mt-0.5 block">
+              {includeResting ? `+{activeKcalValue} kcal` : `${activeKcalValue} kcal`}
+            </span>
+            <span className="text-[9px] text-slate-500">
+              Entered by you
+            </span>
           </div>
 
           <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
-            <span className="text-[10px] text-emerald-300 block">3. Total Burned</span>
+            <span className="text-[10px] text-emerald-300 block">
+              {includeResting ? '3. Total Burned' : '3. Total Exercise'}
+            </span>
             <span className="font-extrabold text-white text-sm mt-0.5 block">{totalBurned} kcal</span>
-            <span className="text-[9px] text-emerald-400">Sum for today</span>
+            <span className="text-[9px] text-emerald-400">
+              {includeResting ? 'Sum for today' : 'Active burn total'}
+            </span>
           </div>
         </div>
 
         {/* Input Field for Active Workout Burn */}
         <div className="space-y-2 pt-1">
           <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>Add Additional Exercise / Active Burn:</span>
-            <span className="text-[11px] text-slate-400">Total: {totalBurned} kcal</span>
+            <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Workout / Exercise Burn:'}</span>
+            <span className="text-[11px] text-slate-400">
+              {includeResting ? `Total Daily: ${totalBurned} kcal` : `Total: ${totalBurned} kcal`}
+            </span>
           </label>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -249,7 +284,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onChange={e => setInputActiveKcal(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
               />
-              <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">active kcal</span>
+              <span className="absolute right-4 top-3 text-xs font-semibold text-slate-400">
+                {includeResting ? 'active kcal' : 'exercise kcal'}
+              </span>
             </div>
 
             <button
@@ -268,7 +305,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Save Exercise</span>
+                  <span>{includeResting ? 'Save Daily Burn' : 'Save Exercise'}</span>
                 </>
               )}
             </button>
@@ -380,6 +417,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         historyData={historyData}
         weightHistory={weightHistory}
         isImperial={settings.profile.unitSystem === 'imperial'}
+        includeResting={includeResting}
       />
 
       {/* 7. Floating Action Button on Mobile with iOS Home Bar Safe Inset */}

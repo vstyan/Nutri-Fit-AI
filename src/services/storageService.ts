@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
   storageLocation: 'local_indexeddb',
   storagePromptDismissed: false,
+  includeRestingCalories: true,
   profile: DEFAULT_PROFILE,
   goals: {
     dailyCaloriesTarget: 2000,
@@ -54,6 +55,7 @@ export async function getAppSettings(): Promise<AppSettings> {
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        includeRestingCalories: parsed.includeRestingCalories !== undefined ? parsed.includeRestingCalories : true,
         profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
         goals: { ...DEFAULT_SETTINGS.goals, ...(parsed.goals || {}) }
       };
@@ -64,6 +66,7 @@ export async function getAppSettings(): Promise<AppSettings> {
       const merged = {
         ...DEFAULT_SETTINGS,
         ...idbSaved,
+        includeRestingCalories: idbSaved.includeRestingCalories !== undefined ? idbSaved.includeRestingCalories : true,
         profile: { ...DEFAULT_PROFILE, ...(idbSaved.profile || {}) },
         goals: { ...DEFAULT_SETTINGS.goals, ...(idbSaved.goals || {}) }
       };
@@ -219,7 +222,8 @@ export async function getAllFavoriteMeals(): Promise<MealRecord[]> {
 
 export async function getActivityForDate(date: string, settings: AppSettings): Promise<DailyActivity> {
   const localKey = `${ACTIVITY_PREFIX}${date}`;
-  const baseBmr = calculateBMR(settings.profile);
+  const includeResting = settings.includeRestingCalories !== false;
+  const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
 
   try {
     const localStr = localStorage.getItem(localKey);
@@ -402,6 +406,7 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
       await saveAppSettings({
         ...DEFAULT_SETTINGS,
         ...data.settings,
+        includeRestingCalories: data.settings.includeRestingCalories !== undefined ? data.settings.includeRestingCalories : true,
         profile: { ...DEFAULT_PROFILE, ...(data.settings.profile || {}) },
         goals: { ...DEFAULT_SETTINGS.goals, ...(data.settings.goals || {}) }
       });

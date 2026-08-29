@@ -74,6 +74,7 @@ export interface AppSettings {
   storageLocation: StorageLocation;
   storagePromptDismissed: boolean;
   googleAccessToken?: string;
+  includeRestingCalories?: boolean;
   profile: UserProfile;
   goals: UserGoals;
 }

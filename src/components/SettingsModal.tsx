@@ -373,12 +373,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold text-white">Your Natural Base Burn (BMR)</div>
-                  <div className="text-[11px] text-slate-400">Mifflin-St Jeor Scientific Baseline</div>
+                  <div className="text-[11px] text-slate-400">
+                    {formData.includeRestingCalories !== false
+                      ? 'Mifflin-St Jeor Scientific Baseline'
+                      : 'Calculated baseline (excluded from total)'}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xl font-black text-amber-400">{currentBMR.toLocaleString()} <span className="text-xs font-normal text-slate-400">kcal/day</span></div>
-                <div className="text-[10px] text-slate-400">Burned before any exercise</div>
+                <div className="text-[10px] text-slate-400">
+                  {formData.includeRestingCalories !== false ? 'Included in daily burn' : 'Excluded from daily burn'}
+                </div>
+              </div>
+            </div>
+
+            {/* Calories Burnt at Rest (BMR) Calculation Option */}
+            <div className="pt-3 border-t border-slate-700/60 space-y-2.5">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Calories Burnt at Rest Calculation</span>
+                </label>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Choose whether to include calories burnt at rest in your daily burned totals. Apps like Google Fit and smartwatches may already include resting burn in their calculations.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, includeRestingCalories: true }))}
+                  className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
+                    formData.includeRestingCalories !== false
+                      ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50'
+                      : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`text-xs font-bold ${formData.includeRestingCalories !== false ? 'text-amber-400' : 'text-slate-300'}`}>
+                      Include at Rest (Default)
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      formData.includeRestingCalories !== false
+                        ? 'border-amber-400 bg-amber-400'
+                        : 'border-slate-600'
+                    }`}>
+                      {formData.includeRestingCalories !== false && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    App adds calculated BMR ({currentBMR} kcal) to any logged workouts or steps.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, includeRestingCalories: false }))}
+                  className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
+                    formData.includeRestingCalories === false
+                      ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
+                      : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`text-xs font-bold ${formData.includeRestingCalories === false ? 'text-cyan-400' : 'text-slate-300'}`}>
+                      Exclude / In Fitness Tracker
+                    </span>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      formData.includeRestingCalories === false
+                        ? 'border-cyan-400 bg-cyan-400'
+                        : 'border-slate-600'
+                    }`}>
+                      {formData.includeRestingCalories === false && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    For Google Fit & trackers that already calculate resting burn in their totals.
+                  </p>
+                </button>
               </div>
             </div>
           </div>
@@ -595,7 +672,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.1.2
+                  v1.1.3
                 </span>
               </label>
 

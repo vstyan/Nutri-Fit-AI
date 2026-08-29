@@ -42,7 +42,8 @@ export function App() {
   const [yesterdayMeals, setYesterdayMeals] = useState<MealRecord[]>([]);
 
   const [activity, setActivity] = useState<DailyActivity>(() => {
-    const base = calculateBMR(DEFAULT_SETTINGS.profile);
+    const includeResting = DEFAULT_SETTINGS.includeRestingCalories !== false;
+    const base = includeResting ? calculateBMR(DEFAULT_SETTINGS.profile) : 0;
     return {
       date: selectedDate,
       activeCaloriesBurned: 0,
@@ -125,6 +126,8 @@ export function App() {
       const fibIn = Math.round(mList.reduce((s, m) => s + (m.totalFiber || 0), 0) * 10) / 10;
       const netCIn = Math.max(0, Math.round((cIn - fibIn) * 10) / 10);
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
+      const includeResting = currentSettings.includeRestingCalories !== false;
+      const defaultBurn = includeResting ? calculateBMR(currentSettings.profile) : 0;
 
       past7.push({
         date: dStr,
@@ -133,7 +136,7 @@ export function App() {
         netCarbsIntake: netCIn,
         carbsBurned: 0,
         caloriesIntake: calIn,
-        caloriesBurned: act.totalCaloriesBurned || 1700
+        caloriesBurned: act.totalCaloriesBurned !== undefined ? act.totalCaloriesBurned : defaultBurn
       });
     }
 
@@ -206,7 +209,8 @@ export function App() {
 
   // Update active exercise calories
   const handleUpdateActiveBurn = async (activeKcal: number) => {
-    const baseBmr = calculateBMR(settings.profile);
+    const includeResting = settings.includeRestingCalories !== false;
+    const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
     const updatedActivity: DailyActivity = {
       ...activity,
       activeCaloriesBurned: activeKcal,
@@ -223,6 +227,16 @@ export function App() {
   const handleSaveSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
     await saveAppSettings(newSettings);
+    const includeResting = newSettings.includeRestingCalories !== false;
+    const baseBmr = includeResting ? calculateBMR(newSettings.profile) : 0;
+    const updatedActivity: DailyActivity = {
+      ...activity,
+      baseBmrCalories: baseBmr,
+      totalCaloriesBurned: baseBmr + (activity.activeCaloriesBurned || 0),
+      lastUpdated: new Date().toISOString()
+    };
+    setActivity(updatedActivity);
+    await saveActivityForDate(updatedActivity, newSettings);
     loadDayData(selectedDate, newSettings);
   };
 
@@ -252,13 +266,15 @@ export function App() {
     fat: Math.round(meals.reduce((sum, m) => sum + (m.totalFat || 0), 0) * 10) / 10,
   };
 
+  const includeResting = settings.includeRestingCalories !== false;
+  const defaultBurn = includeResting ? calculateBMR(settings.profile) : 0;
   const summary: DailySummary = {
     date: selectedDate,
     meals,
     activity,
     weightRecord: currentWeight || undefined,
     totals,
-    netCalories: totals.calories - (activity.totalCaloriesBurned || 1700)
+    netCalories: totals.calories - (activity.totalCaloriesBurned !== undefined ? activity.totalCaloriesBurned : defaultBurn)
   };
 
   return (
