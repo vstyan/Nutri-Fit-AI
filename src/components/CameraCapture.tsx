@@ -109,6 +109,33 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     };
   }, []);
 
+  // Reset all state cleanly whenever camera modal opens or closes
+  useEffect(() => {
+    if (isOpen) {
+      setCapturedImage(null);
+      setUserNotes('');
+      setTextDescription('');
+      setErrorMessage(null);
+      setIsListening(false);
+      setIsAnalyzing(false);
+      setActiveTab('photo');
+      finalTranscriptRef.current = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+    } else {
+      if (isListening && recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      setCapturedImage(null);
+      setUserNotes('');
+      setTextDescription('');
+      setErrorMessage(null);
+    }
+  }, [isOpen]);
+
   // Initialize camera stream when in photo tab
   useEffect(() => {
     let activeStream: MediaStream | null = null;
@@ -256,7 +283,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
     try {
       const result = await analyzeFoodImage(capturedImage, geminiApiKey, userNotes);
-      onAnalysisComplete(capturedImage, result);
+      const img = capturedImage;
+      setCapturedImage(null);
+      setUserNotes('');
+      setTextDescription('');
+      onAnalysisComplete(img, result);
     } catch (err: any) {
       console.error('Photo analysis error:', err);
       setErrorMessage(err.message || 'Failed to analyze food photo. Please try again.');
@@ -287,7 +318,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     setErrorMessage(null);
 
     try {
-      const result = await analyzeFoodText(textDescription.trim(), geminiApiKey);
+      const textToAnalyze = textDescription.trim();
+      const result = await analyzeFoodText(textToAnalyze, geminiApiKey);
+      setTextDescription('');
+      setUserNotes('');
+      setCapturedImage(null);
       onAnalysisComplete('', result);
     } catch (err: any) {
       console.error('Text analysis error:', err);
@@ -318,6 +353,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               if (isListening && recognitionRef.current) {
                 try { recognitionRef.current.stop(); } catch {}
               }
+              setCapturedImage(null);
+              setUserNotes('');
+              setTextDescription('');
+              setErrorMessage(null);
               onClose();
             }}
             className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
