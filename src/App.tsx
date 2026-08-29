@@ -32,7 +32,7 @@ import {
 } from './services/storageService';
 import { calculateBMR } from './utils/bmrCalculator';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
-import { requestGoogleFitAccessToken, fetchGoogleFitCalories } from './services/googleFitService';
+import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesResult } from './services/googleFitService';
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
@@ -134,7 +134,7 @@ export function App() {
     currentSettings: AppSettings = settings,
     isManual: boolean = false
   ) => {
-    if (!currentSettings.googleFitConnected || !currentSettings.googleFitAccessToken) {
+    if (!currentSettings.googleFitConnected) {
       if (isManual) {
         alert('Google Fit is not connected. Please click Connect Google Fit first.');
       }
@@ -142,7 +142,50 @@ export function App() {
     }
     setIsSyncingGoogleFit(true);
     try {
-      const fitResult = await fetchGoogleFitCalories(date, currentSettings.googleFitAccessToken);
+      let activeToken = currentSettings.googleFitAccessToken;
+      const isExpired = !activeToken || (currentSettings.googleFitTokenExpiry && Date.now() >= (currentSettings.googleFitTokenExpiry - 60000));
+
+      if (isExpired) {
+        try {
+          const { accessToken: newToken, expiresIn } = await requestGoogleFitAccessToken(currentSettings.googleClientId);
+          activeToken = newToken;
+          currentSettings = {
+            ...currentSettings,
+            googleFitAccessToken: newToken,
+            googleFitTokenExpiry: Date.now() + (expiresIn * 1000)
+          };
+          await saveAppSettings(currentSettings);
+          setSettings(currentSettings);
+        } catch (tokenErr: any) {
+          console.warn('Google Fit token refresh failed:', tokenErr);
+          if (isManual) {
+            alert('Google Fit authorization expired. Please click Connect Google Fit to re-authorize.');
+          }
+          return;
+        }
+      }
+
+      let fitResult: GoogleFitCaloriesResult;
+      try {
+        fitResult = await fetchGoogleFitCalories(date, activeToken!);
+      } catch (fetchErr: any) {
+        if (fetchErr.message === 'UNAUTHORIZED') {
+          // Token rejected; attempt a fresh token request
+          const { accessToken: newToken, expiresIn } = await requestGoogleFitAccessToken(currentSettings.googleClientId);
+          activeToken = newToken;
+          currentSettings = {
+            ...currentSettings,
+            googleFitAccessToken: newToken,
+            googleFitTokenExpiry: Date.now() + (expiresIn * 1000)
+          };
+          await saveAppSettings(currentSettings);
+          setSettings(currentSettings);
+          fitResult = await fetchGoogleFitCalories(date, activeToken);
+        } else {
+          throw fetchErr;
+        }
+      }
+
       if (fitResult) {
         const includeResting = currentSettings.includeRestingCalories !== false;
         const profileBmr = calculateBMR(currentSettings.profile);
@@ -174,7 +217,7 @@ export function App() {
       }
     } catch (err: any) {
       console.error('Google Fit sync error:', err);
-      if (isManual || err.message?.includes('Fitness API')) {
+      if (isManual || err.message?.includes('Fitness API') || err.message?.includes('Google Fit API')) {
         alert(`Google Fit Sync Notice: ${err.message || 'Unknown error'}`);
       }
     } finally {
