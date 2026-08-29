@@ -58,6 +58,8 @@ export async function requestGoogleFitAccessToken(
 
 /**
  * Fetches total calories burned for a specific calendar date from Google Fit.
+ * Queries both active calories expended (com.google.calories.expended) and
+ * basal metabolic calories (com.google.calories.bmr) across the full 24-hour day window.
  */
 export async function fetchGoogleFitCalories(
   dateStr: string,
@@ -65,13 +67,10 @@ export async function fetchGoogleFitCalories(
 ): Promise<GoogleFitCaloriesResult> {
   const parts = dateStr.split('-').map(Number);
   const startOfDay = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
-  const endOfDay = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
-  const now = new Date();
 
+  // Use full 24-hour window (86,400,000 ms) so Google Fit's 24h bucket aggregates all samples recorded today
   const startTimeMillis = startOfDay.getTime();
-  const endTimeMillis = dateStr === getLocalDateString(now) 
-    ? Math.max(now.getTime(), startTimeMillis + 1000) 
-    : endOfDay.getTime();
+  const endTimeMillis = startTimeMillis + 86400000; // Exact midnight at end of day
 
   const response = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
     method: 'POST',
@@ -81,7 +80,8 @@ export async function fetchGoogleFitCalories(
     },
     body: JSON.stringify({
       aggregateBy: [
-        { dataTypeName: 'com.google.calories.expended' }
+        { dataTypeName: 'com.google.calories.expended' },
+        { dataTypeName: 'com.google.calories.bmr' }
       ],
       bucketByTime: { durationMillis: 86400000 },
       startTimeMillis,
@@ -99,18 +99,25 @@ export async function fetchGoogleFitCalories(
   }
 
   const data = await response.json();
-  let totalCalories = 0;
+  let expendedCalories = 0;
+  let bmrCalories = 0;
 
   if (data.bucket && Array.isArray(data.bucket)) {
     for (const bucket of data.bucket) {
       if (bucket.dataset && Array.isArray(bucket.dataset)) {
         for (const dataset of bucket.dataset) {
+          const isBmr = dataset.dataSourceId?.toLowerCase().includes('bmr');
           if (dataset.point && Array.isArray(dataset.point)) {
             for (const point of dataset.point) {
               if (point.value && Array.isArray(point.value)) {
                 for (const val of point.value) {
-                  if (val.fpVal !== undefined) {
-                    totalCalories += val.fpVal;
+                  const num = typeof val.fpVal === 'number' 
+                    ? val.fpVal 
+                    : (typeof val.intVal === 'number' ? val.intVal : 0);
+                  if (isBmr) {
+                    bmrCalories += num;
+                  } else {
+                    expendedCalories += num;
                   }
                 }
               }
@@ -121,12 +128,13 @@ export async function fetchGoogleFitCalories(
     }
   }
 
-  const roundedTotal = Math.round(totalCalories);
+  const totalCalories = expendedCalories + bmrCalories;
+  console.log(`[Google Fit Sync ${dateStr}] Expended: ${expendedCalories.toFixed(1)} kcal, BMR: ${bmrCalories.toFixed(1)} kcal => Total: ${totalCalories.toFixed(1)} kcal`);
 
   return {
-    totalCalories: roundedTotal,
-    activeCalories: roundedTotal,
-    bmrCalories: 0,
+    totalCalories: Math.round(totalCalories),
+    activeCalories: Math.round(expendedCalories),
+    bmrCalories: Math.round(bmrCalories),
     lastSyncedAt: new Date().toISOString()
   };
 }
