@@ -16,10 +16,13 @@ export interface GoogleFitCaloriesResult {
 
 /**
  * Requests OAuth 2.0 access token for Google Fit via Google Identity Services.
+ * Uses login_hint to prevent "Choose an account" dialogs if multiple Google accounts exist.
  */
 export async function requestGoogleFitAccessToken(
-  clientId: string = DEFAULT_GOOGLE_CLIENT_ID
-): Promise<{ accessToken: string; expiresIn: number }> {
+  clientId: string = DEFAULT_GOOGLE_CLIENT_ID,
+  userEmailHint?: string,
+  promptOption: string = ''
+): Promise<{ accessToken: string; expiresIn: number; email?: string }> {
   return new Promise((resolve, reject) => {
     const google = (window as any).google;
     if (!google?.accounts?.oauth2) {
@@ -28,28 +31,59 @@ export async function requestGoogleFitAccessToken(
     }
 
     try {
-      const client = google.accounts.oauth2.initTokenClient({
+      const config: any = {
         client_id: clientId || DEFAULT_GOOGLE_CLIENT_ID,
         scope: FITNESS_SCOPES,
-        callback: (response: any) => {
+        callback: async (response: any) => {
           if (response.error) {
             console.error('Google Fit OAuth response error:', response);
             reject(new Error(response.error_description || response.error));
             return;
           }
           const expiresIn = Number(response.expires_in) || 3600;
+          let email = userEmailHint;
+          if (!email && response.access_token) {
+            try {
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${response.access_token}` }
+              });
+              if (userInfoRes.ok) {
+                const info = await userInfoRes.json();
+                email = info.email;
+              }
+            } catch (e) {
+              console.warn('Could not fetch user email:', e);
+            }
+          }
           resolve({
             accessToken: response.access_token,
-            expiresIn
+            expiresIn,
+            email
           });
         },
         error_callback: (err: any) => {
           console.warn('Google Fit token error callback:', err);
           reject(new Error(err?.message || 'Google authorization was closed or denied.'));
         }
-      });
+      };
 
-      client.requestAccessToken({ prompt: '' });
+      if (userEmailHint) {
+        config.hint = userEmailHint;
+      }
+
+      const client = google.accounts.oauth2.initTokenClient(config);
+
+      const requestOptions: any = {};
+      if (promptOption !== undefined && promptOption !== '') {
+        requestOptions.prompt = promptOption;
+      } else {
+        requestOptions.prompt = '';
+      }
+      if (userEmailHint) {
+        requestOptions.hint = userEmailHint;
+      }
+
+      client.requestAccessToken(requestOptions);
     } catch (err: any) {
       reject(new Error(err.message || 'Failed to initialize Google login.'));
     }

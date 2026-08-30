@@ -80,6 +80,7 @@ export interface AppSettings {
   googleFitAccessToken?: string;
   googleFitTokenExpiry?: number;
   googleFitLastSync?: string;
+  googleFitUserEmail?: string;
   includeRestingCalories?: boolean;
   profile: UserProfile;
   goals: UserGoals;
