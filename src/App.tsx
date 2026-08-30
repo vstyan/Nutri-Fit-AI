@@ -145,67 +145,43 @@ export function App() {
       }
       return;
     }
-    setIsSyncingGoogleFit(true);
-    try {
-      let activeToken = currentSettings.googleFitAccessToken;
-      const isExpired = !activeToken || (currentSettings.googleFitTokenExpiry && Date.now() >= (currentSettings.googleFitTokenExpiry - 60000));
 
-      if (isExpired) {
-        if (!isManual) {
-          // In background: attempt silent refresh with prompt: 'none' without opening popup
-          try {
-            const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-              currentSettings.googleClientId,
-              currentSettings.googleFitUserEmail,
-              'none'
-            );
-            activeToken = newToken;
-            currentSettings = {
-              ...currentSettings,
-              googleFitAccessToken: newToken,
-              googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-              googleFitUserEmail: email || currentSettings.googleFitUserEmail
-            };
-            await saveAppSettings(currentSettings);
-            setSettings(currentSettings);
-          } catch {
-            // Suppress background popup when interactive login is needed
-            return;
-          }
-        } else {
-          try {
-            const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-              currentSettings.googleClientId,
-              currentSettings.googleFitUserEmail,
-              ''
-            );
-            activeToken = newToken;
-            currentSettings = {
-              ...currentSettings,
-              googleFitAccessToken: newToken,
-              googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-              googleFitUserEmail: email || currentSettings.googleFitUserEmail
-            };
-            await saveAppSettings(currentSettings);
-            setSettings(currentSettings);
-          } catch (tokenErr: any) {
-            console.warn('Google Fit token refresh failed:', tokenErr);
-            alert('Google Fit authorization expired. Please click Connect Google Fit to re-authorize.');
-            return;
-          }
-        }
-      }
-
-      let fitResult: GoogleFitCaloriesResult;
-      try {
-        fitResult = await fetchGoogleFitCalories(date, activeToken!);
-      } catch (fetchErr: any) {
-        if (fetchErr.message === 'UNAUTHORIZED' && isManual) {
-          // Token rejected during manual sync; attempt fresh token request with hint
+    let activeToken = currentSettings.googleFitAccessToken;
+    if (!activeToken) {
+      if (isManual) {
+        try {
           const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
             currentSettings.googleClientId,
-            currentSettings.googleFitUserEmail,
-            ''
+            currentSettings.googleFitUserEmail
+          );
+          activeToken = newToken;
+          currentSettings = {
+            ...currentSettings,
+            googleFitAccessToken: newToken,
+            googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
+            googleFitUserEmail: email || currentSettings.googleFitUserEmail
+          };
+          await saveAppSettings(currentSettings);
+          setSettings(currentSettings);
+        } catch {
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    setIsSyncingGoogleFit(true);
+    try {
+      let fitResult: GoogleFitCaloriesResult;
+      try {
+        fitResult = await fetchGoogleFitCalories(date, activeToken);
+      } catch (fetchErr: any) {
+        if (fetchErr.message === 'UNAUTHORIZED' && isManual) {
+          // Token expired during manual user sync; request renewal
+          const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
+            currentSettings.googleClientId,
+            currentSettings.googleFitUserEmail
           );
           activeToken = newToken;
           currentSettings = {
@@ -248,14 +224,12 @@ export function App() {
         setSettings(updatedSettings);
       }
     } catch (err: any) {
-      console.error('Google Fit sync error:', err);
-      if (isManual || err.message?.includes('Fitness API') || err.message?.includes('Google Fit API')) {
-        alert(`Google Fit Sync Notice: ${err.message || 'Unknown error'}`);
-      }
+      console.warn('Google Fit sync notice:', err);
     } finally {
       setIsSyncingGoogleFit(false);
     }
   }, [selectedDate, settings]);
+
 
   // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit
   useEffect(() => {
