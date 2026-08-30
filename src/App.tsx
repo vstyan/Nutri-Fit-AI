@@ -221,9 +221,9 @@ export function App() {
     }
   }, [selectedDate, settings]);
 
-  // Listen for window focus / visibility change to automatically advance date and auto-sync Fit
+  // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleActiveState = () => {
       if (document.visibilityState === 'visible') {
         const todayStr = getLocalDateString();
         setSelectedDate(prev => {
@@ -233,23 +233,41 @@ export function App() {
           return prev;
         });
 
-        if (settings.googleFitConnected && settings.googleFitAccessToken) {
+        if (settings.googleFitConnected) {
           handleSyncGoogleFit(selectedDate, settings);
         }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleActiveState);
+    window.addEventListener('focus', handleActiveState);
+    window.addEventListener('pageshow', handleActiveState);
+    window.addEventListener('online', handleActiveState);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleActiveState);
+      window.removeEventListener('focus', handleActiveState);
+      window.removeEventListener('pageshow', handleActiveState);
+      window.removeEventListener('online', handleActiveState);
     };
+  }, [selectedDate, settings, handleSyncGoogleFit]);
+
+  // Periodic background sync every 5 minutes while app is open and visible
+  useEffect(() => {
+    if (!settings.googleFitConnected) return;
+
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        handleSyncGoogleFit(selectedDate, settings);
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
   }, [selectedDate, settings, handleSyncGoogleFit]);
 
   // Auto-sync Google Fit when date changes if connected
   useEffect(() => {
-    if (settings.googleFitConnected && settings.googleFitAccessToken) {
+    if (settings.googleFitConnected) {
       handleSyncGoogleFit(selectedDate, settings);
     }
   }, [selectedDate, settings.googleFitConnected]);
