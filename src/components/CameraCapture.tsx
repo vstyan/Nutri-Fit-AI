@@ -52,13 +52,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   // Voice recording states & refs
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const finalTranscriptRef = useRef<string>('');
+  const baselineTextRef = useRef<string>('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize Web Speech API with non-duplicating resultIndex handler
+  // Initialize Web Speech API with non-duplicating full-array iteration
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -68,21 +68,27 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       recognition.lang = 'en-US';
 
       recognition.onresult = (event: any) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        let finalSessionText = '';
+        let interimSessionText = '';
+
+        // Iterate through all results in the current recognition session
+        for (let i = 0; i < event.results.length; i++) {
           const res = event.results[i];
           const transcriptChunk = res[0]?.transcript || '';
           if (res.isFinal) {
-            finalTranscriptRef.current += transcriptChunk + ' ';
+            finalSessionText += transcriptChunk + ' ';
           } else {
-            interim += transcriptChunk;
+            interimSessionText += transcriptChunk;
           }
         }
 
-        const combined = (finalTranscriptRef.current + interim)
-          .replace(/\s+/g, ' ')
-          .trim();
-        setTextDescription(combined);
+        const sessionCombined = (finalSessionText + interimSessionText).replace(/\s+/g, ' ').trim();
+        const base = baselineTextRef.current ? baselineTextRef.current + ' ' : '';
+        const rawCombined = (base + sessionCombined).replace(/\s+/g, ' ').trim();
+
+        // Clean any immediate duplicate consecutive words caused by Speech API buffering
+        const cleaned = rawCombined.replace(/\b(\w+)\s+\1\b/gi, '$1');
+        setTextDescription(cleaned);
       };
 
       recognition.onerror = (event: any) => {
@@ -119,7 +125,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       setIsListening(false);
       setIsAnalyzing(false);
       setActiveTab('photo');
-      finalTranscriptRef.current = '';
+      baselineTextRef.current = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
       if (galleryInputRef.current) galleryInputRef.current.value = '';
     } else {
@@ -188,7 +194,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     } else {
       setErrorMessage(null);
       // Preserve existing text as initial baseline
-      finalTranscriptRef.current = textDescription ? textDescription.trim() + ' ' : '';
+      baselineTextRef.current = textDescription ? textDescription.trim() : '';
       try {
         recognitionRef.current.start();
         setIsListening(true);
@@ -615,7 +621,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        finalTranscriptRef.current = '';
+                        baselineTextRef.current = '';
                         setTextDescription('');
                       }}
                       className="text-[10px] text-slate-500 hover:text-slate-300"
@@ -677,7 +683,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                 value={textDescription}
                 onChange={e => {
                   setTextDescription(e.target.value);
-                  finalTranscriptRef.current = e.target.value;
+                  baselineTextRef.current = e.target.value;
                 }}
                 placeholder="e.g. 2 slices of pepperoni pizza, 1 side garden salad with ranch dressing, and 1 can of diet coke..."
                 rows={4}
@@ -701,7 +707,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                     type="button"
                     onClick={() => {
                       setTextDescription(ex);
-                      finalTranscriptRef.current = ex;
+                      baselineTextRef.current = ex;
                     }}
                     className="text-[11px] bg-slate-800/80 hover:bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 text-left transition"
                   >
