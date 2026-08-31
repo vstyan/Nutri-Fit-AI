@@ -51,56 +51,58 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
   // Voice recording states & refs
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const baselineTextRef = useRef<string>('');
+  const textDescriptionRef = useRef<string>('');
+  textDescriptionRef.current = textDescription;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize Web Speech API with non-duplicating full-array iteration
+  // Initialize Web Speech API with non-duplicating discrete utterance looping
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      recognition.continuous = false; // Prevents Android Chrome accumulating duplicate results
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
       recognition.onresult = (event: any) => {
-        let finalSessionText = '';
-        let interimSessionText = '';
-
-        // Iterate through all results in the current recognition session
+        let currentUtterance = '';
         for (let i = 0; i < event.results.length; i++) {
-          const res = event.results[i];
-          const transcriptChunk = res[0]?.transcript || '';
-          if (res.isFinal) {
-            finalSessionText += transcriptChunk + ' ';
-          } else {
-            interimSessionText += transcriptChunk;
-          }
+          currentUtterance += event.results[i][0]?.transcript || '';
         }
-
-        const sessionCombined = (finalSessionText + interimSessionText).replace(/\s+/g, ' ').trim();
+        currentUtterance = currentUtterance.replace(/\s+/g, ' ').trim();
         const base = baselineTextRef.current ? baselineTextRef.current + ' ' : '';
-        const rawCombined = (base + sessionCombined).replace(/\s+/g, ' ').trim();
-
-        // Clean any immediate duplicate consecutive words caused by Speech API buffering
-        const cleaned = rawCombined.replace(/\b(\w+)\s+\1\b/gi, '$1');
-        setTextDescription(cleaned);
+        const combined = (base + currentUtterance).replace(/\s+/g, ' ').trim();
+        setTextDescription(combined);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
-        if (event.error !== 'no-speech') {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
           setErrorMessage(`Microphone status: ${event.error}. You can also type your meal.`);
+          isListeningRef.current = false;
+          setIsListening(false);
         }
-        setIsListening(false);
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        if (isListeningRef.current) {
+          // Commit current transcribed sentence as baseline and resume listening for next sentence
+          baselineTextRef.current = textDescriptionRef.current ? textDescriptionRef.current.trim() : '';
+          try {
+            recognition.start();
+          } catch {
+            isListeningRef.current = false;
+            setIsListening(false);
+          }
+        } else {
+          setIsListening(false);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -108,6 +110,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
     return () => {
       if (recognitionRef.current) {
+        isListeningRef.current = false;
         try {
           recognitionRef.current.stop();
         } catch {}
@@ -122,6 +125,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       setUserNotes('');
       setTextDescription('');
       setErrorMessage(null);
+      isListeningRef.current = false;
       setIsListening(false);
       setIsAnalyzing(false);
       setActiveTab('photo');
@@ -129,7 +133,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       if (cameraInputRef.current) cameraInputRef.current.value = '';
       if (galleryInputRef.current) galleryInputRef.current.value = '';
     } else {
-      if (isListening && recognitionRef.current) {
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch {}
@@ -187,20 +192,21 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     }
 
     if (isListening) {
+      isListeningRef.current = false;
+      setIsListening(false);
       try {
         recognitionRef.current.stop();
       } catch {}
-      setIsListening(false);
     } else {
       setErrorMessage(null);
       // Preserve existing text as initial baseline
       baselineTextRef.current = textDescription ? textDescription.trim() : '';
+      isListeningRef.current = true;
+      setIsListening(true);
       try {
         recognitionRef.current.start();
-        setIsListening(true);
       } catch (err: any) {
         console.warn('Recognition start error:', err);
-        setIsListening(true);
       }
     }
   };
