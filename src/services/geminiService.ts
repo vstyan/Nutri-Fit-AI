@@ -2,8 +2,11 @@ import { GeminiAnalysisResult } from '../types';
 
 const FALLBACK_MODELS = [
   'gemini-2.5-flash',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-pro',
 ];
 
 const NUTRITION_RESPONSE_SCHEMA = {
@@ -145,6 +148,7 @@ Respond strictly in valid JSON matching the requested schema.`;
 
 async function callGeminiWithFallbacks(requestBody: any, apiKey: string): Promise<GeminiAnalysisResult> {
   let lastError: Error | null = null;
+  const errorSummaries: string[] = [];
 
   for (const model of FALLBACK_MODELS) {
     try {
@@ -155,24 +159,56 @@ async function callGeminiWithFallbacks(requestBody: any, apiKey: string): Promis
         body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          let cleanText = text.trim();
+          if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+          }
+          const parsed: GeminiAnalysisResult = JSON.parse(cleanText);
+          return parsed;
+        }
+      } else {
         const errorText = await response.text();
-        throw new Error(`Gemini API (${model}) failed (${response.status}): ${errorText}`);
-      }
+        
+        // If 400 Bad Request and schema was supplied, try fallback without responseSchema
+        if (response.status === 400 && requestBody.generationConfig?.responseSchema) {
+          const simplifiedBody = {
+            ...requestBody,
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: 'application/json'
+            }
+          };
+          const retryRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(simplifiedBody)
+          });
+          if (retryRes.ok) {
+            const data = await retryRes.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              let cleanText = text.trim();
+              if (cleanText.startsWith('```')) {
+                cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+              }
+              const parsed: GeminiAnalysisResult = JSON.parse(cleanText);
+              return parsed;
+            }
+          }
+        }
 
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        throw new Error(`No content returned from Gemini model ${model}`);
+        throw new Error(`[${model}] ${response.status}: ${errorText}`);
       }
-
-      const parsed: GeminiAnalysisResult = JSON.parse(text);
-      return parsed;
     } catch (err: any) {
       console.warn(`Attempt with ${model} failed:`, err);
       lastError = err;
+      errorSummaries.push(err.message || String(err));
     }
   }
 
-  throw lastError || new Error('Failed to analyze food with all available Gemini models');
+  throw lastError || new Error(`Failed to analyze food with Gemini models. (${errorSummaries.join('; ')})`);
 }
