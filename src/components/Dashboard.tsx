@@ -239,31 +239,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Google Fit Live Sync Widget */}
-        {settings.googleFitConnected ? (
-          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-300">Google Fit Connected</span>
-              {activity.lastSyncedAt && (
-                <span className="text-[10px] text-slate-400 hidden sm:inline">
-                  • Synced {new Date(activity.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {settings.googleFitConnected ? (() => {
+          const isTokenExpired = Boolean(
+            !settings.googleFitAccessToken || 
+            (settings.googleFitTokenExpiry && Date.now() >= (settings.googleFitTokenExpiry - 60000))
+          );
+
+          return (
+            <div className={`flex items-center justify-between bg-slate-950/80 border ${isTokenExpired ? 'border-amber-500/30' : 'border-emerald-500/30'} rounded-xl p-2.5 px-3`}>
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${isTokenExpired ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+                <span className={`text-xs font-semibold ${isTokenExpired ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  {isTokenExpired ? 'Fit Session Expired' : 'Google Fit Connected'}
                 </span>
+                {activity.lastSyncedAt && (
+                  <span className="text-[10px] text-slate-400 hidden sm:inline">
+                    • Synced {new Date(activity.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              {onSyncGoogleFit && (
+                <button
+                  type="button"
+                  onClick={onSyncGoogleFit}
+                  disabled={isSyncingGoogleFit}
+                  className={`text-xs font-semibold flex items-center space-x-1.5 py-1 px-2.5 rounded-lg border transition disabled:opacity-50 ${
+                    isTokenExpired 
+                      ? 'text-amber-300 hover:text-amber-200 bg-amber-950/40 border-amber-500/40 hover:bg-amber-900/40' 
+                      : 'text-cyan-300 hover:text-cyan-200 bg-slate-900 border-slate-700 hover:bg-slate-800'
+                  }`}
+                  title={isTokenExpired ? 'Google OAuth token expired. Tap to re-authorize and sync.' : 'Sync latest calories burned from Google Fit'}
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span>
+                    {isSyncingGoogleFit 
+                      ? (isTokenExpired ? 'Re-authorizing...' : 'Syncing...') 
+                      : (isTokenExpired ? 'Reconnect Fit' : 'Sync Fit')}
+                  </span>
+                </button>
               )}
             </div>
-            {onSyncGoogleFit && (
-              <button
-                type="button"
-                onClick={onSyncGoogleFit}
-                disabled={isSyncingGoogleFit}
-                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 py-1 px-2.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 transition disabled:opacity-50"
-                title="Sync latest calories burned from Google Fit"
-              >
-                <RefreshCw className={`w-3 h-3 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
-                <span>{isSyncingGoogleFit ? 'Syncing...' : 'Sync Fit'}</span>
-              </button>
-            )}
-          </div>
-        ) : onConnectGoogleFit ? (
+          );
+        })() : onConnectGoogleFit ? (
           <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
             <div className="flex items-center space-x-2">
               <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
