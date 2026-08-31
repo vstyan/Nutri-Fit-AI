@@ -78,12 +78,15 @@ export function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoragePromptOpen, setIsStoragePromptOpen] = useState(false);
 
-  // Initial load of settings
+  // Initial load of settings & automatic Google Fit startup sync
   useEffect(() => {
     getAppSettings().then(loaded => {
       setSettings(loaded);
       if (!loaded.storagePromptDismissed) {
         setIsStoragePromptOpen(true);
+      }
+      if (loaded.googleFitConnected) {
+        handleSyncGoogleFit(selectedDate, loaded, false, true);
       }
     });
   }, []);
@@ -110,7 +113,7 @@ export function App() {
       setSettings(updatedSettings);
 
       // Immediately sync calories from Google Fit for selected date
-      await handleSyncGoogleFit(selectedDate, updatedSettings);
+      await handleSyncGoogleFit(selectedDate, updatedSettings, true, true);
     } catch (err: any) {
       console.error('Google Fit connection failed:', err);
       alert(err.message || 'Failed to connect Google Fit. Please allow the popup and try again.');
@@ -133,11 +136,12 @@ export function App() {
     setSettings(updatedSettings);
   };
 
-  // Google Fit Sync Calories for a Date
+  // Google Fit Sync Calories for a Date (Supports automatic launch & active state re-auth)
   const handleSyncGoogleFit = useCallback(async (
     date: string = selectedDate, 
     currentSettings: AppSettings = settings,
-    isManual: boolean = false
+    isManual: boolean = false,
+    allowInteractiveRefresh: boolean = true
   ) => {
     if (!currentSettings.googleFitConnected) {
       if (isManual) {
@@ -147,29 +151,34 @@ export function App() {
     }
 
     let activeToken = currentSettings.googleFitAccessToken;
-    if (!activeToken) {
-      if (isManual) {
-        try {
-          const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-            currentSettings.googleClientId,
-            currentSettings.googleFitUserEmail
-          );
-          activeToken = newToken;
-          currentSettings = {
-            ...currentSettings,
-            googleFitAccessToken: newToken,
-            googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-            googleFitUserEmail: email || currentSettings.googleFitUserEmail
-          };
-          await saveAppSettings(currentSettings);
-          setSettings(currentSettings);
-        } catch {
-          return;
+    const isExpired = !activeToken || (currentSettings.googleFitTokenExpiry && Date.now() >= (currentSettings.googleFitTokenExpiry - 60000));
+
+    // If token is missing or expired, automatically renew using saved user hint
+    if (isExpired && (isManual || allowInteractiveRefresh)) {
+      try {
+        const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
+          currentSettings.googleClientId,
+          currentSettings.googleFitUserEmail
+        );
+        activeToken = newToken;
+        currentSettings = {
+          ...currentSettings,
+          googleFitAccessToken: newToken,
+          googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
+          googleFitUserEmail: email || currentSettings.googleFitUserEmail
+        };
+        await saveAppSettings(currentSettings);
+        setSettings(currentSettings);
+      } catch (tokenErr) {
+        console.warn('Google Fit automatic renewal paused:', tokenErr);
+        if (isManual) {
+          alert('Google Fit authorization expired. Please connect Google Fit again.');
         }
-      } else {
         return;
       }
     }
+
+    if (!activeToken) return;
 
     setIsSyncingGoogleFit(true);
     try {
@@ -177,8 +186,8 @@ export function App() {
       try {
         fitResult = await fetchGoogleFitCalories(date, activeToken);
       } catch (fetchErr: any) {
-        if (fetchErr.message === 'UNAUTHORIZED' && isManual) {
-          // Token expired during manual user sync; request renewal
+        if (fetchErr.message === 'UNAUTHORIZED' && (isManual || allowInteractiveRefresh)) {
+          // Token expired mid-call; refresh token using saved user hint
           const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
             currentSettings.googleClientId,
             currentSettings.googleFitUserEmail
@@ -244,7 +253,7 @@ export function App() {
         });
 
         if (settings.googleFitConnected) {
-          handleSyncGoogleFit(selectedDate, settings);
+          handleSyncGoogleFit(selectedDate, settings, false, true);
         }
       }
     };
@@ -268,7 +277,8 @@ export function App() {
 
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        handleSyncGoogleFit(selectedDate, settings);
+        // Run silent check (only if token is currently active)
+        handleSyncGoogleFit(selectedDate, settings, false, false);
       }
     }, 5 * 60 * 1000);
 
@@ -278,7 +288,7 @@ export function App() {
   // Auto-sync Google Fit when date changes if connected
   useEffect(() => {
     if (settings.googleFitConnected) {
-      handleSyncGoogleFit(selectedDate, settings);
+      handleSyncGoogleFit(selectedDate, settings, false, true);
     }
   }, [selectedDate, settings.googleFitConnected]);
 
