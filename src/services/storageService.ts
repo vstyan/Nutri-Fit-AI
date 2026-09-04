@@ -102,13 +102,13 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
   let localMeals: MealRecord[] = [];
 
   try {
-    const localStr = localStorage.getItem(localKey);
-    if (localStr) {
-      localMeals = JSON.parse(localStr);
+    const idbMeals = await get<MealRecord[]>(localKey);
+    if (idbMeals && Array.isArray(idbMeals) && idbMeals.length > 0) {
+      localMeals = idbMeals;
     } else {
-      localMeals = (await get<MealRecord[]>(localKey)) || [];
-      if (localMeals.length > 0) {
-        localStorage.setItem(localKey, JSON.stringify(localMeals));
+      const localStr = localStorage.getItem(localKey);
+      if (localStr) {
+        localMeals = JSON.parse(localStr);
       }
     }
   } catch (e) {
@@ -125,8 +125,10 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
             combined.push(lm);
           }
         }
-        localStorage.setItem(localKey, JSON.stringify(combined));
-        await set(localKey, combined);
+        try {
+          await set(localKey, combined);
+          localStorage.setItem(localKey, JSON.stringify(combined));
+        } catch {}
         return combined;
       }
     } catch (e) {
@@ -145,15 +147,38 @@ export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise
   const localKey = `${MEALS_PREFIX}${meal.date}`;
   let existing: MealRecord[] = [];
   try {
-    const localStr = localStorage.getItem(localKey);
-    existing = localStr ? JSON.parse(localStr) : ((await get<MealRecord[]>(localKey)) || []);
+    const idbMeals = await get<MealRecord[]>(localKey);
+    if (idbMeals && Array.isArray(idbMeals)) {
+      existing = idbMeals;
+    } else {
+      const localStr = localStorage.getItem(localKey);
+      existing = localStr ? JSON.parse(localStr) : [];
+    }
   } catch {
     existing = [];
   }
 
   const updated = existing.filter(m => m.id !== meal.id).concat(meal);
-  localStorage.setItem(localKey, JSON.stringify(updated));
-  await set(localKey, updated);
+
+  // 1. Always save to IndexedDB (virtually unlimited capacity, handles photo URLs)
+  try {
+    await set(localKey, updated);
+  } catch (idbErr) {
+    console.error('IndexedDB save failed for meal:', idbErr);
+  }
+
+  // 2. Cache in localStorage with QuotaExceededError protection
+  try {
+    localStorage.setItem(localKey, JSON.stringify(updated));
+  } catch (quotaErr) {
+    console.warn('LocalStorage quota reached; caching meal metadata without full photo:', quotaErr);
+    try {
+      const stripped = updated.map(m => ({ ...m, photoUrl: undefined }));
+      localStorage.setItem(localKey, JSON.stringify(stripped));
+    } catch (fallbackErr) {
+      console.warn('Could not cache in localStorage:', fallbackErr);
+    }
+  }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
     try {
@@ -168,15 +193,33 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
   const localKey = `${MEALS_PREFIX}${date}`;
   let existing: MealRecord[] = [];
   try {
-    const localStr = localStorage.getItem(localKey);
-    existing = localStr ? JSON.parse(localStr) : ((await get<MealRecord[]>(localKey)) || []);
+    const idbMeals = await get<MealRecord[]>(localKey);
+    if (idbMeals && Array.isArray(idbMeals)) {
+      existing = idbMeals;
+    } else {
+      const localStr = localStorage.getItem(localKey);
+      existing = localStr ? JSON.parse(localStr) : [];
+    }
   } catch {
     existing = [];
   }
 
   const updated = existing.filter(m => m.id !== mealId);
-  localStorage.setItem(localKey, JSON.stringify(updated));
-  await set(localKey, updated);
+
+  try {
+    await set(localKey, updated);
+  } catch (idbErr) {
+    console.error('IndexedDB update failed on delete:', idbErr);
+  }
+
+  try {
+    localStorage.setItem(localKey, JSON.stringify(updated));
+  } catch {
+    try {
+      const stripped = updated.map(m => ({ ...m, photoUrl: undefined }));
+      localStorage.setItem(localKey, JSON.stringify(stripped));
+    } catch {}
+  }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
     try {
@@ -236,6 +279,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
         activeCaloriesBurned: active,
         baseBmrCalories: baseBmr,
         totalCaloriesBurned: baseBmr + active,
+        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : [],
         notes: parsed.notes,
         lastUpdated: parsed.lastUpdated || new Date().toISOString()
       };
@@ -248,6 +292,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
         activeCaloriesBurned: active,
         baseBmrCalories: baseBmr,
         totalCaloriesBurned: baseBmr + active,
+        workouts: Array.isArray(saved.workouts) ? saved.workouts : [],
         notes: saved.notes,
         lastUpdated: saved.lastUpdated || new Date().toISOString()
       };
@@ -263,6 +308,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     activeCaloriesBurned: 0,
     baseBmrCalories: baseBmr,
     totalCaloriesBurned: baseBmr,
+    workouts: [],
     lastUpdated: new Date().toISOString()
   };
 }

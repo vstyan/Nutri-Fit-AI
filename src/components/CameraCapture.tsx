@@ -48,6 +48,9 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userNotes, setUserNotes] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
+  const activeStreamRef = useRef<MediaStream | null>(null);
 
   // Voice recording states & refs
   const [isListening, setIsListening] = useState(false);
@@ -60,6 +63,22 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const stopMediaTracks = React.useCallback(() => {
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch {}
+      });
+      activeStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setStreamActive(false);
+    setIsStartingCamera(false);
+  }, []);
 
   // Initialize Web Speech API with non-duplicating discrete utterance looping
   useEffect(() => {
@@ -144,44 +163,69 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       setUserNotes('');
       setTextDescription('');
       setErrorMessage(null);
+      stopMediaTracks();
     }
-  }, [isOpen]);
+  }, [isOpen, stopMediaTracks]);
 
   // Initialize camera stream when in photo tab
   useEffect(() => {
-    let activeStream: MediaStream | null = null;
+    let isCancelled = false;
 
     if (isOpen && activeTab === 'photo' && !capturedImage) {
+      setIsStartingCamera(true);
+      setCameraPermissionDenied(false);
+
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({
           video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
         })
         .then(stream => {
-          activeStream = stream;
+          if (isCancelled) {
+            stream.getTracks().forEach(track => {
+              try { track.stop(); } catch {}
+            });
+            return;
+          }
+          activeStreamRef.current = stream;
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             videoRef.current.play().then(() => {
-              setStreamActive(true);
-            }).catch(() => {
-              setStreamActive(false);
+              if (!isCancelled) {
+                setStreamActive(true);
+                setIsStartingCamera(false);
+              }
+            }).catch(err => {
+              console.warn('Video play error:', err);
+              if (!isCancelled) {
+                setStreamActive(false);
+                setIsStartingCamera(false);
+              }
             });
           }
         })
         .catch(err => {
           console.log('Live WebRTC stream not active (will use native camera fallback):', err);
-          setStreamActive(false);
+          if (!isCancelled) {
+            setStreamActive(false);
+            setIsStartingCamera(false);
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+              setCameraPermissionDenied(true);
+            }
+          }
         });
       } else {
+        setIsStartingCamera(false);
         setStreamActive(false);
       }
+    } else {
+      stopMediaTracks();
     }
 
     return () => {
-      if (activeStream) {
-        activeStream.getTracks().forEach(track => track.stop());
-      }
+      isCancelled = true;
+      stopMediaTracks();
     };
-  }, [isOpen, activeTab, capturedImage, facingMode]);
+  }, [isOpen, activeTab, capturedImage, facingMode, stopMediaTracks]);
 
   if (!isOpen) return null;
 
@@ -215,27 +259,40 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
           }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } catch (canvasErr) {
+          console.warn('Image processing error, using original:', canvasErr);
+          resolve(dataUrl);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = (imgErr) => {
+        console.warn('Image load error, using original:', imgErr);
+        resolve(dataUrl);
       };
       img.src = dataUrl;
     });
@@ -252,6 +309,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          // Release camera hardware immediately
+          stopMediaTracks();
           const optimized = await resizeAndConvertImage(rawDataUrl);
           setCapturedImage(optimized);
           return;
@@ -260,10 +319,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         console.warn('Frame capture failed, triggering camera file input:', e);
       }
     }
+    // Stop live stream before invoking native camera to avoid hardware lock/deadlock
+    stopMediaTracks();
     cameraInputRef.current?.click();
   };
 
   const handleOpenGallery = () => {
+    stopMediaTracks();
     galleryInputRef.current?.click();
   };
 
@@ -271,15 +333,30 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      if (event.target?.result) {
-        const optimized = await resizeAndConvertImage(event.target.result as string);
-        setCapturedImage(optimized);
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        if (event.target?.result) {
+          try {
+            const optimized = await resizeAndConvertImage(event.target.result as string);
+            setCapturedImage(optimized);
+          } catch (resizeErr) {
+            console.warn('Resize error, using raw file data:', resizeErr);
+            setCapturedImage(event.target.result as string);
+          }
+        }
+      };
+      reader.onerror = (err) => {
+        console.error('File read error:', err);
+        setErrorMessage('Failed to read image file. Please try again.');
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Upload processing error:', err);
+      setErrorMessage(err.message || 'Failed to process selected image.');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleAnalyzePhoto = async () => {
@@ -440,42 +517,61 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                   alt="Captured meal"
                   className="w-full h-full object-contain max-h-[380px]"
                 />
-              ) : streamActive ? (
-                <video
-                  ref={videoRef}
-                  playsInline
-                  autoPlay
-                  muted
-                  className="w-full h-full object-cover"
-                />
               ) : (
-                <div className="text-center p-6 space-y-4 max-w-xs">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-cyan-400 border border-slate-700">
-                    <Camera className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-white">Camera ready</p>
-                    <p className="text-xs text-slate-400 mt-1">Take a photo or pick from your phone gallery</p>
-                  </div>
-                  <div className="flex justify-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleCaptureFrame}
-                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition shadow"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>Take Photo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenGallery}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition border border-slate-700"
-                    >
-                      <ImageIcon className="w-4 h-4 text-emerald-400" />
-                      <span>Gallery</span>
-                    </button>
-                  </div>
-                </div>
+                <>
+                  <video
+                    ref={videoRef}
+                    playsInline
+                    autoPlay
+                    muted
+                    className={`w-full h-full object-cover ${streamActive ? 'block' : 'hidden'}`}
+                  />
+                  {!streamActive && (
+                    <div className="text-center p-6 space-y-4 max-w-xs">
+                      {isStartingCamera ? (
+                        <div className="space-y-3">
+                          <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto" />
+                          <p className="text-sm font-bold text-white">Starting live camera...</p>
+                          <p className="text-xs text-slate-400">Connecting to your device camera</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-cyan-400 border border-slate-700">
+                            <Camera className="w-8 h-8" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-white">
+                              {cameraPermissionDenied ? 'Camera Permission Blocked' : 'Camera Ready'}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {cameraPermissionDenied
+                                ? 'Please allow camera access in browser settings or choose a photo from gallery'
+                                : 'Take a photo or pick from your phone gallery'}
+                            </p>
+                          </div>
+                          <div className="flex justify-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleCaptureFrame}
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition shadow"
+                            >
+                              <Camera className="w-4 h-4" />
+                              <span>Take Photo</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleOpenGallery}
+                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition border border-slate-700"
+                            >
+                              <ImageIcon className="w-4 h-4 text-emerald-400" />
+                              <span>Gallery</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
 
               {streamActive && !capturedImage && (

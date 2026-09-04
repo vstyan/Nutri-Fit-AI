@@ -13,7 +13,8 @@ import {
   DailySummary, 
   GeminiAnalysisResult,
   StorageLocation,
-  WeightRecord
+  WeightRecord,
+  WorkoutEntry
 } from './types';
 import { 
   getAppSettings, 
@@ -437,6 +438,55 @@ export function App() {
     loadDayData(selectedDate, settings);
   };
 
+  // Add a voice/AI estimated workout to today's activity (running total)
+  const handleAddWorkout = async (workout: WorkoutEntry) => {
+    const previousActive = activity.activeCaloriesBurned || 0;
+    const newActiveKcal = previousActive + workout.caloriesBurned;
+    const includeResting = settings.includeRestingCalories !== false;
+    const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
+    const existingWorkouts = Array.isArray(activity.workouts) ? activity.workouts : [];
+    const updatedWorkouts = [...existingWorkouts, workout];
+
+    const updatedActivity: DailyActivity = {
+      ...activity,
+      activeCaloriesBurned: newActiveKcal,
+      baseBmrCalories: baseBmr,
+      totalCaloriesBurned: baseBmr + newActiveKcal,
+      workouts: updatedWorkouts,
+      lastUpdated: new Date().toISOString()
+    };
+
+    setActivity(updatedActivity);
+    await saveActivityForDate(updatedActivity, settings);
+    loadDayData(selectedDate, settings);
+  };
+
+  // Delete a logged workout from today's activity and adjust running total
+  const handleDeleteWorkout = async (workoutId: string) => {
+    const existingWorkouts = Array.isArray(activity.workouts) ? activity.workouts : [];
+    const workoutToDelete = existingWorkouts.find(w => w.id === workoutId);
+    if (!workoutToDelete) return;
+
+    const previousActive = activity.activeCaloriesBurned || 0;
+    const newActiveKcal = Math.max(0, previousActive - (workoutToDelete.caloriesBurned || 0));
+    const includeResting = settings.includeRestingCalories !== false;
+    const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
+    const updatedWorkouts = existingWorkouts.filter(w => w.id !== workoutId);
+
+    const updatedActivity: DailyActivity = {
+      ...activity,
+      activeCaloriesBurned: newActiveKcal,
+      baseBmrCalories: baseBmr,
+      totalCaloriesBurned: baseBmr + newActiveKcal,
+      workouts: updatedWorkouts,
+      lastUpdated: new Date().toISOString()
+    };
+
+    setActivity(updatedActivity);
+    await saveActivityForDate(updatedActivity, settings);
+    loadDayData(selectedDate, settings);
+  };
+
   // Save settings
   const handleSaveSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
@@ -518,6 +568,8 @@ export function App() {
           onToggleFavorite={handleToggleFavorite}
           onCopyMealToToday={handleCopyMealToToday}
           onUpdateActiveBurn={handleUpdateActiveBurn}
+          onAddWorkout={handleAddWorkout}
+          onDeleteWorkout={handleDeleteWorkout}
           onSaveWeight={handleSaveWeight}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onConnectGoogleFit={handleConnectGoogleFit}

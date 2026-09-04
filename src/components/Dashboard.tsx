@@ -10,18 +10,25 @@ import {
   Wheat, 
   Scale, 
   RefreshCw, 
-  Activity 
+  Activity,
+  Mic,
+  Dumbbell,
+  Trash2,
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import { 
   DailySummary, 
   AppSettings, 
   MealRecord, 
-  WeightRecord 
+  WeightRecord,
+  WorkoutEntry
 } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
 import { WeightTrackerCard } from './WeightTrackerCard';
+import { VoiceWorkoutModal } from './VoiceWorkoutModal';
 
 interface DashboardProps {
   summary: DailySummary;
@@ -45,6 +52,8 @@ interface DashboardProps {
   onToggleFavorite: (mealId: string) => void;
   onCopyMealToToday: (meal: MealRecord) => void;
   onUpdateActiveBurn: (activeKcal: number) => void;
+  onAddWorkout?: (workout: WorkoutEntry) => void;
+  onDeleteWorkout?: (workoutId: string) => void;
   onSaveWeight: (weight: WeightRecord) => void;
   onOpenSettings: () => void;
   onConnectGoogleFit?: () => void;
@@ -65,6 +74,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onToggleFavorite,
   onCopyMealToToday,
   onUpdateActiveBurn,
+  onAddWorkout,
+  onDeleteWorkout,
   onSaveWeight,
   onOpenSettings,
   onConnectGoogleFit,
@@ -77,6 +88,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     activity.activeCaloriesBurned > 0 ? String(activity.activeCaloriesBurned) : ''
   );
   const [isSavedRecently, setIsSavedRecently] = useState(false);
+  const [isVoiceWorkoutOpen, setIsVoiceWorkoutOpen] = useState(false);
 
   useEffect(() => {
     setInputActiveKcal(activity.activeCaloriesBurned > 0 ? String(activity.activeCaloriesBurned) : '');
@@ -325,21 +337,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {/* Input Field for Workout / Tracker Burn (Hidden when Google Fit is connected) */}
+        {/* Input Field for Workout / Tracker Burn (Hidden when Google Fit is connected) */}
         {!settings.googleFitConnected && (
           <div className="space-y-2 pt-1">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Rest + Workout Burn:'}</span>
-              <span className="text-[11px] text-slate-400">
-                {includeResting ? `Total Daily: ${totalBurned} kcal` : `Total: ${totalBurned} kcal`}
-              </span>
-            </label>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>{includeResting ? 'Add Workout / Active Burn:' : 'Add Rest + Workout Burn:'}</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsVoiceWorkoutOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-950 transition active:scale-95 shrink-0 self-start sm:self-auto"
+                title="Describe your workout using voice and let Gemini estimate calories burnt"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <Sparkles className="w-3 h-3 text-emerald-200" />
+                <span>Voice Workout (AI)</span>
+              </button>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="relative flex-1 w-full">
                 <input
                   type="number"
                   value={inputActiveKcal === '0' ? '' : inputActiveKcal}
-                  placeholder={includeResting ? "e.g. 450 (walking, workout, running)" : "e.g. 2400 (from Google Fit total burn)"}
+                  placeholder={includeResting ? "e.g. 450 (or use Voice Workout above)" : "e.g. 2400 (from fitness tracker total burn)"}
                   onFocus={e => e.target.select()}
                   onChange={e => setInputActiveKcal(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-base text-white font-bold placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
@@ -385,6 +408,71 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Today's Logged Workouts List */}
+            {activity.workouts && activity.workouts.length > 0 && (
+              <div className="pt-3 mt-2 border-t border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Dumbbell className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Workouts Logged Today ({activity.workouts.length})</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-400">
+                    Running Exercise Total: +{activity.workouts.reduce((s, w) => s + (w.caloriesBurned || 0), 0)} kcal
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {activity.workouts.map((workout) => (
+                    <div
+                      key={workout.id}
+                      className="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 px-3 hover:border-slate-700 transition"
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                        <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400 shrink-0">
+                          <Activity className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <span className="text-xs font-bold text-white truncate">{workout.title}</span>
+                            {workout.durationMinutes && (
+                              <span className="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0">
+                                <Clock className="w-2.5 h-2.5" />
+                                {workout.durationMinutes}m
+                              </span>
+                            )}
+                            {workout.intensity && (
+                              <span className="text-[9px] text-emerald-300/80 bg-emerald-950/50 px-1.5 py-0.2 rounded border border-emerald-500/20 capitalize shrink-0">
+                                {workout.intensity}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5" title={workout.description}>
+                            "{workout.description}"
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 shrink-0 ml-2">
+                        <span className="text-xs font-black text-emerald-400">
+                          +{workout.caloriesBurned} kcal
+                        </span>
+                        {onDeleteWorkout && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteWorkout(workout.id)}
+                            className="p-1 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition"
+                            title="Delete workout entry"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -499,6 +587,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="hidden sm:inline text-sm font-extrabold pr-1">Log Meal</span>
         </button>
       </div>
+
+      {/* Voice Workout Modal - Only shown when Google Fit is not connected */}
+      {!settings.googleFitConnected && (
+        <VoiceWorkoutModal
+          isOpen={isVoiceWorkoutOpen}
+          geminiApiKey={settings.geminiApiKey}
+          profile={settings.profile}
+          includeResting={includeResting}
+          baseBmr={baseBmr}
+          currentActiveKcal={activity.activeCaloriesBurned || 0}
+          onSaveWorkout={(workout) => {
+            if (onAddWorkout) {
+              onAddWorkout(workout);
+            } else {
+              const newTotal = (activity.activeCaloriesBurned || 0) + workout.caloriesBurned;
+              setInputActiveKcal(String(newTotal));
+              handleSaveActiveBurn(newTotal);
+            }
+          }}
+          onClose={() => setIsVoiceWorkoutOpen(false)}
+        />
+      )}
     </div>
   );
 };

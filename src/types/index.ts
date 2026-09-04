@@ -49,11 +49,23 @@ export interface MealRecord {
   isFavorite?: boolean;
 }
 
+export interface WorkoutEntry {
+  id: string;
+  timestamp: string; // ISO string
+  title: string;
+  description: string;
+  caloriesBurned: number; // kcal
+  durationMinutes?: number;
+  intensity?: 'low' | 'moderate' | 'high' | 'vigorous';
+  explanation?: string;
+}
+
 export interface DailyActivity {
   date: string; // YYYY-MM-DD
   activeCaloriesBurned: number; // exercise / workout calories entered by user
   baseBmrCalories: number; // resting BMR base calories
   totalCaloriesBurned: number; // baseBmrCalories + activeCaloriesBurned
+  workouts?: WorkoutEntry[];
   notes?: string;
   source?: 'manual' | 'google_fit';
   lastSyncedAt?: string;
@@ -123,4 +135,12 @@ export interface GeminiAnalysisResult {
   totalFat: number;
   totalCalories: number;
   dietaryNotes?: string;
+}
+
+export interface WorkoutEstimationResult {
+  title: string;
+  caloriesBurned: number;
+  durationMinutes?: number;
+  intensity?: 'low' | 'moderate' | 'high' | 'vigorous';
+  explanation?: string;
 }
