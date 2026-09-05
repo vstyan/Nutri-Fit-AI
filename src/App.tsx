@@ -363,12 +363,21 @@ export function App() {
 
   // Save meal from review or edit
   const handleSaveMeal = async (meal: MealRecord) => {
-    await saveMeal(meal, settings);
-    setIsReviewOpen(false);
-    setReviewResult(null);
-    setReviewPhotoUrl('');
-    setEditingMeal(null);
-    loadDayData(selectedDate, settings);
+    try {
+      await saveMeal(meal, settings);
+    } catch (err) {
+      console.error('Error saving meal:', err);
+    } finally {
+      setIsReviewOpen(false);
+      setReviewResult(null);
+      setReviewPhotoUrl('');
+      setEditingMeal(null);
+      try {
+        await loadDayData(selectedDate, settings);
+      } catch (loadErr) {
+        console.warn('Error reloading day data:', loadErr);
+      }
+    }
   };
 
   // Open edit modal for an existing logged meal

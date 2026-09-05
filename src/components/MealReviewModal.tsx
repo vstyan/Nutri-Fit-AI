@@ -24,7 +24,7 @@ interface MealReviewModalProps {
   editingMeal?: MealRecord | null;
   targetDate: string;
   geminiApiKey?: string;
-  onSave: (meal: MealRecord) => void;
+  onSave: (meal: MealRecord) => Promise<void> | void;
   onCancel: () => void;
 }
 
@@ -44,22 +44,25 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const [notes, setNotes] = useState(editingMeal?.notes || initialResult?.dietaryNotes || '');
   const [isFavorite, setIsFavorite] = useState(editingMeal?.isFavorite || false);
   const [isEditing, setIsEditing] = useState(isEditMode);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const [items, setItems] = useState<FoodItem[]>(() => {
-    if (editingMeal && editingMeal.items) {
+    if (editingMeal && Array.isArray(editingMeal.items)) {
       return editingMeal.items;
     }
-    if (initialResult && initialResult.items) {
+    if (initialResult && Array.isArray(initialResult.items)) {
       return initialResult.items.map((item, idx) => ({
         id: `item-${Date.now()}-${idx}`,
-        name: item.name,
-        portion: item.portion,
-        grams: item.grams,
-        carbs: item.carbs,
-        fiber: item.fiber || 0,
-        protein: item.protein,
-        fat: item.fat,
-        calories: item.calories,
-        confidence: item.confidence
+        name: item.name || 'Ingredient',
+        portion: item.portion || `${item.grams || 100}g`,
+        grams: Number(item.grams) || 100,
+        carbs: Number(item.carbs) || 0,
+        fiber: Number(item.fiber) || 0,
+        protein: Number(item.protein) || 0,
+        fat: Number(item.fat) || 0,
+        calories: Number(item.calories) || 0,
+        confidence: item.confidence || 'medium'
       }));
     }
     return [];
@@ -68,45 +71,51 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   // Sync state whenever modal opens or props change
   React.useEffect(() => {
     if (isOpen) {
+      setIsSaving(false);
+      setSaveError(null);
       if (editingMeal) {
-        setTitle(editingMeal.title);
+        setTitle(editingMeal.title || '');
         setMealType(editingMeal.mealType || 'lunch');
         setNotes(editingMeal.notes || '');
         setIsFavorite(!!editingMeal.isFavorite);
         setIsEditing(true);
         setItems(
-          (editingMeal.items || []).map((item, idx) => ({
-            id: item.id || `item-${Date.now()}-${idx}`,
-            name: item.name,
-            portion: item.portion || `${item.grams || 100}g`,
-            grams: item.grams || 100,
-            carbs: item.carbs || 0,
-            fiber: item.fiber || 0,
-            protein: item.protein || 0,
-            fat: item.fat || 0,
-            calories: item.calories || 0,
-            confidence: item.confidence || 'high'
-          }))
+          Array.isArray(editingMeal.items)
+            ? editingMeal.items.map((item, idx) => ({
+                id: item.id || `item-${Date.now()}-${idx}`,
+                name: item.name || 'Ingredient',
+                portion: item.portion || `${item.grams || 100}g`,
+                grams: Number(item.grams) || 100,
+                carbs: Number(item.carbs) || 0,
+                fiber: Number(item.fiber) || 0,
+                protein: Number(item.protein) || 0,
+                fat: Number(item.fat) || 0,
+                calories: Number(item.calories) || 0,
+                confidence: item.confidence || 'high'
+              }))
+            : []
         );
       } else if (initialResult) {
-        setTitle(initialResult.title);
+        setTitle(initialResult.title || '');
         setMealType(initialResult.mealType || 'lunch');
         setNotes(initialResult.dietaryNotes || '');
         setIsFavorite(false);
         setIsEditing(false);
         setItems(
-          initialResult.items.map((item, idx) => ({
-            id: `item-${Date.now()}-${idx}`,
-            name: item.name,
-            portion: item.portion,
-            grams: item.grams,
-            carbs: item.carbs,
-            fiber: item.fiber || 0,
-            protein: item.protein,
-            fat: item.fat,
-            calories: item.calories,
-            confidence: item.confidence
-          }))
+          Array.isArray(initialResult.items)
+            ? initialResult.items.map((item, idx) => ({
+                id: `item-${Date.now()}-${idx}`,
+                name: item.name || 'Ingredient',
+                portion: item.portion || `${item.grams || 100}g`,
+                grams: Number(item.grams) || 100,
+                carbs: Number(item.carbs) || 0,
+                fiber: Number(item.fiber) || 0,
+                protein: Number(item.protein) || 0,
+                fat: Number(item.fat) || 0,
+                calories: Number(item.calories) || 0,
+                confidence: item.confidence || 'high'
+              }))
+            : []
         );
       }
     }
@@ -201,25 +210,49 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
     setItems(prev => prev.filter(it => it.id !== id));
   };
 
-  const handleQuickSave = () => {
-    const meal: MealRecord = {
-      id: editingMeal ? editingMeal.id : `meal-${Date.now()}`,
-      timestamp: editingMeal ? editingMeal.timestamp : new Date().toISOString(),
-      date: editingMeal ? editingMeal.date : targetDate,
-      mealType,
-      title: title.trim() || (editingMeal ? editingMeal.title : 'Meal Entry'),
-      notes,
-      items,
-      totalCarbs,
-      totalFiber,
-      netCarbs,
-      totalProtein,
-      totalFat,
-      totalCalories,
-      photoUrl: currentPhoto,
-      isFavorite
-    };
-    onSave(meal);
+  const handleQuickSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const finalItems = items.length > 0 ? items : [{
+        id: `item-${Date.now()}-0`,
+        name: title.trim() || 'Meal Entry',
+        portion: '1 serving',
+        grams: 100,
+        carbs: totalCarbs || 0,
+        fiber: totalFiber || 0,
+        protein: totalProtein || 0,
+        fat: totalFat || 0,
+        calories: totalCalories || 0,
+        confidence: 'high' as const
+      }];
+
+      const meal: MealRecord = {
+        id: editingMeal ? editingMeal.id : `meal-${Date.now()}`,
+        timestamp: editingMeal ? editingMeal.timestamp : new Date().toISOString(),
+        date: (editingMeal && editingMeal.date) ? editingMeal.date : (targetDate || new Date().toISOString().split('T')[0]),
+        mealType: mealType || 'lunch',
+        title: title.trim() || (editingMeal ? editingMeal.title : 'Meal Entry'),
+        notes: notes || '',
+        items: finalItems,
+        totalCarbs,
+        totalFiber,
+        netCarbs,
+        totalProtein,
+        totalFat,
+        totalCalories,
+        photoUrl: currentPhoto || undefined,
+        isFavorite: !!isFavorite
+      };
+
+      await onSave(meal);
+    } catch (err: any) {
+      console.error('Save meal error:', err);
+      setSaveError(err.message || 'Could not save meal. Please try again.');
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -395,13 +428,31 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
               </div>
             </div>
             <button
+              type="button"
               onClick={handleQuickSave}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5"
+              disabled={isSaving}
+              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-slate-950 font-bold text-sm rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5 active:scale-95"
             >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>{isEditMode ? 'Update Meal' : '1-Tap Save'}</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>{isEditMode ? 'Update Meal' : '1-Tap Save'}</span>
+                </>
+              )}
             </button>
           </div>
+
+          {saveError && (
+            <div className="p-3 bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs rounded-xl flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span className="flex-1 font-medium">{saveError}</span>
+            </div>
+          )}
 
           {/* Edit Items Section Toggle */}
           <div className="border border-slate-800 rounded-xl overflow-hidden">
@@ -532,10 +583,20 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
           <button
             type="button"
             onClick={handleQuickSave}
-            className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow flex items-center space-x-1.5"
+            disabled={isSaving}
+            className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow flex items-center space-x-1.5 active:scale-95"
           >
-            <Check className="w-4 h-4" />
-            <span>{isEditMode ? 'Save Changes' : 'Save Meal'}</span>
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                <span>{isEditMode ? 'Save Changes' : 'Save Meal'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

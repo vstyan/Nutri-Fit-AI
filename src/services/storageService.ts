@@ -97,12 +97,42 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
   }
 }
 
+const IDB_TIMEOUT_MS = 2500;
+
+export function withIdbTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => {
+      console.warn('IndexedDB operation timed out; falling back');
+      resolve(fallback);
+    }, IDB_TIMEOUT_MS))
+  ]);
+}
+
+export function cleanOldPhotosFromLocalStorage(): void {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(MEALS_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw && raw.includes('data:image/')) {
+            const list: MealRecord[] = JSON.parse(raw);
+            const cleaned = list.map(m => ({ ...m, photoUrl: undefined }));
+            localStorage.setItem(key, JSON.stringify(cleaned));
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
 export async function getMealsForDate(date: string, settings: AppSettings): Promise<MealRecord[]> {
   const localKey = `${MEALS_PREFIX}${date}`;
   let localMeals: MealRecord[] = [];
 
   try {
-    const idbMeals = await get<MealRecord[]>(localKey);
+    const idbMeals = await withIdbTimeout(get<MealRecord[]>(localKey), undefined);
     if (idbMeals && Array.isArray(idbMeals) && idbMeals.length > 0) {
       localMeals = idbMeals;
     } else {
@@ -126,7 +156,7 @@ export async function getMealsForDate(date: string, settings: AppSettings): Prom
           }
         }
         try {
-          await set(localKey, combined);
+          await withIdbTimeout(set(localKey, combined), undefined);
           localStorage.setItem(localKey, JSON.stringify(combined));
         } catch {}
         return combined;
@@ -147,7 +177,7 @@ export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise
   const localKey = `${MEALS_PREFIX}${meal.date}`;
   let existing: MealRecord[] = [];
   try {
-    const idbMeals = await get<MealRecord[]>(localKey);
+    const idbMeals = await withIdbTimeout(get<MealRecord[]>(localKey), undefined);
     if (idbMeals && Array.isArray(idbMeals)) {
       existing = idbMeals;
     } else {
@@ -162,7 +192,7 @@ export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise
 
   // 1. Always save to IndexedDB (virtually unlimited capacity, handles photo URLs)
   try {
-    await set(localKey, updated);
+    await withIdbTimeout(set(localKey, updated), undefined);
   } catch (idbErr) {
     console.error('IndexedDB save failed for meal:', idbErr);
   }
@@ -171,12 +201,13 @@ export async function saveMeal(meal: MealRecord, settings: AppSettings): Promise
   try {
     localStorage.setItem(localKey, JSON.stringify(updated));
   } catch (quotaErr) {
-    console.warn('LocalStorage quota reached; caching meal metadata without full photo:', quotaErr);
+    console.warn('LocalStorage quota reached; stripping photo and cleaning old cached photos:', quotaErr);
+    cleanOldPhotosFromLocalStorage();
     try {
       const stripped = updated.map(m => ({ ...m, photoUrl: undefined }));
       localStorage.setItem(localKey, JSON.stringify(stripped));
     } catch (fallbackErr) {
-      console.warn('Could not cache in localStorage:', fallbackErr);
+      console.warn('Could not cache in localStorage even after photo stripping:', fallbackErr);
     }
   }
 
@@ -193,7 +224,7 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
   const localKey = `${MEALS_PREFIX}${date}`;
   let existing: MealRecord[] = [];
   try {
-    const idbMeals = await get<MealRecord[]>(localKey);
+    const idbMeals = await withIdbTimeout(get<MealRecord[]>(localKey), undefined);
     if (idbMeals && Array.isArray(idbMeals)) {
       existing = idbMeals;
     } else {
@@ -207,7 +238,7 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
   const updated = existing.filter(m => m.id !== mealId);
 
   try {
-    await set(localKey, updated);
+    await withIdbTimeout(set(localKey, updated), undefined);
   } catch (idbErr) {
     console.error('IndexedDB update failed on delete:', idbErr);
   }
@@ -215,6 +246,7 @@ export async function deleteMeal(mealId: string, date: string, settings: AppSett
   try {
     localStorage.setItem(localKey, JSON.stringify(updated));
   } catch {
+    cleanOldPhotosFromLocalStorage();
     try {
       const stripped = updated.map(m => ({ ...m, photoUrl: undefined }));
       localStorage.setItem(localKey, JSON.stringify(stripped));
@@ -315,8 +347,20 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
 
 export async function saveActivityForDate(activity: DailyActivity, settings: AppSettings): Promise<void> {
   const localKey = `${ACTIVITY_PREFIX}${activity.date}`;
-  localStorage.setItem(localKey, JSON.stringify(activity));
-  await set(localKey, activity);
+  try {
+    localStorage.setItem(localKey, JSON.stringify(activity));
+  } catch (e) {
+    cleanOldPhotosFromLocalStorage();
+    try {
+      localStorage.setItem(localKey, JSON.stringify(activity));
+    } catch {}
+  }
+
+  try {
+    await withIdbTimeout(set(localKey, activity), undefined);
+  } catch (idbErr) {
+    console.error('IndexedDB save failed for activity:', idbErr);
+  }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
     try {
@@ -333,9 +377,11 @@ export async function getWeightForDate(date: string): Promise<WeightRecord | nul
   try {
     const localStr = localStorage.getItem(key);
     if (localStr) return JSON.parse(localStr);
-    const saved = await get<WeightRecord>(key);
+    const saved = await withIdbTimeout(get<WeightRecord>(key), undefined);
     if (saved) {
-      localStorage.setItem(key, JSON.stringify(saved));
+      try {
+        localStorage.setItem(key, JSON.stringify(saved));
+      } catch {}
       return saved;
     }
   } catch (e) {
@@ -346,8 +392,20 @@ export async function getWeightForDate(date: string): Promise<WeightRecord | nul
 
 export async function saveWeightForDate(weight: WeightRecord, settings: AppSettings): Promise<void> {
   const key = `${WEIGHT_PREFIX}${weight.date}`;
-  localStorage.setItem(key, JSON.stringify(weight));
-  await set(key, weight);
+  try {
+    localStorage.setItem(key, JSON.stringify(weight));
+  } catch (e) {
+    cleanOldPhotosFromLocalStorage();
+    try {
+      localStorage.setItem(key, JSON.stringify(weight));
+    } catch {}
+  }
+
+  try {
+    await withIdbTimeout(set(key, weight), undefined);
+  } catch (idbErr) {
+    console.error('IndexedDB save failed for weight:', idbErr);
+  }
 
   if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
     try {
