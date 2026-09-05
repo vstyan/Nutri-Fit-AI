@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, WorkoutEntry, WorkoutEstimationResult } from '../types';
 import { estimateWorkoutCalories } from '../services/geminiService';
+import { getStickyGeminiKeySynchronous } from '../services/storageService';
 
 interface VoiceWorkoutModalProps {
   isOpen: boolean;
@@ -166,7 +167,9 @@ export const VoiceWorkoutModal: React.FC<VoiceWorkoutModalProps> = ({
       setErrorMessage('Please provide a workout description first (speak or type).');
       return;
     }
-    if (!geminiApiKey) {
+
+    const activeApiKey = (geminiApiKey || '').trim() || getStickyGeminiKeySynchronous();
+    if (!activeApiKey) {
       setErrorMessage('Gemini API key is required. Please add it in App Settings.');
       return;
     }
@@ -176,7 +179,7 @@ export const VoiceWorkoutModal: React.FC<VoiceWorkoutModalProps> = ({
     setErrorMessage(null);
 
     try {
-      const result = await estimateWorkoutCalories(workoutText.trim(), profile, geminiApiKey);
+      const result = await estimateWorkoutCalories(workoutText.trim(), profile, activeApiKey);
       setEstimationResult(result);
       setConfirmedKcal(String(result.caloriesBurned));
     } catch (err: any) {

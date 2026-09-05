@@ -48,7 +48,137 @@ export interface ImportResult {
   dayCount: number;
 }
 
-export async function getAppSettings(): Promise<AppSettings> {
+export const STICKY_GEMINI_KEY = 'nutrifit_gemini_api_key_persistent';
+const LEGACY_SETTINGS_KEYS = [
+  'nutrifit_settings_v4',
+  'nutrifit_settings_v3',
+  'nutrifit_settings_v2',
+  'nutrifit_settings_v1',
+  'nutrifit_settings'
+];
+
+function setCookie(name: string, value: string, days = 3650): void {
+  try {
+    if (typeof document === 'undefined') return;
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+  } catch {}
+}
+
+function getCookie(name: string): string | null {
+  try {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+    return match ? decodeURIComponent(match[3]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function removeCookie(name: string): void {
+  try {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+  } catch {}
+}
+
+export function persistStickyGeminiKey(key: string): void {
+  const clean = key ? key.trim() : '';
+  if (!clean) return;
+
+  // 1. Dedicated persistent localStorage key
+  try {
+    localStorage.setItem(STICKY_GEMINI_KEY, clean);
+  } catch {}
+
+  // 2. Dedicated persistent IndexedDB entry
+  try {
+    set(STICKY_GEMINI_KEY, clean).catch(() => {});
+  } catch {}
+
+  // 3. 10-year persistent cookie (survives iOS Safari storage flushes)
+  try {
+    setCookie(STICKY_GEMINI_KEY, clean);
+  } catch {}
+}
+
+export function clearStickyGeminiKey(): void {
+  try {
+    localStorage.removeItem(STICKY_GEMINI_KEY);
+  } catch {}
+  try {
+    set(STICKY_GEMINI_KEY, '').catch(() => {});
+  } catch {}
+  try {
+    removeCookie(STICKY_GEMINI_KEY);
+  } catch {}
+}
+
+export function getStickyGeminiKeySynchronous(): string {
+  try {
+    // 1. Dedicated persistent localStorage key
+    const directKey = localStorage.getItem(STICKY_GEMINI_KEY);
+    if (directKey && directKey.trim().length > 0) {
+      return directKey.trim();
+    }
+
+    // 2. Current & legacy settings in localStorage
+    for (const key of LEGACY_SETTINGS_KEYS) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.geminiApiKey === 'string' && parsed.geminiApiKey.trim().length > 0) {
+            const found = parsed.geminiApiKey.trim();
+            persistStickyGeminiKey(found);
+            return found;
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Persistent cookie fallback
+    const cookieKey = getCookie(STICKY_GEMINI_KEY);
+    if (cookieKey && cookieKey.trim().length > 0) {
+      const found = cookieKey.trim();
+      persistStickyGeminiKey(found);
+      return found;
+    }
+  } catch {}
+  return '';
+}
+
+export async function getStickyGeminiKey(): Promise<string> {
+  const syncKey = getStickyGeminiKeySynchronous();
+  if (syncKey) return syncKey;
+
+  // Check dedicated key in IndexedDB
+  try {
+    const idbDirect = await withIdbTimeout(get<string>(STICKY_GEMINI_KEY), undefined);
+    if (idbDirect && idbDirect.trim().length > 0) {
+      const found = idbDirect.trim();
+      persistStickyGeminiKey(found);
+      return found;
+    }
+  } catch {}
+
+  // Check legacy settings in IndexedDB
+  for (const key of LEGACY_SETTINGS_KEYS) {
+    try {
+      const idbLegacy = await withIdbTimeout(get<any>(key), undefined);
+      if (idbLegacy && typeof idbLegacy.geminiApiKey === 'string' && idbLegacy.geminiApiKey.trim().length > 0) {
+        const found = idbLegacy.geminiApiKey.trim();
+        persistStickyGeminiKey(found);
+        return found;
+      }
+    } catch {}
+  }
+
+  return '';
+}
+
+export function getInitialSettingsSynchronous(): AppSettings {
+  const stickyKey = getStickyGeminiKeySynchronous();
   try {
     const localStr = localStorage.getItem(SETTINGS_KEY);
     if (localStr) {
@@ -56,41 +186,106 @@ export async function getAppSettings(): Promise<AppSettings> {
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        geminiApiKey: (parsed.geminiApiKey && parsed.geminiApiKey.trim().length > 0)
+          ? parsed.geminiApiKey.trim()
+          : stickyKey,
         includeRestingCalories: parsed.includeRestingCalories !== undefined ? parsed.includeRestingCalories : true,
         profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
         goals: { ...DEFAULT_SETTINGS.goals, ...(parsed.goals || {}) }
       };
     }
+  } catch {}
 
-    const idbSaved = await get<AppSettings>(SETTINGS_KEY);
-    if (idbSaved) {
-      const merged = {
-        ...DEFAULT_SETTINGS,
-        ...idbSaved,
-        includeRestingCalories: idbSaved.includeRestingCalories !== undefined ? idbSaved.includeRestingCalories : true,
-        profile: { ...DEFAULT_PROFILE, ...(idbSaved.profile || {}) },
-        goals: { ...DEFAULT_SETTINGS.goals, ...(idbSaved.goals || {}) }
-      };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
-      return merged;
+  return {
+    ...DEFAULT_SETTINGS,
+    geminiApiKey: stickyKey
+  };
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  let settingsToReturn: AppSettings = getInitialSettingsSynchronous();
+
+  try {
+    const localStr = localStorage.getItem(SETTINGS_KEY);
+    let parsedLocal: any = null;
+    if (localStr) {
+      try {
+        parsedLocal = JSON.parse(localStr);
+      } catch {}
     }
+
+    let idbSaved: any = null;
+    try {
+      idbSaved = await withIdbTimeout(get<AppSettings>(SETTINGS_KEY), undefined);
+    } catch {}
+
+    const merged: AppSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(idbSaved || {}),
+      ...(parsedLocal || {}),
+      includeRestingCalories: (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories) !== undefined
+        ? (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories)
+        : true,
+      profile: { ...DEFAULT_PROFILE, ...(idbSaved?.profile || {}), ...(parsedLocal?.profile || {}) },
+      goals: { ...DEFAULT_SETTINGS.goals, ...(idbSaved?.goals || {}) },
+      geminiApiKey: (parsedLocal?.geminiApiKey || idbSaved?.geminiApiKey || '').trim()
+    };
+
+    // Recover sticky Gemini key if settings object has an empty key
+    let apiKey = merged.geminiApiKey;
+    if (!apiKey) {
+      apiKey = await getStickyGeminiKey();
+    }
+    if (apiKey) {
+      merged.geminiApiKey = apiKey;
+      persistStickyGeminiKey(apiKey);
+    }
+
+    settingsToReturn = merged;
+
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+      await withIdbTimeout(set(SETTINGS_KEY, merged), undefined);
+    } catch {}
   } catch (e) {
     console.error('Error loading settings:', e);
   }
-  return DEFAULT_SETTINGS;
+
+  return settingsToReturn;
 }
 
-export async function saveAppSettings(settings: AppSettings): Promise<void> {
+export async function saveAppSettings(settings: AppSettings, explicitKeyUpdate = false): Promise<void> {
+  let effectiveKey = (settings.geminiApiKey || '').trim();
+
+  // Protect against accidental blank overwrites during app updates or background auto-saves
+  if (!effectiveKey && !explicitKeyUpdate) {
+    const existingSticky = getStickyGeminiKeySynchronous();
+    if (existingSticky) {
+      effectiveKey = existingSticky;
+    }
+  }
+
+  if (effectiveKey) {
+    persistStickyGeminiKey(effectiveKey);
+  } else if (explicitKeyUpdate) {
+    clearStickyGeminiKey();
+  }
+
+  const finalSettings: AppSettings = {
+    ...settings,
+    geminiApiKey: effectiveKey
+  };
+
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    await set(SETTINGS_KEY, settings);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(finalSettings));
+    await withIdbTimeout(set(SETTINGS_KEY, finalSettings), undefined);
   } catch (e) {
     console.error('Error saving settings:', e);
   }
 
-  if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
+  if (finalSettings.storageLocation === 'google_drive' && finalSettings.googleAccessToken) {
     try {
-      await saveJsonToDrive('app-settings.json', settings, settings.googleAccessToken);
+      await saveJsonToDrive('app-settings.json', finalSettings, finalSettings.googleAccessToken);
     } catch (e) {
       console.warn('Could not sync settings to Google Drive:', e);
     }
@@ -562,20 +757,28 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
 
 export async function clearAllAppData(keepSettings = true): Promise<void> {
   const currentSettings = await getAppSettings();
+  const currentStickyKey = getStickyGeminiKeySynchronous() || (await getStickyGeminiKey());
 
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k && (k.startsWith('nutrifit_') || k.startsWith(MEALS_PREFIX) || k.startsWith(ACTIVITY_PREFIX) || k.startsWith(WEIGHT_PREFIX))) {
-      if (keepSettings && k === SETTINGS_KEY) continue;
+      if (keepSettings && (k === SETTINGS_KEY || k === STICKY_GEMINI_KEY)) continue;
       keysToRemove.push(k);
     }
   }
   keysToRemove.forEach(k => localStorage.removeItem(k));
 
+  if (!keepSettings) {
+    clearStickyGeminiKey();
+  }
+
   try {
     await clearIdb();
     if (keepSettings) {
+      if (currentStickyKey) {
+        persistStickyGeminiKey(currentStickyKey);
+      }
       await saveAppSettings(currentSettings);
     }
   } catch (e) {

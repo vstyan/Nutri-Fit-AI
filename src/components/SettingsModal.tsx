@@ -38,7 +38,7 @@ interface SettingsModalProps {
   isOpen: boolean;
   settings: AppSettings;
   isConnectingGoogleFit?: boolean;
-  onSaveSettings: (settings: AppSettings) => void;
+  onSaveSettings: (settings: AppSettings, explicitKeyUpdate?: boolean) => void;
   onClose: () => void;
   onConnectGoogleFit?: () => void;
   onDisconnectGoogleFit?: () => void;
@@ -224,7 +224,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(formData);
+    onSaveSettings(formData, true);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -765,7 +765,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.3.7
+                  v1.3.8
                 </span>
               </label>
 

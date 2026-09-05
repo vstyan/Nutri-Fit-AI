@@ -29,7 +29,8 @@ import {
   getWeightHistory,
   getAllFavoriteMeals,
   toggleFavoriteMeal,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  getInitialSettingsSynchronous
 } from './services/storageService';
 import { calculateBMR } from './utils/bmrCalculator';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
@@ -37,7 +38,7 @@ import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesR
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(() => getInitialSettingsSynchronous());
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [currentWeight, setCurrentWeight] = useState<WeightRecord | null>(null);
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
@@ -497,9 +498,9 @@ export function App() {
   };
 
   // Save settings
-  const handleSaveSettings = async (newSettings: AppSettings) => {
+  const handleSaveSettings = async (newSettings: AppSettings, explicitKeyUpdate = true) => {
     setSettings(newSettings);
-    await saveAppSettings(newSettings);
+    await saveAppSettings(newSettings, explicitKeyUpdate);
     const includeResting = newSettings.includeRestingCalories !== false;
     const baseBmr = includeResting ? calculateBMR(newSettings.profile) : 0;
     const updatedActivity: DailyActivity = {

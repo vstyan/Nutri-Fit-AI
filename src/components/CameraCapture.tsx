@@ -15,6 +15,7 @@ import {
   Square
 } from 'lucide-react';
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
+import { getStickyGeminiKeySynchronous } from '../services/storageService';
 import { GeminiAnalysisResult } from '../types';
 
 declare const window: any;
@@ -362,7 +363,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   const handleAnalyzePhoto = async () => {
     if (!capturedImage) return;
 
-    if (!geminiApiKey) {
+    const activeApiKey = (geminiApiKey || '').trim() || getStickyGeminiKeySynchronous();
+    if (!activeApiKey) {
       setErrorMessage('Please enter your Gemini API Key in Settings to analyze meals.');
       return;
     }
@@ -371,7 +373,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     setErrorMessage(null);
 
     try {
-      const result = await analyzeFoodImage(capturedImage, geminiApiKey, userNotes);
+      const result = await analyzeFoodImage(capturedImage, activeApiKey, userNotes);
       const img = capturedImage;
       setCapturedImage(null);
       setUserNotes('');
@@ -398,7 +400,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       return;
     }
 
-    if (!geminiApiKey) {
+    const activeApiKey = (geminiApiKey || '').trim() || getStickyGeminiKeySynchronous();
+    if (!activeApiKey) {
       setErrorMessage('Please enter your Gemini API Key in Settings to analyze meals.');
       return;
     }
@@ -408,7 +411,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
     try {
       const textToAnalyze = textDescription.trim();
-      const result = await analyzeFoodText(textToAnalyze, geminiApiKey);
+      const result = await analyzeFoodText(textToAnalyze, activeApiKey);
       setTextDescription('');
       setUserNotes('');
       setCapturedImage(null);

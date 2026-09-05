@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
 import { analyzeFoodText } from '../services/geminiService';
+import { getStickyGeminiKeySynchronous } from '../services/storageService';
 
 interface MealReviewModalProps {
   isOpen: boolean;
@@ -138,7 +139,8 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
 
   const handleReanalyzeWithAI = async () => {
     if (!title.trim()) return;
-    if (!geminiApiKey) {
+    const activeApiKey = (geminiApiKey || '').trim() || getStickyGeminiKeySynchronous();
+    if (!activeApiKey) {
       setReanalyzeError('Please enter your Gemini API Key in Settings to re-calculate with AI.');
       return;
     }
@@ -146,7 +148,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
     setReanalyzeError(null);
     try {
       const descriptionToAnalyze = notes.trim() ? `${title.trim()}, ${notes.trim()}` : title.trim();
-      const result = await analyzeFoodText(descriptionToAnalyze, geminiApiKey);
+      const result = await analyzeFoodText(descriptionToAnalyze, activeApiKey);
       if (result.items && result.items.length > 0) {
         setItems(
           result.items.map((item, idx) => ({
