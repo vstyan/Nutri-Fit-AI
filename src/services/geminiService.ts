@@ -1,13 +1,11 @@
 import { GeminiAnalysisResult, UserProfile, WorkoutEstimationResult } from '../types';
 
 const FALLBACK_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-pro',
-  'gemini-2.5-flash',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
 ];
 
 const WORKOUT_RESPONSE_SCHEMA = {
@@ -221,78 +219,98 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
   const errorSummaries: string[] = [];
 
   for (const model of FALLBACK_MODELS) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-      if (response.ok) {
-        const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          let cleanText = text.trim();
-          if (cleanText.startsWith('```')) {
-            cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-          }
-          const parsed: T = JSON.parse(cleanText);
-          return parsed;
-        }
-      } else {
-        const errorText = await response.text();
-        
-        // If 400 Bad Request and schema was supplied, try fallback without responseSchema
-        if (response.status === 400 && requestBody.generationConfig?.responseSchema) {
-          const simplifiedBody = {
-            ...requestBody,
-            generationConfig: {
-              temperature: 0.2,
-              responseMimeType: 'application/json'
+        if (response.ok) {
+          const data = await response.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            let cleanText = text.trim();
+            if (cleanText.startsWith('```')) {
+              cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
             }
-          };
-          const retryController = new AbortController();
-          const retryTimeoutId = setTimeout(() => retryController.abort(), 20000);
+            const parsed: T = JSON.parse(cleanText);
+            return parsed;
+          }
+        } else {
+          const errorText = await response.text();
+
+          let cleanErrMsg = errorText;
           try {
-            const retryRes = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(simplifiedBody),
-              signal: retryController.signal
-            });
-            clearTimeout(retryTimeoutId);
-            if (retryRes.ok) {
-              const data = await retryRes.json();
-              const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) {
-                let cleanText = text.trim();
-                if (cleanText.startsWith('```')) {
-                  cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-                }
-                const parsed: T = JSON.parse(cleanText);
-                return parsed;
-              }
+            const parsedJson = JSON.parse(errorText);
+            if (parsedJson?.error?.message) {
+              cleanErrMsg = parsedJson.error.message;
             }
-          } catch (retryErr) {
-            clearTimeout(retryTimeoutId);
+          } catch {
+            // keep errorText
           }
-        }
 
-        throw new Error(`[${model}] ${response.status}: ${errorText}`);
+          // If transient error (503 Service Unavailable or 429 Rate Limit) and first attempt, back off and retry
+          if ((response.status === 503 || response.status === 429) && attempt === 1) {
+            console.warn(`[${model}] transient ${response.status}, retrying in 1.2s...`);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            continue;
+          }
+
+          // If 400 Bad Request and schema was supplied, try fallback without responseSchema
+          if (response.status === 400 && requestBody.generationConfig?.responseSchema) {
+            const simplifiedBody = {
+              ...requestBody,
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: 'application/json'
+              }
+            };
+            const retryController = new AbortController();
+            const retryTimeoutId = setTimeout(() => retryController.abort(), 20000);
+            try {
+              const retryRes = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(simplifiedBody),
+                signal: retryController.signal
+              });
+              clearTimeout(retryTimeoutId);
+              if (retryRes.ok) {
+                const data = await retryRes.json();
+                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  let cleanText = text.trim();
+                  if (cleanText.startsWith('```')) {
+                    cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+                  }
+                  const parsed: T = JSON.parse(cleanText);
+                  return parsed;
+                }
+              }
+            } catch (retryErr) {
+              clearTimeout(retryTimeoutId);
+            }
+          }
+
+          throw new Error(`[${model}] ${response.status}: ${cleanErrMsg}`);
+        }
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        const isAbort = err.name === 'AbortError';
+        const msg = isAbort ? `[${model}] Request timed out after 25s` : (err.message || String(err));
+        console.warn(`Attempt with ${model} failed:`, msg);
+        lastError = isAbort ? new Error(msg) : err;
+        errorSummaries.push(msg);
+        break; // Advance to next model on non-transient error or timeout
       }
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      const isAbort = err.name === 'AbortError';
-      const msg = isAbort ? `[${model}] Request timed out after 25s` : (err.message || String(err));
-      console.warn(`Attempt with ${model} failed:`, msg);
-      lastError = isAbort ? new Error(msg) : err;
-      errorSummaries.push(msg);
     }
   }
 
