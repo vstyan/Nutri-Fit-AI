@@ -15,6 +15,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { MealRecord, MealType } from '../types';
+import { calculateMealTEF } from '../utils/calorieEngine';
 
 interface MealHistoryProps {
   meals: MealRecord[];
@@ -303,6 +304,12 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                         </span>
                         <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30">
                           {meal.totalCalories} <span className="text-[10px] font-normal text-slate-400">kcal</span>
+                        </span>
+                        <span 
+                          className="text-xs font-mono font-bold text-orange-400 bg-orange-950/60 px-2 py-0.5 rounded-lg border border-orange-500/30"
+                          title="Thermic Effect of Food: Energy expended by the body digesting this meal"
+                        >
+                          +{calculateMealTEF(meal)} <span className="text-[10px] font-normal text-slate-400">TEF</span>
                         </span>
                       </div>
                     </div>

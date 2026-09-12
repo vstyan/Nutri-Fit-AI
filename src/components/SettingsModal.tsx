@@ -452,8 +452,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <p className="text-[10px] text-slate-400 leading-normal">
                     {settings.googleFitConnected
-                      ? 'Disabled to prevent double-counting. Google Fit already tracks resting burn.'
-                      : `App adds calculated BMR (${currentBMR} kcal) to any logged workouts or steps.`}
+                      ? 'Disabled to prevent double-counting. Google Fit already tracks resting burn and NEAT.'
+                      : `Calculates full TDEE: BMR (${currentBMR} kcal) + Sedentary NEAT (${Math.round(currentBMR * 0.15)} kcal) + TEF (food) + Workouts.`}
                   </p>
                 </button>
 

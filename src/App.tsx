@@ -32,7 +32,7 @@ import {
   DEFAULT_SETTINGS,
   getInitialSettingsSynchronous
 } from './services/storageService';
-import { calculateBMR } from './utils/bmrCalculator';
+import { calculateBMR, calculateDailyTEF, calculateTDEE } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
 import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesResult } from './services/googleFitService';
 
@@ -52,11 +52,14 @@ export function App() {
   const [activity, setActivity] = useState<DailyActivity>(() => {
     const includeResting = DEFAULT_SETTINGS.includeRestingCalories !== false;
     const base = includeResting ? calculateBMR(DEFAULT_SETTINGS.profile) : 0;
+    const neat = includeResting ? Math.round(base * 0.15) : 0;
     return {
       date: getLocalDateString(),
       activeCaloriesBurned: 0,
       baseBmrCalories: base,
-      totalCaloriesBurned: base,
+      neatCalories: neat,
+      tefCalories: 0,
+      totalCaloriesBurned: base + neat,
       lastUpdated: new Date().toISOString()
     };
   });
@@ -213,12 +216,17 @@ export function App() {
         const includeResting = currentSettings.includeRestingCalories !== false;
         const profileBmr = calculateBMR(currentSettings.profile);
         const baseBmr = includeResting ? profileBmr : 0;
+        const currentMeals = await getMealsForDate(date, currentSettings);
+        const tef = calculateDailyTEF(currentMeals);
+        const fitTotal = includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories;
 
         const updatedActivity: DailyActivity = {
           date,
           activeCaloriesBurned: fitResult.totalCalories,
           baseBmrCalories: baseBmr,
-          totalCaloriesBurned: includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories,
+          neatCalories: 0, // Google Fit already accounts for NEAT; 0 added to prevent double counting
+          tefCalories: tef,
+          totalCaloriesBurned: fitTotal + tef,
           source: 'google_fit',
           lastSyncedAt: fitResult.lastSyncedAt,
           lastUpdated: new Date().toISOString()
@@ -306,8 +314,38 @@ export function App() {
     const yStr = addDaysToDateString(date, -1);
     const yMeals = await getMealsForDate(yStr, currentSettings);
 
+    // Calculate dynamic TEF from logged nutrition
+    const dayTef = calculateDailyTEF(dayMeals);
+
+    // Calculate TDEE breakdown: Total Burned = BMR + NEAT + EAT + TEF
+    const includeResting = currentSettings.includeRestingCalories !== false;
+    const profileBmr = calculateBMR(currentSettings.profile);
+    const baseBmr = includeResting ? (dayActivity.baseBmrCalories || profileBmr) : 0;
+    const isFit = dayActivity.source === 'google_fit' || !!currentSettings.googleFitConnected;
+
+    const tdeeBreakdown = calculateTDEE({
+      bmr: baseBmr,
+      activeCalories: dayActivity.activeCaloriesBurned || 0,
+      meals: dayMeals,
+      source: dayActivity.source,
+      isGoogleFitConnected: currentSettings.googleFitConnected,
+      includeResting
+    });
+
+    const synchedActivity: DailyActivity = {
+      ...dayActivity,
+      baseBmrCalories: baseBmr,
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: dayTef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned,
+      source: isFit ? 'google_fit' : (dayActivity.source || 'manual')
+    };
+
+    // Save updated activity
+    await saveActivityForDate(synchedActivity, currentSettings);
+
     setMeals(dayMeals);
-    setActivity(dayActivity);
+    setActivity(synchedActivity);
     setCurrentWeight(dayWeight);
     setWeightHistory(wHistory);
     setFavoriteMeals(allFavs);
@@ -333,8 +371,16 @@ export function App() {
       const fibIn = Math.round(mList.reduce((s, m) => s + (m.totalFiber || 0), 0) * 10) / 10;
       const netCIn = Math.max(0, Math.round((cIn - fibIn) * 10) / 10);
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
-      const includeResting = currentSettings.includeRestingCalories !== false;
-      const defaultBurn = includeResting ? calculateBMR(currentSettings.profile) : 0;
+
+      const pastBmr = includeResting ? calculateBMR(currentSettings.profile) : 0;
+      const pastBreakdown = calculateTDEE({
+        bmr: pastBmr,
+        activeCalories: act.activeCaloriesBurned || 0,
+        meals: mList,
+        source: act.source,
+        isGoogleFitConnected: currentSettings.googleFitConnected && dStr === date,
+        includeResting
+      });
 
       past7.push({
         date: dStr,
@@ -343,7 +389,7 @@ export function App() {
         netCarbsIntake: netCIn,
         carbsBurned: 0,
         caloriesIntake: calIn,
-        caloriesBurned: act.totalCaloriesBurned !== undefined ? act.totalCaloriesBurned : defaultBurn
+        caloriesBurned: pastBreakdown.totalBurned
       });
     }
 
@@ -435,12 +481,24 @@ export function App() {
   // Update active exercise calories
   const handleUpdateActiveBurn = async (activeKcal: number) => {
     const includeResting = settings.includeRestingCalories !== false;
-    const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
+    const profileBmr = calculateBMR(settings.profile);
+    const baseBmr = includeResting ? profileBmr : 0;
+    const tdeeBreakdown = calculateTDEE({
+      bmr: baseBmr,
+      activeCalories: activeKcal,
+      meals,
+      source: activity.source,
+      isGoogleFitConnected: settings.googleFitConnected,
+      includeResting
+    });
+
     const updatedActivity: DailyActivity = {
       ...activity,
       activeCaloriesBurned: activeKcal,
       baseBmrCalories: baseBmr,
-      totalCaloriesBurned: baseBmr + activeKcal,
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: tdeeBreakdown.tef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned,
       lastUpdated: new Date().toISOString()
     };
     setActivity(updatedActivity);
@@ -457,11 +515,22 @@ export function App() {
     const existingWorkouts = Array.isArray(activity.workouts) ? activity.workouts : [];
     const updatedWorkouts = [...existingWorkouts, workout];
 
+    const tdeeBreakdown = calculateTDEE({
+      bmr: baseBmr,
+      activeCalories: newActiveKcal,
+      meals,
+      source: activity.source,
+      isGoogleFitConnected: settings.googleFitConnected,
+      includeResting
+    });
+
     const updatedActivity: DailyActivity = {
       ...activity,
       activeCaloriesBurned: newActiveKcal,
       baseBmrCalories: baseBmr,
-      totalCaloriesBurned: baseBmr + newActiveKcal,
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: tdeeBreakdown.tef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned,
       workouts: updatedWorkouts,
       lastUpdated: new Date().toISOString()
     };
@@ -483,11 +552,22 @@ export function App() {
     const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
     const updatedWorkouts = existingWorkouts.filter(w => w.id !== workoutId);
 
+    const tdeeBreakdown = calculateTDEE({
+      bmr: baseBmr,
+      activeCalories: newActiveKcal,
+      meals,
+      source: activity.source,
+      isGoogleFitConnected: settings.googleFitConnected,
+      includeResting
+    });
+
     const updatedActivity: DailyActivity = {
       ...activity,
       activeCaloriesBurned: newActiveKcal,
       baseBmrCalories: baseBmr,
-      totalCaloriesBurned: baseBmr + newActiveKcal,
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: tdeeBreakdown.tef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned,
       workouts: updatedWorkouts,
       lastUpdated: new Date().toISOString()
     };
@@ -503,10 +583,21 @@ export function App() {
     await saveAppSettings(newSettings, explicitKeyUpdate);
     const includeResting = newSettings.includeRestingCalories !== false;
     const baseBmr = includeResting ? calculateBMR(newSettings.profile) : 0;
+    const tdeeBreakdown = calculateTDEE({
+      bmr: baseBmr,
+      activeCalories: activity.activeCaloriesBurned || 0,
+      meals,
+      source: activity.source,
+      isGoogleFitConnected: newSettings.googleFitConnected,
+      includeResting
+    });
+
     const updatedActivity: DailyActivity = {
       ...activity,
       baseBmrCalories: baseBmr,
-      totalCaloriesBurned: baseBmr + (activity.activeCaloriesBurned || 0),
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: tdeeBreakdown.tef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned,
       lastUpdated: new Date().toISOString()
     };
     setActivity(updatedActivity);
@@ -526,29 +617,58 @@ export function App() {
     setIsStoragePromptOpen(false);
   };
 
-  // Compute Daily Summary totals including Fiber and Net Carbs
+  // Compute Daily Summary totals including Fiber, Net Carbs, and dynamic TEF
   const totalCarbs = Math.round(meals.reduce((sum, m) => sum + (m.totalCarbs || 0), 0) * 10) / 10;
   const totalFiber = Math.round(meals.reduce((sum, m) => sum + (m.totalFiber || 0), 0) * 10) / 10;
   const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
+  const totalProtein = Math.round(meals.reduce((sum, m) => sum + (m.totalProtein || 0), 0) * 10) / 10;
+  const totalFat = Math.round(meals.reduce((sum, m) => sum + (m.totalFat || 0), 0) * 10) / 10;
+  const totalCalories = Math.round(meals.reduce((sum, m) => sum + (m.totalCalories || 0), 0));
+  const tef = calculateDailyTEF(meals);
 
   const totals = {
-    calories: Math.round(meals.reduce((sum, m) => sum + (m.totalCalories || 0), 0)),
+    calories: totalCalories,
     carbs: totalCarbs,
     fiber: totalFiber,
     netCarbs,
-    protein: Math.round(meals.reduce((sum, m) => sum + (m.totalProtein || 0), 0) * 10) / 10,
-    fat: Math.round(meals.reduce((sum, m) => sum + (m.totalFat || 0), 0) * 10) / 10,
+    protein: totalProtein,
+    fat: totalFat,
+    tef
   };
 
   const includeResting = settings.includeRestingCalories !== false;
-  const defaultBurn = includeResting ? calculateBMR(settings.profile) : 0;
+  const profileBmr = calculateBMR(settings.profile);
+  const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
+
+  const tdeeBreakdown = calculateTDEE({
+    bmr: baseBmr,
+    activeCalories: activity.activeCaloriesBurned || 0,
+    meals,
+    source: activity.source,
+    isGoogleFitConnected: settings.googleFitConnected,
+    includeResting
+  });
+
   const summary: DailySummary = {
     date: selectedDate,
     meals,
-    activity,
+    activity: {
+      ...activity,
+      baseBmrCalories: baseBmr,
+      neatCalories: tdeeBreakdown.neat,
+      tefCalories: tdeeBreakdown.tef,
+      totalCaloriesBurned: tdeeBreakdown.totalBurned
+    },
     weightRecord: currentWeight || undefined,
     totals,
-    netCalories: totals.calories - (activity.totalCaloriesBurned !== undefined ? activity.totalCaloriesBurned : defaultBurn)
+    burnBreakdown: {
+      bmr: tdeeBreakdown.bmr,
+      neat: tdeeBreakdown.neat,
+      eat: tdeeBreakdown.eat,
+      tef: tdeeBreakdown.tef,
+      total: tdeeBreakdown.totalBurned
+    },
+    netCalories: totals.calories - tdeeBreakdown.totalBurned
   };
 
   return (

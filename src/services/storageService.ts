@@ -501,26 +501,48 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     if (localStr) {
       const parsed = JSON.parse(localStr);
       const active = Number(parsed.activeCaloriesBurned ?? parsed.caloriesBurned) || 0;
+      const isFit = parsed.source === 'google_fit' || (settings.googleFitConnected && (!parsed.source || parsed.source === 'google_fit'));
+      const neat = (isFit || !includeResting) ? 0 : (parsed.neatCalories !== undefined ? Number(parsed.neatCalories) : Math.round(baseBmr * 0.15));
+      const tef = Number(parsed.tefCalories) || 0;
+      const totalBurned = isFit 
+        ? active + tef 
+        : (!includeResting ? active + tef : baseBmr + neat + active + tef);
+
       return {
         date,
         activeCaloriesBurned: active,
         baseBmrCalories: baseBmr,
-        totalCaloriesBurned: baseBmr + active,
+        neatCalories: neat,
+        tefCalories: tef,
+        totalCaloriesBurned: totalBurned,
         workouts: Array.isArray(parsed.workouts) ? parsed.workouts : [],
         notes: parsed.notes,
+        source: parsed.source || (isFit ? 'google_fit' : 'manual'),
+        lastSyncedAt: parsed.lastSyncedAt,
         lastUpdated: parsed.lastUpdated || new Date().toISOString()
       };
     }
     const saved = await get<any>(localKey);
     if (saved) {
       const active = Number(saved.activeCaloriesBurned ?? saved.caloriesBurned) || 0;
+      const isFit = saved.source === 'google_fit' || (settings.googleFitConnected && (!saved.source || saved.source === 'google_fit'));
+      const neat = (isFit || !includeResting) ? 0 : (saved.neatCalories !== undefined ? Number(saved.neatCalories) : Math.round(baseBmr * 0.15));
+      const tef = Number(saved.tefCalories) || 0;
+      const totalBurned = isFit 
+        ? active + tef 
+        : (!includeResting ? active + tef : baseBmr + neat + active + tef);
+
       const act: DailyActivity = {
         date,
         activeCaloriesBurned: active,
         baseBmrCalories: baseBmr,
-        totalCaloriesBurned: baseBmr + active,
+        neatCalories: neat,
+        tefCalories: tef,
+        totalCaloriesBurned: totalBurned,
         workouts: Array.isArray(saved.workouts) ? saved.workouts : [],
         notes: saved.notes,
+        source: saved.source || (isFit ? 'google_fit' : 'manual'),
+        lastSyncedAt: saved.lastSyncedAt,
         lastUpdated: saved.lastUpdated || new Date().toISOString()
       };
       localStorage.setItem(localKey, JSON.stringify(act));
@@ -530,12 +552,16 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     console.error('Error fetching activity:', e);
   }
 
+  const defaultNeat = includeResting ? Math.round(baseBmr * 0.15) : 0;
   return {
     date,
     activeCaloriesBurned: 0,
     baseBmrCalories: baseBmr,
-    totalCaloriesBurned: baseBmr,
+    neatCalories: defaultNeat,
+    tefCalories: 0,
+    totalCaloriesBurned: baseBmr + defaultNeat,
     workouts: [],
+    source: settings.googleFitConnected ? 'google_fit' : 'manual',
     lastUpdated: new Date().toISOString()
   };
 }

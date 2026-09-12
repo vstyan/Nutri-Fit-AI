@@ -38,3 +38,6 @@ export function feetInchesToCm(feet: number, inches: number): number {
   const totalInches = (feet * 12) + inches;
   return Math.round(totalInches * 2.54);
 }
+
+// Re-export calorie engine functions and types for convenience
+export * from './calorieEngine';

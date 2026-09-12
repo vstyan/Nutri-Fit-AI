@@ -62,14 +62,24 @@ export interface WorkoutEntry {
 
 export interface DailyActivity {
   date: string; // YYYY-MM-DD
-  activeCaloriesBurned: number; // exercise / workout calories entered by user
+  activeCaloriesBurned: number; // exercise / workout calories entered by user (EAT)
   baseBmrCalories: number; // resting BMR base calories
-  totalCaloriesBurned: number; // baseBmrCalories + activeCaloriesBurned
+  neatCalories?: number; // Non-Exercise Activity Thermogenesis (baseline sedentary floor when manual)
+  tefCalories?: number; // Thermic Effect of Food dynamically calculated from logged food
+  totalCaloriesBurned: number; // Total TDEE: BMR + NEAT + EAT + TEF
   workouts?: WorkoutEntry[];
   notes?: string;
   source?: 'manual' | 'google_fit';
   lastSyncedAt?: string;
   lastUpdated: string;
+}
+
+export interface BurnBreakdown {
+  bmr: number;
+  neat: number;
+  eat: number;
+  tef: number;
+  total: number;
 }
 
 export interface UserGoals {
@@ -110,7 +120,9 @@ export interface DailySummary {
     netCarbs: number;
     protein: number;
     fat: number;
+    tef?: number; // Thermic Effect of Food (TEF) dynamically calculated
   };
+  burnBreakdown?: BurnBreakdown;
   netCalories: number; // Calories Consumed - Total Calories Burned
 }
 

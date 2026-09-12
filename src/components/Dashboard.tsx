@@ -24,7 +24,7 @@ import {
   WeightRecord,
   WorkoutEntry
 } from '../types';
-import { calculateBMR } from '../utils/bmrCalculator';
+import { calculateBMR, calculateTDEE, calculateTEFBreakdown } from '../utils/calorieEngine';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
 import { WeightTrackerCard } from './WeightTrackerCard';
@@ -98,9 +98,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);
   const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
-  const totalBurned = baseBmr + activeKcalValue;
+
+  // TDEE Engine: Total Burned = BMR + NEAT + EAT + TEF
+  const tdeeBreakdown = calculateTDEE({
+    bmr: baseBmr,
+    activeCalories: activeKcalValue,
+    meals: summary.meals,
+    source: activity.source,
+    isGoogleFitConnected: settings.googleFitConnected,
+    includeResting
+  });
+
+  const { bmr: burnBmr, neat: burnNeat, eat: burnEat, tef: burnTef, totalBurned } = tdeeBreakdown;
   const netCalories = totals.calories - totalBurned;
   const isCaloricDeficit = netCalories <= 0;
+
+  const tefBreakdown = calculateTEFBreakdown(totals.protein, totals.carbs, totals.fat, totals.calories);
 
   const handleSaveActiveBurn = (valToSave?: number) => {
     const finalVal = valToSave !== undefined ? valToSave : (Number(inputActiveKcal) || 0);
@@ -136,9 +149,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <h2 className="text-base font-extrabold text-white">Daily Caloric Balance</h2>
               <p className="text-xs text-slate-400">
-                {includeResting 
-                  ? 'Food Intake vs. Total Daily Burn (Base BMR + Exercise)' 
-                  : 'Food Intake vs. Total Daily Burn (Rest + Exercise)'}
+                {includeResting && !settings.googleFitConnected
+                  ? 'Food Intake vs. Total Daily Burn (Rest + NEAT + TEF + Exercise)' 
+                  : settings.googleFitConnected
+                  ? 'Food Intake vs. Total Daily Burn (Google Fit + TEF)'
+                  : 'Food Intake vs. Total Daily Burn (Tracker + TEF)'}
               </p>
             </div>
           </div>
@@ -155,15 +170,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Total Calories Burned */}
-          <div className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center">
+          <div 
+            className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center"
+            title={includeResting && !settings.googleFitConnected ? `${burnBmr} kcal Rest + ${burnNeat} kcal NEAT + ${burnTef} kcal TEF + ${burnEat} kcal Exercise` : undefined}
+          >
             <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
               Total Burned
             </div>
             <div className="text-xl sm:text-3xl font-black text-white mt-1">
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5">
-              {includeResting ? `${baseBmr} base + ${activeKcalValue} act` : 'Rest + exercise (tracker)'}
+            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 font-medium truncate">
+              {includeResting && !settings.googleFitConnected 
+                ? 'Rest + NEAT + TEF + Exercise' 
+                : settings.googleFitConnected
+                ? `Fit (${burnEat}) + TEF (${burnTef})`
+                : `Tracker (${burnEat}) + TEF (${burnTef})`}
             </div>
           </div>
 
@@ -229,13 +251,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">
-                {includeResting ? 'Daily Energy Burn Breakdown' : 'Rest + Exercise Burn'}
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>{includeResting && !settings.googleFitConnected ? 'Daily Energy Burn Breakdown (TDEE)' : 'Total Energy Burn (TDEE)'}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                  TDEE Model
+                </span>
               </h3>
               <p className="text-xs text-slate-400">
-                {includeResting 
-                  ? 'Natural BMR baseline + workout/activity burn' 
-                  : 'Combined resting and active calories (e.g. from Google Fit)'}
+                {includeResting && !settings.googleFitConnected 
+                  ? 'Comprehensive expenditure: Rest (BMR) + NEAT + TEF + Exercise (EAT)' 
+                  : settings.googleFitConnected
+                  ? 'Google Fit tracked burn (Rest + NEAT + Exercise) + dynamic TEF from logged nutrition'
+                  : 'Combined resting, active, and food-induced thermogenesis'}
               </p>
             </div>
           </div>
@@ -245,7 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={onOpenSettings}
               className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
             >
-              {includeResting ? `Edit Profile (BMR: ${baseBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
+              {includeResting && !settings.googleFitConnected ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
             </button>
           </div>
         </div>
@@ -291,25 +318,89 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ) : null}
 
-        {/* Burn Display: 3-column breakdown if BMR included, single entry if Exclude / In Fitness Tracker */}
-        {includeResting ? (
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[10px] text-slate-400 block">1. Natural Base (BMR)</span>
-              <span className="font-bold text-amber-400 text-sm mt-0.5 block">{baseBmr} kcal</span>
-              <span className="text-[9px] text-slate-500">Auto from profile</span>
+        {/* Burn Display: 4-pillar breakdown (Rest + NEAT + TEF + Exercise) */}
+        {includeResting && !settings.googleFitConnected ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              {/* 1. Rest (BMR) */}
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-amber-500/20">
+                <span className="text-[10px] text-amber-400 font-semibold block uppercase tracking-wider">1. Rest (BMR)</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">{burnBmr} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">Mifflin-St Jeor base</span>
+              </div>
+
+              {/* 2. NEAT */}
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-indigo-500/20">
+                <span className="text-[10px] text-indigo-400 font-semibold block uppercase tracking-wider">2. NEAT</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">+{burnNeat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">Sedentary floor (15%)</span>
+              </div>
+
+              {/* 3. TEF */}
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-orange-500/20">
+                <span className="text-[10px] text-orange-400 font-semibold block uppercase tracking-wider">3. TEF (Food)</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">+{burnTef} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">From logged meals</span>
+              </div>
+
+              {/* 4. Exercise (EAT) */}
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20">
+                <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">4. Exercise (EAT)</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">+{burnEat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">{activity.workouts?.length ? `${activity.workouts.length} workout(s)` : 'Active burn'}</span>
+              </div>
             </div>
 
-            <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[10px] text-slate-400 block">2. Exercise / Steps</span>
-              <span className="font-bold text-emerald-400 text-sm mt-0.5 block">+{activeKcalValue} kcal</span>
-              <span className="text-[9px] text-slate-500">{activity.source === 'google_fit' ? 'From Google Fit' : 'Entered by you'}</span>
+            {/* Total Burned Formula Bar */}
+            <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/20">
+                  <Flame className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    Total Daily Energy Expenditure (TDEE)
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {burnBmr} (Rest) + {burnNeat} (NEAT) + {burnTef} (TEF) + {burnEat} (Exercise)
+                  </span>
+                </div>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-xl font-black text-emerald-400 block">
+                  {totalBurned} <span className="text-xs font-normal text-slate-400">kcal</span>
+                </span>
+                <span className="text-[10px] text-emerald-400/80 uppercase font-semibold">Total Burned Today</span>
+              </div>
+            </div>
+          </div>
+        ) : settings.googleFitConnected ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20">
+                <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">1. Google Fit Burn</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">{burnEat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">Rest + NEAT + Exercise</span>
+              </div>
+
+              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-orange-500/20">
+                <span className="text-[10px] text-orange-400 font-semibold block uppercase tracking-wider">2. Thermic Effect (TEF)</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">+{burnTef} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-slate-400">Food digestion burn</span>
+              </div>
+
+              <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
+                <span className="text-[10px] text-emerald-300 font-semibold block uppercase tracking-wider">3. Total Burned (TDEE)</span>
+                <span className="font-extrabold text-white text-base mt-0.5 block">{totalBurned} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                <span className="text-[9px] text-emerald-400 font-medium">Google Fit + TEF</span>
+              </div>
             </div>
 
-            <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
-              <span className="text-[10px] text-emerald-300 block">3. Total Burned</span>
-              <span className="font-extrabold text-white text-sm mt-0.5 block">{totalBurned} kcal</span>
-              <span className="text-[9px] text-emerald-400">Sum for today</span>
+            <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/20 rounded-xl text-emerald-300 text-[11px] flex items-center space-x-2">
+              <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>
+                <strong>NEAT Double-Counting Protected:</strong> Google Fit already accounts for daily steps and NEAT. NutriFit dynamically adds TEF from your logged meals without double-counting NEAT.
+              </span>
             </div>
           </div>
         ) : (
@@ -319,9 +410,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Flame className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold text-white block">Rest + Exercise Burned</span>
-                <span className="text-[11px] text-slate-400">
-                  {activity.source === 'google_fit' ? 'Auto-synced from Google Fit' : 'Total daily burn from Google Fit / fitness tracker'}
+                <span className="text-xs font-bold text-white block">External Tracker Burn + TEF</span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {burnEat} (Tracker Burn) + {burnTef} (Food TEF)
                 </span>
               </div>
             </div>
@@ -329,9 +420,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-xl font-extrabold text-emerald-400 block">
                 {totalBurned} <span className="text-xs font-normal text-slate-400">kcal</span>
               </span>
-              <span className="text-[10px] text-emerald-400/80">
-                {activity.source === 'google_fit' ? 'Google Fit live' : 'Single total logged'}
-              </span>
+              <span className="text-[10px] text-emerald-400/80">Total TDEE</span>
             </div>
           </div>
         )}
@@ -546,6 +635,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span>{fatPercent}% of goal</span>
               <span>{fatCalories} kcal</span>
             </div>
+          </div>
+        </div>
+
+        {/* Dynamic Thermic Effect of Food (TEF) Breakdown */}
+        <div className="bg-slate-950/60 border border-orange-500/20 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-400 shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                <span>Thermic Effect of Food (TEF)</span>
+                <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-950/60 px-1.5 py-0.5 rounded border border-orange-500/30">
+                  +{burnTef} kcal burned
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Metabolic digestion cost: Protein (25%) • Carbs (8%) • Fat (2%)
+              </div>
+            </div>
+          </div>
+          <div className="text-left sm:text-right text-[10px] text-slate-400 shrink-0 font-mono bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">
+            <span>P: {tefBreakdown.proteinTef} kcal • C: {tefBreakdown.carbsTef} kcal • F: {tefBreakdown.fatTef} kcal</span>
           </div>
         </div>
       </div>

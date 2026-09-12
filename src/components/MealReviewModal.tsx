@@ -17,6 +17,7 @@ import {
 import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
 import { analyzeFoodText } from '../services/geminiService';
 import { getStickyGeminiKeySynchronous } from '../services/storageService';
+import { calculateTEFBreakdown } from '../utils/calorieEngine';
 
 interface MealReviewModalProps {
   isOpen: boolean;
@@ -409,9 +410,21 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 text-right px-1">
-              Net Carbs = Total Carbs ({totalCarbs}g) - Fiber ({totalFiber}g) = <strong className="text-cyan-300">{netCarbs}g</strong>
-            </div>
+            {(() => {
+              const mealTefBreakdown = calculateTEFBreakdown(totalProtein, totalCarbs, totalFat, totalCalories);
+              return (
+                <div className="text-[11px] text-slate-400 flex items-center justify-between px-1 flex-wrap gap-1 pt-0.5">
+                  <span>
+                    Net Carbs = Total Carbs ({totalCarbs}g) - Fiber ({totalFiber}g) = <strong className="text-cyan-300">{netCarbs}g</strong>
+                  </span>
+                  <span className="text-orange-400 font-mono flex items-center gap-1 font-semibold" title="Thermic Effect of Food: Estimated energy burned digesting this meal">
+                    <Sparkles className="w-3 h-3 text-orange-400 shrink-0" />
+                    <span>TEF Burn: +{mealTefBreakdown.totalTef} kcal</span>
+                    <span className="text-slate-500 font-normal text-[10px] hidden sm:inline">(P: {mealTefBreakdown.proteinTef} • C: {mealTefBreakdown.carbsTef} • F: {mealTefBreakdown.fatTef})</span>
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* 1-Tap Save Action Hero */}
