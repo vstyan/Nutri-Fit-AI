@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { CameraCapture } from './components/CameraCapture';
@@ -38,6 +38,13 @@ import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesR
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
+  const lastActiveTimeRef = useRef<number>(Date.now());
+
+  const handleDateChange = useCallback((newDate: string) => {
+    lastActiveTimeRef.current = Date.now();
+    setSelectedDate(newDate);
+  }, []);
+
   const [settings, setSettings] = useState<AppSettings>(() => getInitialSettingsSynchronous());
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [currentWeight, setCurrentWeight] = useState<WeightRecord | null>(null);
@@ -253,17 +260,23 @@ export function App() {
   // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit
   useEffect(() => {
     const handleActiveState = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' || (typeof document.hasFocus === 'function' && document.hasFocus())) {
         const todayStr = getLocalDateString();
-        setSelectedDate(prev => {
-          if (prev === addDaysToDateString(todayStr, -1)) {
-            return todayStr;
-          }
-          return prev;
-        });
+        const elapsedMinutes = (Date.now() - lastActiveTimeRef.current) / (60 * 1000);
+        lastActiveTimeRef.current = Date.now();
+
+        let targetDate = selectedDate;
+        // If viewing a past date and either:
+        // 1. App was inactive/backgrounded for > 15 minutes (or resumed from previous session days ago)
+        // 2. The previous date was yesterday (overnight midnight rollover)
+        // Automatically advance to today
+        if (selectedDate < todayStr && (elapsedMinutes > 15 || selectedDate === addDaysToDateString(todayStr, -1))) {
+          targetDate = todayStr;
+          setSelectedDate(todayStr);
+        }
 
         if (settings.googleFitConnected) {
-          handleSyncGoogleFit(selectedDate, settings, false, true);
+          handleSyncGoogleFit(targetDate, settings, false, true);
         }
       }
     };
@@ -283,12 +296,19 @@ export function App() {
 
   // Periodic background sync every 5 minutes while app is open and visible
   useEffect(() => {
-    if (!settings.googleFitConnected) return;
-
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        // Run silent check (only if token is currently active)
-        handleSyncGoogleFit(selectedDate, settings, false, false);
+        const todayStr = getLocalDateString();
+        // If midnight rolled over while app was continuously open, advance to today
+        if (selectedDate === addDaysToDateString(todayStr, -1)) {
+          setSelectedDate(todayStr);
+          return;
+        }
+
+        if (settings.googleFitConnected) {
+          // Run silent check (only if token is currently active)
+          handleSyncGoogleFit(selectedDate, settings, false, false);
+        }
       }
     }, 5 * 60 * 1000);
 
@@ -676,7 +696,7 @@ export function App() {
       {/* Header */}
       <Header
         selectedDate={selectedDate}
-        onDateChange={setSelectedDate}
+        onDateChange={handleDateChange}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenStorageModal={() => setIsStoragePromptOpen(true)}
