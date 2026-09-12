@@ -172,7 +172,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Total Calories Burned */}
           <div 
             className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center"
-            title={includeResting && !settings.googleFitConnected ? `${burnBmr} kcal Rest + ${burnNeat} kcal NEAT + ${burnTef} kcal TEF + ${burnEat} kcal Exercise` : undefined}
+            title={
+              includeResting && !settings.googleFitConnected 
+                ? `${burnBmr} kcal Rest + ${burnNeat} kcal NEAT + ${burnTef} kcal TEF + ${burnEat} kcal Exercise` 
+                : `${burnEat} kcal ${settings.googleFitConnected ? 'Google Fit' : 'Tracker'} + ${burnTef} kcal TEF`
+            }
           >
             <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
               Total Burned
@@ -184,8 +188,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {includeResting && !settings.googleFitConnected 
                 ? 'Rest + NEAT + TEF + Exercise' 
                 : settings.googleFitConnected
-                ? `Fit (${burnEat}) + TEF (${burnTef})`
-                : `Tracker (${burnEat}) + TEF (${burnTef})`}
+                ? 'Fit + TEF'
+                : 'Tracker + TEF'}
             </div>
           </div>
 
