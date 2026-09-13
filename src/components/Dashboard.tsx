@@ -188,7 +188,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {includeResting && !settings.googleFitConnected 
                 ? 'Rest + NEAT + TEF + Exercise' 
                 : settings.googleFitConnected
-                ? 'Fit + TEF'
+                ? 'Google Fit + TEF'
                 : 'Tracker + TEF'}
             </div>
           </div>
