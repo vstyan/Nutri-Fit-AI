@@ -150,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <h2 className="text-base font-extrabold text-white">Daily Caloric Balance</h2>
               <p className="text-xs text-slate-400">
                 {includeResting && !settings.googleFitConnected
-                  ? 'Food Intake vs. Total Daily Burn (Rest + NEAT + TEF + Exercise)' 
+                  ? 'Food Intake vs. Total Daily Burn (TDEE)' 
                   : settings.googleFitConnected
                   ? 'Food Intake vs. Total Daily Burn (Google Fit + TEF)'
                   : 'Food Intake vs. Total Daily Burn (Tracker + TEF)'}
@@ -186,7 +186,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 font-medium truncate">
               {includeResting && !settings.googleFitConnected 
-                ? 'Rest + NEAT + TEF + Exercise' 
+                ? 'Rest + Active' 
                 : settings.googleFitConnected
                 ? 'Google Fit + TEF'
                 : 'Tracker + TEF'}
