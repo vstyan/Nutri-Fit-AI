@@ -69,7 +69,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
             borderRadius: 6,
           },
           {
-            label: includeResting ? 'Total Calories Burned (kcal)' : 'Exercise Calories Burned (kcal)',
+            label: 'Total Calories Burned (kcal)',
             data: historyData.map(d => d.caloriesBurned),
             backgroundColor: 'rgba(52, 211, 153, 0.75)',
             borderColor: '#34d399',
