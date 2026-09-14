@@ -54,12 +54,17 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
   return (
     <div className="space-y-3">
       {/* Section Header with Quick Copy trigger */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-white flex items-center gap-2">
-          <Utensils className="w-4 h-4 text-cyan-400" />
-          <span>Logged Meals ({meals.length})</span>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <Utensils className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="leading-tight">
+            <span>Logged</span>
+            <br className="sm:hidden" />
+            <span className="hidden sm:inline"> </span>
+            <span className="whitespace-nowrap">Meals ({meals.length})</span>
+          </span>
         </h2>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           {hasQuickOptions && (
             <button
               onClick={() => setShowQuickDrawer(!showQuickDrawer)}
