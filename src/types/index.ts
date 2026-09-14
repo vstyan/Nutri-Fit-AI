@@ -91,6 +91,7 @@ export interface UserGoals {
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
+export type ThemeMode = 'apple_dark' | 'midnight_slate';
 
 export interface AppSettings {
   geminiApiKey: string;
@@ -104,6 +105,7 @@ export interface AppSettings {
   googleFitLastSync?: string;
   googleFitUserEmail?: string;
   includeRestingCalories?: boolean;
+  themeMode?: ThemeMode;
   profile: UserProfile;
   goals: UserGoals;
 }

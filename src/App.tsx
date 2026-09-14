@@ -90,6 +90,22 @@ export function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoragePromptOpen, setIsStoragePromptOpen] = useState(false);
 
+  // Theme mode sync (Apple Pure Black vs Midnight Slate)
+  useEffect(() => {
+    const theme = settings.themeMode || 'apple_dark';
+    const root = document.documentElement;
+    const metaThemeColor = document.getElementById('app-theme-color');
+    if (theme === 'midnight_slate') {
+      root.classList.remove('theme-apple');
+      root.classList.add('theme-midnight');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
+    } else {
+      root.classList.remove('theme-midnight');
+      root.classList.add('theme-apple');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
+    }
+  }, [settings.themeMode]);
+
   // Initial load of settings & automatic Google Fit startup sync
   useEffect(() => {
     getAppSettings().then(loaded => {

@@ -130,6 +130,8 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
     ]
   };
 
+  const isMidnight = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-midnight');
+
   const chartOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
@@ -137,7 +139,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
       legend: {
         position: 'top' as const,
         labels: {
-          color: '#94a3b8',
+          color: isMidnight ? '#94a3b8' : '#8e8e93',
           font: { size: 11, weight: '500' },
           boxWidth: 10,
           usePointStyle: true,
@@ -145,10 +147,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         }
       },
       tooltip: {
-        backgroundColor: '#0f172a',
-        titleColor: '#f8fafc',
-        bodyColor: '#cbd5e1',
-        borderColor: '#334155',
+        backgroundColor: isMidnight ? '#0f172a' : '#1c1c1e',
+        titleColor: '#ffffff',
+        bodyColor: isMidnight ? '#cbd5e1' : '#d1d1d6',
+        borderColor: isMidnight ? '#334155' : '#38383a',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 8
@@ -156,12 +158,12 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
     },
     scales: {
       x: {
-        grid: { color: 'rgba(51, 65, 85, 0.3)' },
-        ticks: { color: '#94a3b8', font: { size: 11 } }
+        grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
+        ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } }
       },
       y: {
-        grid: { color: 'rgba(51, 65, 85, 0.3)' },
-        ticks: { color: '#94a3b8', font: { size: 11 } },
+        grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
+        ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } },
         beginAtZero: metric !== 'weight'
       }
     }

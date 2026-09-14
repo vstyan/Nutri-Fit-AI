@@ -2,23 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+:root,
+html.theme-apple {
   color-scheme: dark;
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
+
+  /* Apple Pure Black (OLED) & iOS System Grays */
+  --color-slate-950: 0 0 0;        /* Pure OLED Black #000000 */
+  --color-slate-900: 28 28 30;     /* iOS System Gray 6 #1C1C1E (Cards & Primary Surfaces) */
+  --color-slate-800: 44 44 46;     /* iOS System Gray 5 #2C2C2E (Secondary Wells & Inputs) */
+  --color-slate-700: 56 56 58;     /* iOS Separator / Border #38383A */
+  --color-slate-600: 72 72 74;     /* iOS System Gray 3 #48484A */
+  --color-slate-500: 99 99 102;    /* iOS System Gray 4 #636366 */
+  --color-slate-400: 142 142 147;  /* iOS System Gray / Secondary Label #8E8E93 */
+  --color-slate-300: 174 174 178;  /* iOS System Gray 2 #AEAEB2 */
+  --color-slate-200: 209 209 214;  /* iOS System Gray 3 #D1D1D6 */
+  --color-slate-100: 242 242 247;  /* iOS Primary Label #F2F2F7 */
+  --color-slate-50: 255 255 255;   /* Pure White #FFFFFF */
+}
+
+html.theme-midnight {
+  /* Classic Midnight Slate (Original) */
+  --color-slate-950: 2 6 23;       /* Tailwind Slate 950 #020617 */
+  --color-slate-900: 15 23 42;     /* Tailwind Slate 900 #0f172a */
+  --color-slate-800: 30 41 59;     /* Tailwind Slate 800 #1e293b */
+  --color-slate-700: 51 65 85;     /* Tailwind Slate 700 #334155 */
+  --color-slate-600: 71 85 105;    /* Tailwind Slate 600 #475569 */
+  --color-slate-500: 100 116 139;  /* Tailwind Slate 500 #64748b */
+  --color-slate-400: 148 163 184;  /* Tailwind Slate 400 #94a3b8 */
+  --color-slate-300: 203 213 225;  /* Tailwind Slate 300 #cbd5e1 */
+  --color-slate-200: 226 232 240;  /* Tailwind Slate 200 #e2e8f0 */
+  --color-slate-100: 241 245 249;  /* Tailwind Slate 100 #f1f5f9 */
+  --color-slate-50: 248 250 252;   /* Tailwind Slate 50 #f8fafc */
 }
 
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: rgb(var(--color-slate-950));
+  color: rgb(var(--color-slate-100));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   overscroll-behavior-y: contain;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Ensure full viewport height on mobile iOS Safari */
@@ -28,21 +58,22 @@ html, body {
   display: flex;
   flex-direction: column;
   overscroll-behavior-y: contain;
+  background-color: rgb(var(--color-slate-950));
 }
 
 /* Glassmorphism helpers */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgb(var(--color-slate-900) / 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(var(--color-slate-700) / 0.6);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgb(var(--color-slate-800) / 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgb(var(--color-slate-700) / 0.4);
 }
 
 /* Custom scrollbar */
@@ -52,14 +83,14 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgb(var(--color-slate-950) / 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.5);
+  background: rgb(var(--color-slate-600) / 0.5);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.8);
+  background: rgb(var(--color-slate-500) / 0.8);
 }

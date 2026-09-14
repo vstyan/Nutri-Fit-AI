@@ -1,13 +1,29 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="dark theme-apple">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#000000" id="app-theme-color" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>NutriFit AI</title>
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('nutrifit_settings_v4');
+          if (raw) {
+            var s = JSON.parse(raw);
+            if (s && s.themeMode === 'midnight_slate') {
+              document.documentElement.classList.remove('theme-apple');
+              document.documentElement.classList.add('theme-midnight');
+              var m = document.getElementById('app-theme-color');
+              if (m) m.setAttribute('content', '#020617');
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
