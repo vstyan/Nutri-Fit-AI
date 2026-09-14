@@ -100,7 +100,7 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold text-white">Daily Body Weight</h3>
-            <p className="text-xs text-slate-400">Scale log & rolling trend tracker</p>
+            <p className="text-xs text-slate-400">Daily weigh-in and 7-day trend</p>
           </div>
         </div>
 
@@ -121,7 +121,7 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
         <button
           type="button"
           onClick={() => handleNudge(-0.2)}
-          className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition"
+          className="w-11 h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 rounded-2xl border border-slate-700 transition flex items-center justify-center shrink-0"
           title="-0.2"
         >
           <Minus className="w-4 h-4" />
@@ -136,7 +136,7 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
             placeholder="0"
             onFocus={e => e.target.select()}
             onChange={e => setInputWeight(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg text-white font-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+            className="w-full h-11 bg-slate-950 border border-slate-700 rounded-2xl px-4 text-center text-lg text-white font-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
           />
           <span className="absolute right-3 top-3 text-xs font-bold text-slate-500">
             {isImperial ? 'lbs' : 'kg'}
@@ -147,7 +147,7 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
         <button
           type="button"
           onClick={() => handleNudge(0.2)}
-          className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition"
+          className="w-11 h-11 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 rounded-2xl border border-slate-700 transition flex items-center justify-center shrink-0"
           title="+0.2"
         >
           <Plus className="w-4 h-4" />
@@ -157,7 +157,7 @@ export const WeightTrackerCard: React.FC<WeightTrackerCardProps> = ({
         <button
           type="button"
           onClick={handleSave}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center space-x-1.5 shadow-lg ${
+          className={`h-11 px-5 rounded-2xl font-bold text-xs sm:text-sm active:scale-95 transition flex items-center space-x-1.5 shadow-lg shrink-0 ${
             isSaved 
               ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20' 
               : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'

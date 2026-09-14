@@ -263,7 +263,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </h3>
               <p className="text-xs text-slate-400">
                 {includeResting && !settings.googleFitConnected 
-                  ? 'Comprehensive expenditure: Rest (BMR) + NEAT + TEF + Exercise (EAT)' 
+                  ? 'Resting metabolic rate, active movement, and food digestion' 
                   : settings.googleFitConnected
                   ? 'Google Fit tracked burn (Rest + NEAT + Exercise) + dynamic TEF from logged nutrition'
                   : 'Combined resting, active, and food-induced thermogenesis'}
@@ -274,7 +274,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center space-x-2 self-end sm:self-auto">
             <button
               onClick={onOpenSettings}
-              className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
+              className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 min-h-[36px] px-3 py-1.5 rounded-xl border border-slate-700 active:scale-95 transition"
             >
               {includeResting && !settings.googleFitConnected ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
             </button>
@@ -298,11 +298,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 type="button"
                 onClick={onSyncGoogleFit}
                 disabled={isSyncingGoogleFit}
-                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 py-1 px-2.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 transition disabled:opacity-50"
+                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50"
                 title="Sync latest calories burned from Google Fit"
               >
-                <RefreshCw className={`w-3 h-3 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
-                <span>{isSyncingGoogleFit ? 'Syncing...' : 'Sync Fit'}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{isSyncingGoogleFit ? 'Syncing...' : 'Sync Google Fit'}</span>
               </button>
             )}
           </div>
@@ -315,7 +315,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={onConnectGoogleFit}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1 py-1 px-2.5 rounded-lg bg-emerald-950/50 border border-emerald-500/30 hover:bg-emerald-900/50 transition shadow-sm shrink-0"
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-emerald-950/50 border border-emerald-500/30 hover:bg-emerald-900/50 active:scale-95 transition shadow-sm shrink-0"
             >
               <span>Connect Google Fit</span>
             </button>

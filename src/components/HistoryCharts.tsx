@@ -176,7 +176,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </div>
           <div>
             <h2 className="text-base font-bold text-white">Historical Trends & Charts</h2>
-            <p className="text-xs text-slate-400">Calories, Net Carbs & Body Weight Progression</p>
+            <p className="text-xs text-slate-400">Calories, net carbs, and body weight progression</p>
           </div>
         </div>
 
@@ -184,7 +184,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         <div className="flex items-center space-x-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700 self-end sm:self-auto">
           <button
             onClick={() => setMetric('calories')}
-            className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
               metric === 'calories'
                 ? 'bg-cyan-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -194,7 +194,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </button>
           <button
             onClick={() => setMetric('carbs')}
-            className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
               metric === 'carbs'
                 ? 'bg-cyan-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -204,7 +204,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </button>
           <button
             onClick={() => setMetric('weight')}
-            className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
               metric === 'weight'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
