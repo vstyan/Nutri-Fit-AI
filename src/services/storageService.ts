@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   storageLocation: 'local_indexeddb',
   storagePromptDismissed: false,
   includeRestingCalories: true,
-  themeMode: 'apple_dark',
+  themeMode: 'pure_black',
   profile: DEFAULT_PROFILE,
   goals: {
     dailyCaloriesTarget: 2000,

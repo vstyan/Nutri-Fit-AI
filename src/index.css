@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root,
+html.theme-pure-black,
 html.theme-apple {
   color-scheme: dark;
   --sat: env(safe-area-inset-top, 0px);
@@ -10,7 +11,7 @@ html.theme-apple {
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
-  /* Apple Pure Black (OLED) & iOS System Grays */
+  /* Pure Black (OLED) & Neutral Gray Tokens */
   --color-slate-950: 0 0 0;        /* Pure OLED Black #000000 */
   --color-slate-900: 28 28 30;     /* iOS System Gray 6 #1C1C1E (Cards & Primary Surfaces) */
   --color-slate-800: 44 44 46;     /* iOS System Gray 5 #2C2C2E (Secondary Wells & Inputs) */

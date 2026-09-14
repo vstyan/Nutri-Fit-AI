@@ -223,33 +223,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }, 1000);
   };
 
-  const handleThemeChange = (mode: 'apple_dark' | 'midnight_slate') => {
+  const handleThemeChange = (mode: 'pure_black' | 'midnight_slate') => {
     setFormData(prev => ({ ...prev, themeMode: mode }));
     const root = document.documentElement;
     const metaThemeColor = document.getElementById('app-theme-color');
     if (mode === 'midnight_slate') {
-      root.classList.remove('theme-apple');
+      root.classList.remove('theme-pure-black', 'theme-apple');
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
     } else {
       root.classList.remove('theme-midnight');
-      root.classList.add('theme-apple');
+      root.classList.add('theme-pure-black');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
     }
   };
 
   const handleModalClose = () => {
     // Revert live preview if closed without saving
-    const activeTheme = settings.themeMode || 'apple_dark';
+    const activeTheme = settings.themeMode || 'pure_black';
     const root = document.documentElement;
     const metaThemeColor = document.getElementById('app-theme-color');
     if (activeTheme === 'midnight_slate') {
-      root.classList.remove('theme-apple');
+      root.classList.remove('theme-pure-black', 'theme-apple');
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
     } else {
       root.classList.remove('theme-midnight');
-      root.classList.add('theme-apple');
+      root.classList.add('theme-pure-black');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
     }
     onClose();
@@ -790,23 +790,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* Appearance & Theme (Apple HIG Pure Black vs Midnight Slate) */}
+            {/* Appearance & Theme (Pure Black OLED vs Midnight Slate) */}
             <div className="space-y-3 pt-3 border-t border-slate-800">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Palette className="w-4 h-4 text-cyan-400" />
                   Appearance & Theme
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">Apple HIG vs Classic</span>
+                <span className="text-[10px] text-slate-400 font-medium">OLED vs Slate</span>
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* Apple Pure Black option */}
+                {/* Pure Black option */}
                 <button
                   type="button"
-                  onClick={() => handleThemeChange('apple_dark')}
+                  onClick={() => handleThemeChange('pure_black')}
                   className={`p-3 rounded-2xl border text-left transition flex items-start space-x-3 ${
-                    (formData.themeMode || 'apple_dark') === 'apple_dark'
+                    (formData.themeMode || 'pure_black') !== 'midnight_slate'
                       ? 'bg-black/90 border-cyan-500 ring-1 ring-cyan-500/60 shadow-lg'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
@@ -818,13 +818,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">Apple Pure Black</span>
-                      {(formData.themeMode || 'apple_dark') === 'apple_dark' && (
+                      <span className="text-xs font-bold text-white">Pure Black (OLED)</span>
+                      {(formData.themeMode || 'pure_black') !== 'midnight_slate' && (
                         <Check className="w-3.5 h-3.5 text-cyan-400" />
                       )}
                     </div>
                     <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                      OLED pure black & iOS System Gray cards for high contrast and battery savings.
+                      True black background with neutral gray cards for maximum contrast and battery savings.
                     </p>
                   </div>
                 </button>
@@ -858,7 +858,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
               <p className="text-[11px] text-slate-400">
-                You can toggle between Apple Pure Black and Midnight Slate at any time. Changes preview immediately.
+                You can toggle between Pure Black and Midnight Slate at any time. Changes preview immediately.
               </p>
             </div>
 
@@ -870,7 +870,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.4.6
+                  v1.4.7
                 </span>
               </label>
 

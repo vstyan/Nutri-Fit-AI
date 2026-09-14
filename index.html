@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark theme-apple">
+<html lang="en" class="dark theme-pure-black">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -15,7 +15,7 @@
           if (raw) {
             var s = JSON.parse(raw);
             if (s && s.themeMode === 'midnight_slate') {
-              document.documentElement.classList.remove('theme-apple');
+              document.documentElement.classList.remove('theme-pure-black', 'theme-apple');
               document.documentElement.classList.add('theme-midnight');
               var m = document.getElementById('app-theme-color');
               if (m) m.setAttribute('content', '#020617');

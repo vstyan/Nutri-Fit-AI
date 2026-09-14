@@ -91,7 +91,7 @@ export interface UserGoals {
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
-export type ThemeMode = 'apple_dark' | 'midnight_slate';
+export type ThemeMode = 'pure_black' | 'midnight_slate' | 'apple_dark';
 
 export interface AppSettings {
   geminiApiKey: string;
