@@ -659,6 +659,9 @@ export function App() {
   const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
   const totalProtein = Math.round(meals.reduce((sum, m) => sum + (m.totalProtein || 0), 0) * 10) / 10;
   const totalFat = Math.round(meals.reduce((sum, m) => sum + (m.totalFat || 0), 0) * 10) / 10;
+  const totalUnsaturatedFat = Math.round(meals.reduce((sum, m) => sum + (m.totalUnsaturatedFat ?? 0), 0) * 10) / 10;
+  const totalSaturatedFat = Math.round(meals.reduce((sum, m) => sum + (m.totalSaturatedFat ?? 0), 0) * 10) / 10;
+  const totalTransFat = Math.round(meals.reduce((sum, m) => sum + (m.totalTransFat ?? 0), 0) * 10) / 10;
   const totalCalories = Math.round(meals.reduce((sum, m) => sum + (m.totalCalories || 0), 0));
   const tef = calculateDailyTEF(meals);
 
@@ -669,6 +672,9 @@ export function App() {
     netCarbs,
     protein: totalProtein,
     fat: totalFat,
+    unsaturatedFat: totalUnsaturatedFat,
+    saturatedFat: totalSaturatedFat,
+    transFat: totalTransFat,
     tef
   };
 

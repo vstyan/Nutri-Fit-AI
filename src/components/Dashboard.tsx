@@ -626,20 +626,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          {/* Fat */}
-          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs font-medium">
-              <span className="text-amber-400 font-bold">Fat</span>
-              <span className="text-slate-300">{totals.fat}g / {goals.dailyFatTarget}g</span>
-            </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, fatPercent)}%` }} />
-            </div>
-            <div className="text-[10px] text-slate-400 flex justify-between">
-              <span>{fatPercent}% of goal</span>
-              <span>{fatCalories} kcal</span>
-            </div>
-          </div>
+          {/* Fat with Dual-Tone Split Meter */}
+          {(() => {
+            const hasFatQuality = (totals.unsaturatedFat !== undefined && totals.unsaturatedFat > 0) || (totals.saturatedFat !== undefined && totals.saturatedFat > 0);
+            const unsatGrams = totals.unsaturatedFat || 0;
+            const satGrams = totals.saturatedFat || 0;
+            const totalSplit = unsatGrams + satGrams;
+            const unsatPct = totalSplit > 0 ? Math.round((unsatGrams / totalSplit) * 100) : (totals.fat > 0 ? 70 : 0);
+            const satPct = totalSplit > 0 ? Math.round((satGrams / totalSplit) * 100) : (totals.fat > 0 ? 30 : 0);
+            
+            const target = goals.dailyFatTarget || 65;
+            const unsatWidth = Math.min(100, (unsatGrams / target) * 100);
+            const satWidth = Math.min(100 - unsatWidth, (satGrams / target) * 100);
+
+            return (
+              <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex justify-between text-xs font-medium">
+                  <span className="text-amber-400 font-bold">Total Fat</span>
+                  <span className="text-slate-300">{totals.fat}g / {goals.dailyFatTarget}g</span>
+                </div>
+
+                {hasFatQuality ? (
+                  <div className="space-y-1.5">
+                    {/* Dual-Tone Split Meter */}
+                    <div 
+                      className="h-2.5 bg-slate-800 rounded-full overflow-hidden flex gap-0.5"
+                      title={`Healthy Unsaturated: ${unsatGrams}g (${unsatPct}%) | Saturated: ${satGrams}g (${satPct}%)`}
+                    >
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-l-full transition-all duration-500" 
+                        style={{ width: `${Math.max(unsatWidth > 0 ? 3 : 0, unsatWidth)}%` }} 
+                      />
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-r-full transition-all duration-500" 
+                        style={{ width: `${Math.max(satWidth > 0 ? 3 : 0, satWidth)}%` }} 
+                      />
+                    </div>
+
+                    {/* Sub-labels */}
+                    <div className="text-[10px] flex justify-between items-center text-slate-400">
+                      <span className="text-emerald-300 font-medium">● {unsatGrams}g Good <span className="text-slate-500">({unsatPct}%)</span></span>
+                      <span className="text-amber-300 font-medium">● {satGrams}g Sat <span className="text-slate-500">({satPct}%)</span></span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, fatPercent)}%` }} />
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex justify-between">
+                      <span>{fatPercent}% of goal</span>
+                      <span>{fatCalories} kcal</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Dynamic Thermic Effect of Food (TEF) Breakdown */}

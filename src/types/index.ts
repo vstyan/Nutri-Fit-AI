@@ -27,6 +27,9 @@ export interface FoodItem {
   fiber: number; // dietary fiber in grams
   protein: number;
   fat: number;
+  unsaturatedFat?: number; // healthy unsaturated fat (mono + poly) in grams
+  saturatedFat?: number;   // saturated fat in grams
+  transFat?: number;       // trans fat in grams
   calories: number;
   confidence?: 'high' | 'medium' | 'low';
 }
@@ -44,6 +47,9 @@ export interface MealRecord {
   netCarbs: number; // totalCarbs - totalFiber (min 0)
   totalProtein: number;
   totalFat: number;
+  totalUnsaturatedFat?: number; // sum of healthy unsaturated fats in grams
+  totalSaturatedFat?: number;   // sum of saturated fats in grams
+  totalTransFat?: number;       // sum of trans fats in grams
   totalCalories: number;
   photoUrl?: string; // base64
   isFavorite?: boolean;
@@ -122,6 +128,9 @@ export interface DailySummary {
     netCarbs: number;
     protein: number;
     fat: number;
+    unsaturatedFat?: number;
+    saturatedFat?: number;
+    transFat?: number;
     tef?: number; // Thermic Effect of Food (TEF) dynamically calculated
   };
   burnBreakdown?: BurnBreakdown;
@@ -139,6 +148,9 @@ export interface GeminiAnalysisResult {
     fiber?: number;
     protein: number;
     fat: number;
+    unsaturatedFat?: number;
+    saturatedFat?: number;
+    transFat?: number;
     calories: number;
     confidence: 'high' | 'medium' | 'low';
   }>;
@@ -147,6 +159,9 @@ export interface GeminiAnalysisResult {
   netCarbs?: number;
   totalProtein: number;
   totalFat: number;
+  totalUnsaturatedFat?: number;
+  totalSaturatedFat?: number;
+  totalTransFat?: number;
   totalCalories: number;
   dietaryNotes?: string;
 }

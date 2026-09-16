@@ -304,7 +304,12 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                         <span className="text-xs font-mono font-semibold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded-lg border border-rose-500/30">
                           {meal.totalProtein}g <span className="text-[10px] font-normal text-slate-400">P</span>
                         </span>
-                        <span className="text-xs font-mono font-semibold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                        <span 
+                          className="text-xs font-mono font-semibold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-lg border border-amber-500/30"
+                          title={meal.totalUnsaturatedFat !== undefined || meal.totalSaturatedFat !== undefined
+                            ? `Total Fat: ${meal.totalFat}g (Healthy Unsaturated: ${meal.totalUnsaturatedFat || 0}g | Saturated: ${meal.totalSaturatedFat || 0}g)`
+                            : `Total Fat: ${meal.totalFat}g`}
+                        >
                           {meal.totalFat}g <span className="text-[10px] font-normal text-slate-400">F</span>
                         </span>
                         <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30">
@@ -347,14 +352,31 @@ export const MealHistory: React.FC<MealHistoryProps> = ({
                             <span className="font-medium text-slate-200">{item.name}</span>
                             <span className="text-slate-400 text-[11px] ml-1.5">({item.portion || `${item.grams}g`})</span>
                           </div>
-                          <div className="font-mono text-[11px] text-slate-300 space-x-2">
-                            <span className="text-cyan-300">{item.carbs}g C</span>
-                            {item.fiber !== undefined && item.fiber > 0 && (
-                              <span className="text-indigo-300">{item.fiber}g Fib</span>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono text-[11px] text-slate-300 space-x-2">
+                              <span className="text-cyan-300">{item.carbs}g C</span>
+                              {item.fiber !== undefined && item.fiber > 0 && (
+                                <span className="text-indigo-300">{item.fiber}g Fib</span>
+                              )}
+                              <span className="text-rose-400">{item.protein}g P</span>
+                              <span 
+                                className="text-amber-400"
+                                title={item.unsaturatedFat !== undefined || item.saturatedFat !== undefined 
+                                  ? `Good: ${item.unsaturatedFat || 0}g | Sat: ${item.saturatedFat || 0}g` 
+                                  : undefined}
+                              >
+                                {item.fat}g F
+                              </span>
+                              <span className="text-emerald-400 font-semibold">{item.calories} kcal</span>
+                            </div>
+                            {item.fat > 0 && (item.unsaturatedFat !== undefined || item.saturatedFat !== undefined) && (
+                              <span 
+                                className="text-[10px] font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-1.5 py-0.5 rounded hidden sm:inline-block" 
+                                title={`Healthy Unsaturated: ${item.unsaturatedFat || 0}g | Saturated: ${item.saturatedFat || 0}g`}
+                              >
+                                ✓ {item.unsaturatedFat ?? Math.max(0, item.fat - (item.saturatedFat || 0))}g Good
+                              </span>
                             )}
-                            <span className="text-rose-400">{item.protein}g P</span>
-                            <span className="text-amber-400">{item.fat}g F</span>
-                            <span className="text-emerald-400 font-semibold">{item.calories} kcal</span>
                           </div>
                         </div>
                       ))}

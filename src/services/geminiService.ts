@@ -39,7 +39,10 @@ const NUTRITION_RESPONSE_SCHEMA = {
           carbs: { type: 'NUMBER', description: 'Total Carbohydrates in grams' },
           fiber: { type: 'NUMBER', description: 'Dietary fiber in grams' },
           protein: { type: 'NUMBER', description: 'Protein in grams' },
-          fat: { type: 'NUMBER', description: 'Fat in grams' },
+          fat: { type: 'NUMBER', description: 'Total fat in grams' },
+          unsaturatedFat: { type: 'NUMBER', description: 'Estimated healthy unsaturated fats (monounsaturated + polyunsaturated) in grams' },
+          saturatedFat: { type: 'NUMBER', description: 'Estimated saturated fats in grams' },
+          transFat: { type: 'NUMBER', description: 'Estimated trans fats in grams' },
           calories: { type: 'NUMBER', description: 'Calories in kcal' },
           confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] }
         },
@@ -49,12 +52,82 @@ const NUTRITION_RESPONSE_SCHEMA = {
     totalCarbs: { type: 'NUMBER', description: 'Sum of total carbohydrates in grams' },
     totalFiber: { type: 'NUMBER', description: 'Sum of dietary fiber in grams' },
     totalProtein: { type: 'NUMBER', description: 'Sum of protein in grams' },
-    totalFat: { type: 'NUMBER', description: 'Sum of fat in grams' },
+    totalFat: { type: 'NUMBER', description: 'Sum of total fat in grams' },
+    totalUnsaturatedFat: { type: 'NUMBER', description: 'Sum of heart-healthy unsaturated fats in grams' },
+    totalSaturatedFat: { type: 'NUMBER', description: 'Sum of saturated fats in grams' },
+    totalTransFat: { type: 'NUMBER', description: 'Sum of trans fats in grams' },
     totalCalories: { type: 'NUMBER', description: 'Total calories in kcal' },
     dietaryNotes: { type: 'STRING', description: 'Brief health or nutrition note' }
   },
   required: ['title', 'mealType', 'items', 'totalCarbs', 'totalFiber', 'totalProtein', 'totalFat', 'totalCalories']
 };
+
+function formatNutritionResult(result: any): GeminiAnalysisResult {
+  const totalFiber = Number(result.totalFiber) || 0;
+  const netCarbs = Math.max(0, Math.round(((Number(result.totalCarbs) || 0) - totalFiber) * 10) / 10);
+
+  const items = Array.isArray(result.items)
+    ? result.items.map((item: any) => {
+        const fat = Math.round((Number(item.fat) || 0) * 10) / 10;
+        let saturatedFat = item.saturatedFat !== undefined ? Math.round((Number(item.saturatedFat) || 0) * 10) / 10 : undefined;
+        let unsaturatedFat = item.unsaturatedFat !== undefined ? Math.round((Number(item.unsaturatedFat) || 0) * 10) / 10 : undefined;
+        const transFat = item.transFat !== undefined ? Math.round((Number(item.transFat) || 0) * 10) / 10 : 0;
+
+        // Fallback calculation if model returned total fat but omitted sub-classification
+        if (fat > 0 && saturatedFat === undefined && unsaturatedFat === undefined) {
+          unsaturatedFat = Math.round(fat * 0.7 * 10) / 10;
+          saturatedFat = Math.max(0, Math.round((fat - unsaturatedFat) * 10) / 10);
+        } else if (fat > 0 && saturatedFat !== undefined && unsaturatedFat === undefined) {
+          unsaturatedFat = Math.max(0, Math.round((fat - saturatedFat) * 10) / 10);
+        } else if (fat > 0 && unsaturatedFat !== undefined && saturatedFat === undefined) {
+          saturatedFat = Math.max(0, Math.round((fat - unsaturatedFat) * 10) / 10);
+        }
+
+        return {
+          name: item.name || 'Ingredient',
+          portion: item.portion || `${item.grams || 100}g`,
+          grams: Number(item.grams) || 100,
+          carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
+          fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
+          protein: Math.round((Number(item.protein) || 0) * 10) / 10,
+          fat,
+          unsaturatedFat,
+          saturatedFat,
+          transFat,
+          calories: Math.round(Number(item.calories) || 0),
+          confidence: item.confidence || 'high'
+        };
+      })
+    : [];
+
+  const totalFat = Math.round((Number(result.totalFat) || items.reduce((s: number, it: any) => s + it.fat, 0)) * 10) / 10;
+
+  const totalUnsaturatedFat = result.totalUnsaturatedFat !== undefined
+    ? Math.round((Number(result.totalUnsaturatedFat) || 0) * 10) / 10
+    : Math.round(items.reduce((s: number, it: any) => s + (it.unsaturatedFat || 0), 0) * 10) / 10;
+
+  const totalSaturatedFat = result.totalSaturatedFat !== undefined
+    ? Math.round((Number(result.totalSaturatedFat) || 0) * 10) / 10
+    : Math.round(items.reduce((s: number, it: any) => s + (it.saturatedFat || 0), 0) * 10) / 10;
+
+  const totalTransFat = result.totalTransFat !== undefined
+    ? Math.round((Number(result.totalTransFat) || 0) * 10) / 10
+    : Math.round(items.reduce((s: number, it: any) => s + (it.transFat || 0), 0) * 10) / 10;
+
+  return {
+    ...result,
+    items,
+    totalCarbs: Math.round((Number(result.totalCarbs) || 0) * 10) / 10,
+    totalFiber,
+    netCarbs,
+    totalProtein: Math.round((Number(result.totalProtein) || 0) * 10) / 10,
+    totalFat,
+    totalUnsaturatedFat,
+    totalSaturatedFat,
+    totalTransFat,
+    totalCalories: Math.round(Number(result.totalCalories) || 0)
+  };
+}
 
 export async function analyzeFoodImage(
   imageBase64DataUrl: string,
@@ -76,8 +149,8 @@ export async function analyzeFoodImage(
 Analyze the provided food photo with high precision:
 1. Identify all visible dishes and components.
 2. Estimate the realistic portion size and weight in grams for each item.
-3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Protein, Fat, Calories).
+3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), and Total Calories (kcal).
+4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack) based on the food type.
 ${userNotes ? `User context/notes: "${userNotes}"` : ''}
 
@@ -105,13 +178,7 @@ Respond strictly in valid JSON matching the requested schema.`;
   };
 
   const result = await callGeminiWithFallbacks(requestBody, apiKey);
-  const totalFiber = Number(result.totalFiber) || 0;
-  const netCarbs = Math.max(0, Math.round(((result.totalCarbs || 0) - totalFiber) * 10) / 10);
-  return {
-    ...result,
-    totalFiber,
-    netCarbs
-  };
+  return formatNutritionResult(result);
 }
 
 export async function analyzeFoodText(
@@ -128,8 +195,8 @@ The user describes a meal they ate (or transcribed from voice):
 
 1. Identify all ingredients, dishes, and portion descriptions mentioned.
 2. Estimate the realistic weight in grams and portions for each component.
-3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Carbs, Total Fiber, Net Carbs, Total Protein, Total Fat, Total Calories).
+3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), and Total Calories (kcal).
+4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack).
 
 Respond strictly in valid JSON matching the requested schema.`;
@@ -148,13 +215,7 @@ Respond strictly in valid JSON matching the requested schema.`;
   };
 
   const result = await callGeminiWithFallbacks<GeminiAnalysisResult>(requestBody, apiKey);
-  const totalFiber = Number(result.totalFiber) || 0;
-  const netCarbs = Math.max(0, Math.round(((result.totalCarbs || 0) - totalFiber) * 10) / 10);
-  return {
-    ...result,
-    totalFiber,
-    netCarbs
-  };
+  return formatNutritionResult(result);
 }
 
 export async function estimateWorkoutCalories(
