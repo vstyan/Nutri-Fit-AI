@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { WifiOff, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { CameraCapture } from './components/CameraCapture';
@@ -55,6 +56,26 @@ export function App() {
   // Google Fit state
   const [isConnectingGoogleFit, setIsConnectingGoogleFit] = useState(false);
   const [isSyncingGoogleFit, setIsSyncingGoogleFit] = useState(false);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
+  const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showOfflineNotice = useCallback((message: string) => {
+    if (offlineTimerRef.current) {
+      clearTimeout(offlineTimerRef.current);
+    }
+    setOfflineNotice(message);
+    offlineTimerRef.current = setTimeout(() => {
+      setOfflineNotice(null);
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+      }
+    };
+  }, []);
 
   const [activity, setActivity] = useState<DailyActivity>(() => {
     const includeResting = DEFAULT_SETTINGS.includeRestingCalories !== false;
@@ -178,6 +199,13 @@ export function App() {
       return;
     }
 
+    if (!navigator.onLine) {
+      if (isManual) {
+        showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
+      }
+      return;
+    }
+
     let activeToken = currentSettings.googleFitAccessToken;
     const isExpired = !activeToken || (currentSettings.googleFitTokenExpiry && Date.now() >= (currentSettings.googleFitTokenExpiry - 60000));
 
@@ -200,7 +228,11 @@ export function App() {
       } catch (tokenErr) {
         console.warn('Google Fit automatic renewal paused:', tokenErr);
         if (isManual) {
-          alert('Google Fit authorization expired. Please connect Google Fit again.');
+          if (!navigator.onLine) {
+            showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
+          } else {
+            showOfflineNotice('Google Fit authorization expired. Please connect Google Fit again.');
+          }
         }
         return;
       }
@@ -267,10 +299,17 @@ export function App() {
       }
     } catch (err: any) {
       console.warn('Google Fit sync notice:', err);
+      if (isManual) {
+        if (!navigator.onLine) {
+          showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
+        } else {
+          showOfflineNotice('Unable to reach Google Fit right now. Displaying your last synced data until your connection returns.');
+        }
+      }
     } finally {
       setIsSyncingGoogleFit(false);
     }
-  }, [selectedDate, settings]);
+  }, [selectedDate, settings, showOfflineNotice]);
 
 
   // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit
@@ -297,16 +336,21 @@ export function App() {
       }
     };
 
+    const handleOnline = () => {
+      setOfflineNotice(null);
+      handleActiveState();
+    };
+
     document.addEventListener('visibilitychange', handleActiveState);
     window.addEventListener('focus', handleActiveState);
     window.addEventListener('pageshow', handleActiveState);
-    window.addEventListener('online', handleActiveState);
+    window.addEventListener('online', handleOnline);
 
     return () => {
       document.removeEventListener('visibilitychange', handleActiveState);
       window.removeEventListener('focus', handleActiveState);
       window.removeEventListener('pageshow', handleActiveState);
-      window.removeEventListener('online', handleActiveState);
+      window.removeEventListener('online', handleOnline);
     };
   }, [selectedDate, settings, handleSyncGoogleFit]);
 
@@ -715,6 +759,31 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+      {/* Offline Toast Notification */}
+      {offlineNotice && (
+        <div 
+          role="status"
+          aria-live="polite"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-slate-900/95 backdrop-blur-md border border-amber-500/40 text-slate-100 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-200"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
+              <WifiOff className="w-5 h-5" />
+            </div>
+            <p className="text-xs sm:text-sm font-medium leading-snug text-slate-200">
+              {offlineNotice}
+            </p>
+          </div>
+          <button
+            onClick={() => setOfflineNotice(null)}
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <Header
         selectedDate={selectedDate}

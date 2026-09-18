@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'NutriFit AI - Food & Calorie Tracker',
         short_name: 'NutriFit',
         description: 'Track macros via AI photo recognition and compare with calories burned.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#000000',
+        background_color: '#000000',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
@@ -28,7 +28,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/]
       }
     })
   ],
