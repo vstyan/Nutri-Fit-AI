@@ -132,16 +132,41 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
 
   const isMidnight = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-midnight');
 
+  // Custom Chart.js plugin to add breathing room between top legend and the chart plot area
+  const legendMarginPlugin = {
+    id: 'legendMargin',
+    beforeInit(chart: any) {
+      const fitValue = chart.legend?.fit;
+      if (fitValue) {
+        chart.legend.fit = function fit() {
+          fitValue.bind(chart.legend)();
+          return (this.height += 16);
+        };
+      }
+    }
+  };
+
   const chartOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        top: 6,
+        bottom: 2,
+        left: 2,
+        right: 4
+      }
+    },
     plugins: {
       legend: {
         position: 'top' as const,
+        align: 'center' as const,
         labels: {
           color: isMidnight ? '#94a3b8' : '#8e8e93',
-          font: { size: 11, weight: '500' },
-          boxWidth: 10,
+          font: { size: 11, weight: '600' },
+          boxWidth: 9,
+          boxHeight: 9,
+          padding: 18,
           usePointStyle: true,
           pointStyle: 'circle'
         }
@@ -164,7 +189,8 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
       y: {
         grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
         ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } },
-        beginAtZero: metric !== 'weight'
+        beginAtZero: metric !== 'weight',
+        grace: '6%'
       }
     }
   };
@@ -217,7 +243,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         </div>
       </div>
 
-      <div className="h-64 w-full pt-2">
+      <div className="h-72 sm:h-80 w-full pt-2">
         {metric === 'weight' ? (
           sortedWeight.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs space-y-1">
@@ -226,10 +252,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
               <span className="text-[11px] text-slate-600">Log your scale weight above to start seeing trends!</span>
             </div>
           ) : (
-            <Line data={weightLineData} options={chartOptions} />
+            <Line data={weightLineData} options={chartOptions} plugins={[legendMarginPlugin]} />
           )
         ) : (
-          <Bar data={barChartData} options={chartOptions} />
+          <Bar data={barChartData} options={chartOptions} plugins={[legendMarginPlugin]} />
         )}
       </div>
     </div>
