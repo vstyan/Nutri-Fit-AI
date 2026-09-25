@@ -636,8 +636,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const satPct = totalSplit > 0 ? Math.round((satGrams / totalSplit) * 100) : (totals.fat > 0 ? 30 : 0);
             
             const target = goals.dailyFatTarget || 65;
-            const unsatWidth = Math.min(100, (unsatGrams / target) * 100);
-            const satWidth = Math.min(100 - unsatWidth, (satGrams / target) * 100);
+            const totalWidth = Math.min(100, Math.max(0, (totals.fat / target) * 100));
+            const unsatRatio = totalSplit > 0 ? (unsatGrams / totalSplit) : (totals.fat > 0 ? 0.7 : 0);
+            const satRatio = totalSplit > 0 ? (satGrams / totalSplit) : (totals.fat > 0 ? 0.3 : 0);
+            const unsatWidth = totalWidth * unsatRatio;
+            const satWidth = totalWidth * satRatio;
 
             return (
               <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 space-y-2">
@@ -654,11 +657,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       title={`Healthy Unsaturated: ${unsatGrams}g (${unsatPct}%) | Saturated: ${satGrams}g (${satPct}%)`}
                     >
                       <div 
-                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-l-full transition-all duration-500" 
+                        className={`h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ${satWidth > 0 ? 'rounded-l-full' : 'rounded-full'}`} 
                         style={{ width: `${Math.max(unsatWidth > 0 ? 3 : 0, unsatWidth)}%` }} 
                       />
                       <div 
-                        className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-r-full transition-all duration-500" 
+                        className={`h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-500 ${unsatWidth > 0 ? 'rounded-r-full' : 'rounded-full'}`} 
                         style={{ width: `${Math.max(satWidth > 0 ? 3 : 0, satWidth)}%` }} 
                       />
                     </div>
