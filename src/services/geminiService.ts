@@ -1,10 +1,10 @@
 import { GeminiAnalysisResult, UserProfile, WorkoutEstimationResult } from '../types';
 
 const FALLBACK_MODELS = [
-  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
   'gemini-2.5-flash',
-  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash-lite',
   'gemini-flash-lite-latest',
 ];
 
@@ -275,6 +275,16 @@ Respond strictly in valid JSON matching the requested schema.`;
   };
 }
 
+function getThinkingConfig(model: string) {
+  // Gemini 2.5 series uses thinkingBudget (token count limit).
+  // 1024 tokens allows quick portion & macro sanity check without long deliberation.
+  if (model.includes('2.5')) {
+    return { thinkingBudget: 1024 };
+  }
+  // Gemini 3.x models use thinkingLevel ('low' provides fast reasoning with sanity checks).
+  return { thinkingLevel: 'low' };
+}
+
 async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string): Promise<T> {
   let lastError: Error | null = null;
   const errorSummaries: string[] = [];
@@ -282,14 +292,23 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
   for (const model of FALLBACK_MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
 
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const thinkingConfig = getThinkingConfig(model);
+        const payload = {
+          ...requestBody,
+          generationConfig: {
+            ...requestBody.generationConfig,
+            thinkingConfig
+          }
+        };
+
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify(payload),
           signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -325,7 +344,7 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
             continue;
           }
 
-          // If 400 Bad Request and schema was supplied, try fallback without responseSchema
+          // If 400 Bad Request and schema was supplied, try fallback without responseSchema or thinkingConfig
           if (response.status === 400 && requestBody.generationConfig?.responseSchema) {
             const simplifiedBody = {
               ...requestBody,
@@ -335,7 +354,7 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
               }
             };
             const retryController = new AbortController();
-            const retryTimeoutId = setTimeout(() => retryController.abort(), 20000);
+            const retryTimeoutId = setTimeout(() => retryController.abort(), 12000);
             try {
               const retryRes = await fetch(url, {
                 method: 'POST',
@@ -366,7 +385,7 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
       } catch (err: any) {
         clearTimeout(timeoutId);
         const isAbort = err.name === 'AbortError';
-        const msg = isAbort ? `[${model}] Request timed out after 25s` : (err.message || String(err));
+        const msg = isAbort ? `[${model}] Request timed out after 14s` : (err.message || String(err));
         console.warn(`Attempt with ${model} failed:`, msg);
         lastError = isAbort ? new Error(msg) : err;
         errorSummaries.push(msg);

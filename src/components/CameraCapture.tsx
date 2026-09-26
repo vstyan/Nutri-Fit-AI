@@ -256,7 +256,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     }
   };
 
-  const resizeAndConvertImage = (dataUrl: string, maxDim = 1000): Promise<string> => {
+  const resizeAndConvertImage = (dataUrl: string, maxDim = 800): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -285,7 +285,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.80));
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
         } catch (canvasErr) {
           console.warn('Image processing error, using original:', canvasErr);
           resolve(dataUrl);
