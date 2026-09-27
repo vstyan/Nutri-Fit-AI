@@ -29,6 +29,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globIgnores: ['**/version.json'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/]
       }

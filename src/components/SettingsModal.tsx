@@ -18,9 +18,10 @@ import {
   RefreshCw, 
   Sparkles, 
   Activity,
-  Palette 
+  Palette,
+  BookOpen
 } from 'lucide-react';
-import { AppSettings, Gender, UnitSystem } from '../types';
+import { AppSettings, Gender, UnitSystem, APP_VERSION } from '../types';
 import { 
   calculateBMR, 
   kgToLbs, 
@@ -41,6 +42,7 @@ interface SettingsModalProps {
   isConnectingGoogleFit?: boolean;
   onSaveSettings: (settings: AppSettings, explicitKeyUpdate?: boolean) => void;
   onClose: () => void;
+  onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
   onDisconnectGoogleFit?: () => void;
 }
@@ -51,6 +53,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isConnectingGoogleFit = false,
   onSaveSettings,
   onClose,
+  onOpenDocumentation,
   onConnectGoogleFit,
   onDisconnectGoogleFit
 }) => {
@@ -71,6 +74,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // App update checking states
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
+  const [availableVersionInfo, setAvailableVersionInfo] = useState<{ version: string; notes?: string } | null>(null);
 
   // Sync formData whenever settings changes or modal opens
   useEffect(() => {
@@ -84,6 +88,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setShowClearConfirm(false);
       setClearSuccessMessage(false);
       setUpdateStatus('idle');
+      setAvailableVersionInfo(null);
       setIsCheckingUpdate(false);
     }
   }, [isOpen, settings]);
@@ -94,42 +99,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsCheckingUpdate(true);
     setUpdateStatus('checking');
 
+    try {
+      let isNewAvailable = false;
+      let remoteInfo: { version: string; notes?: string } | null = null;
+
+      try {
+        const res = await fetch('./version.json?t=' + Date.now(), { 
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.version && data.version !== APP_VERSION) {
+            isNewAvailable = true;
+            remoteInfo = data;
+          }
+        }
+      } catch (e) {
+        console.warn('version.json fetch error:', e);
+      }
+
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        if (isNewAvailable) {
+          await registration.update().catch(() => {});
+        }
+        if (registration.waiting || isNewAvailable) {
+          setAvailableVersionInfo(remoteInfo);
+          setUpdateStatus('available');
+        } else {
+          setUpdateStatus('latest');
+        }
+      } else if (isNewAvailable) {
+        setAvailableVersionInfo(remoteInfo);
+        setUpdateStatus('available');
+      } else {
+        setUpdateStatus('latest');
+      }
+    } catch (err) {
+      console.warn('Update check failed:', err);
+      setUpdateStatus('error');
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyUpdateNow = async () => {
+    localStorage.removeItem('nutrifit_deferred_version');
     if ('serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready;
         await registration.update();
-        setTimeout(() => {
-          setIsCheckingUpdate(false);
-          if (registration.waiting) {
-            setUpdateStatus('available');
-          } else {
-            setUpdateStatus('latest');
-          }
-        }, 1000);
-      } catch (err) {
-        console.warn('Update check failed:', err);
-        setIsCheckingUpdate(false);
-        setUpdateStatus('error');
-      }
-    } else {
-      setTimeout(() => {
-        setIsCheckingUpdate(false);
-        setUpdateStatus('latest');
-      }, 800);
-    }
-  };
-
-  const handleApplyUpdateNow = () => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
         if (registration.waiting) {
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
-        window.location.reload();
-      });
-    } else {
-      window.location.reload();
+      } catch (e) {
+        console.warn('Service worker skip waiting error:', e);
+      }
     }
+    window.location.reload();
   };
 
   const currentBMR = calculateBMR(formData.profile);
@@ -281,6 +309,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Scrollable Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-5 overflow-y-auto space-y-6 flex-1">
+          {/* User Guide & Documentation Shortcut */}
+          {onOpenDocumentation && (
+            <div className="bg-gradient-to-r from-cyan-950/40 to-slate-900 border border-cyan-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">NutriFit AI Guide &amp; Documentation</h4>
+                  <p className="text-[11px] text-slate-400">Google Fit sync tips, TDEE model, AI logging &amp; offline mode</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenDocumentation()}
+                className="px-3 py-1.5 bg-cyan-600/30 hover:bg-cyan-600/40 text-cyan-300 font-semibold text-xs rounded-xl border border-cyan-500/40 transition active:scale-95 shrink-0"
+              >
+                Open Guide
+              </button>
+            </div>
+          )}
+
           {/* 1. User Profile & Base BMR Metabolism */}
           <div className="space-y-3 bg-slate-800/40 border border-slate-700/70 rounded-2xl p-4">
             <div className="flex items-center justify-between">
@@ -692,6 +742,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Automatically sync your total calories burned (Rest + Exercise) throughout the day directly from Google Fit, Wear OS, and fitness trackers.
             </p>
 
+            {onOpenDocumentation && (
+              <button
+                type="button"
+                onClick={() => onOpenDocumentation('google-fit')}
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>How Google Fit sync works &amp; tips for watch users &rarr;</span>
+              </button>
+            )}
+
             {settings.googleFitConnected ? (
               <div className="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
                 <div>
@@ -870,7 +931,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   App Updates & Version
                 </span>
                 <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                  v1.5.0
+                  v{APP_VERSION}
                 </span>
               </label>
 
@@ -880,7 +941,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>NutriFit AI PWA</span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Offline-capable with 1-click update notifications
+                    Explicit Approval Mode: Updates never install automatically without your permission.
                   </div>
                 </div>
 
@@ -907,23 +968,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {updateStatus === 'latest' && (
                 <div className="p-2.5 rounded-xl text-xs flex items-center space-x-2 bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 animate-in fade-in">
                   <Check className="w-4 h-4 shrink-0" />
-                  <span>You are running the latest version of NutriFit AI.</span>
+                  <span>You are running the latest version of NutriFit AI (v{APP_VERSION}).</span>
                 </div>
               )}
 
               {updateStatus === 'available' && (
-                <div className="p-3 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 animate-in fade-in">
-                  <div className="flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4 shrink-0 text-cyan-400" />
-                    <span className="font-medium">A new version is available!</span>
+                <div className="p-3 rounded-xl text-xs flex flex-col gap-2.5 bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 animate-in fade-in">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <Sparkles className="w-4 h-4 shrink-0 text-cyan-400" />
+                        <span className="font-bold text-white">
+                          Update Available: v{availableVersionInfo?.version || 'New Version'}
+                        </span>
+                      </div>
+                      {availableVersionInfo?.notes && (
+                        <p className="text-[11px] text-slate-300 pl-6 leading-relaxed">
+                          {availableVersionInfo.notes}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleApplyUpdateNow}
-                    className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs transition shadow shrink-0"
-                  >
-                    Refresh Now
-                  </button>
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-cyan-500/20">
+                    <button
+                      type="button"
+                      onClick={() => setUpdateStatus('idle')}
+                      className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition"
+                    >
+                      Keep Current v{APP_VERSION}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyUpdateNow}
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition shadow shrink-0 active:scale-95 cursor-pointer"
+                    >
+                      Accept &amp; Install Update
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

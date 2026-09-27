@@ -7,7 +7,8 @@ import {
   Cloud, 
   HardDrive,
   History,
-  RotateCcw
+  RotateCcw,
+  BookOpen
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { getLocalDateString, addDaysToDateString, formatDisplayDate } from '../utils/dateUtils';
@@ -18,6 +19,7 @@ interface HeaderProps {
   settings: AppSettings;
   onOpenSettings: () => void;
   onOpenStorageModal: () => void;
+  onOpenDocumentation?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   settings,
   onOpenSettings,
   onOpenStorageModal,
+  onOpenDocumentation,
 }) => {
   const todayStr = getLocalDateString();
   const isToday = selectedDate === todayStr;
@@ -125,6 +128,18 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </button>
+
+          {/* Documentation / Guide Button */}
+          {onOpenDocumentation && (
+            <button
+              onClick={onOpenDocumentation}
+              className="w-10 h-10 sm:w-11 sm:h-11 bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 hover:text-cyan-400 border border-slate-700/80 rounded-2xl transition flex items-center justify-center shadow-sm"
+              title="NutriFit AI Guide & Documentation"
+              aria-label="Documentation & User Guide"
+            >
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />
+            </button>
+          )}
 
           {/* Settings Button - Large, Touch-Friendly */}
           <button

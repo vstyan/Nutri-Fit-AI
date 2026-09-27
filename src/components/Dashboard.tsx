@@ -15,7 +15,8 @@ import {
   Dumbbell,
   Trash2,
   Sparkles,
-  Clock
+  Clock,
+  HelpCircle
 } from 'lucide-react';
 import { 
   DailySummary, 
@@ -56,6 +57,7 @@ interface DashboardProps {
   onDeleteWorkout?: (workoutId: string) => void;
   onSaveWeight: (weight: WeightRecord) => void;
   onOpenSettings: () => void;
+  onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
   onSyncGoogleFit?: () => Promise<void>;
 }
@@ -78,6 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDeleteWorkout,
   onSaveWeight,
   onOpenSettings,
+  onOpenDocumentation,
   onConnectGoogleFit,
   onSyncGoogleFit
 }) => {
@@ -283,13 +286,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Google Fit Live Sync Widget */}
         {settings.googleFitConnected ? (
-          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-semibold text-emerald-300">Google Fit Connected</span>
+          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 min-w-0">
+              <div className="flex items-center space-x-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-xs font-semibold text-emerald-300 truncate">Google Fit Connected</span>
+                {onOpenDocumentation && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDocumentation('google-fit')}
+                    className="text-slate-400 hover:text-emerald-300 p-0.5 rounded transition"
+                    title="How Google Fit sync works (Pro Tip)"
+                    aria-label="Google Fit sync guide"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               {activity.lastSyncedAt && (
-                <span className="text-[10px] text-slate-400 hidden sm:inline">
-                  • Synced {new Date(activity.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <span className="text-[10px] text-slate-400 sm:before:content-['•'] sm:before:mr-1.5 pl-3.5 sm:pl-0">
+                  Synced {new Date(activity.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
             </div>
@@ -298,7 +314,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 type="button"
                 onClick={onSyncGoogleFit}
                 disabled={isSyncingGoogleFit}
-                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50"
+                className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50 shrink-0"
                 title="Sync latest calories burned from Google Fit"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGoogleFit ? 'animate-spin text-cyan-400' : ''}`} />
