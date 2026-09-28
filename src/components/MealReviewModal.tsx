@@ -18,6 +18,7 @@ import { GeminiAnalysisResult, MealRecord, MealType, FoodItem } from '../types';
 import { analyzeFoodText } from '../services/geminiService';
 import { getStickyGeminiKeySynchronous } from '../services/storageService';
 import { calculateTEFBreakdown } from '../utils/calorieEngine';
+import { getDefaultMealTypeByTime } from '../utils/dateUtils';
 
 interface MealReviewModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
 }) => {
   const isEditMode = !!editingMeal;
   const [title, setTitle] = useState(editingMeal?.title || initialResult?.title || '');
-  const [mealType, setMealType] = useState<MealType>(editingMeal?.mealType || initialResult?.mealType || 'lunch');
+  const [mealType, setMealType] = useState<MealType>(editingMeal?.mealType || getDefaultMealTypeByTime());
   const [notes, setNotes] = useState(editingMeal?.notes || initialResult?.dietaryNotes || '');
   const [isFavorite, setIsFavorite] = useState(editingMeal?.isFavorite || false);
   const [isEditing, setIsEditing] = useState(isEditMode);
@@ -103,7 +104,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         );
       } else if (initialResult) {
         setTitle(initialResult.title || '');
-        setMealType(initialResult.mealType || 'lunch');
+        setMealType(getDefaultMealTypeByTime());
         setNotes(initialResult.dietaryNotes || '');
         setIsFavorite(false);
         setIsEditing(false);

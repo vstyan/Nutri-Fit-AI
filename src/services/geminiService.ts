@@ -575,21 +575,33 @@ Analyze the user's daily telemetry data provided in JSON format below:
 ${JSON.stringify(payload, null, 2)}
 
 CRITICAL COACHING INSTRUCTIONS:
-1. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
-2. CHRONO-NUTRITION & MEAL TIMING:
+1. REAL-TIME DAY PACING (CRITICAL):
+   - Check 'dayPacingContext':
+   - If 'isDayInProgress' is true (e.g. current local time is ${payload.dayPacingContext.currentLocalTime}, phase: ${payload.dayPacingContext.dayPhase}):
+     * The user is ACTIVELY in the middle of their day! Lunch, afternoon fuel, and dinner are still ahead.
+     * Consuming ${payload.dayPacingContext.caloriesConsumedSoFar} kcal of ${payload.dayPacingContext.dailyCalorieTarget} kcal target (~${payload.dayPacingContext.percentTargetConsumedSoFar}%) is normal daytime pacing—this is NOT a "severe calorie deficit" or "very low intake".
+     * The interim net balance (${payload.dayPacingContext.interimNetBalance > 0 ? '+' : ''}${payload.dayPacingContext.interimNetBalance} kcal) compares intake so far against morning burn so far (${payload.dayPacingContext.burnRecordedSoFar} kcal), NOT a final 24-hour balance.
+     * Your advice MUST focus on the REMAINING MEALS FOR TODAY (how to allocate the remaining ${payload.dayPacingContext.caloriesRemainingToday} kcal and protein/fiber across lunch and dinner today).
+     * NEVER tell the user to "eat more tomorrow" to fix an unfinished today! Advise them on what to eat for lunch right now and dinner tonight.
+   - If 'isDayInProgress' is false:
+     * Provide a full 24-hour retrospective and suggest micro-adjustments for tomorrow.
+2. RELY ON TIMESTAMPS, NOT MEAL LABELS:
+   - Examine actual 24h meal timestamps (e.g., 08:15, 10:05, 13:20). Do NOT deduce behavior from meal labels like 'breakfast' or 'dinner'—users frequently eat multiple morning fuelings or log items under default tags. Evaluate the spacing and nutritional composition of meals chronologically.
+3. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
+4. CHRONO-NUTRITION & MEAL TIMING:
    - Examine firstMealTime, lastMealTime, eatingWindowHours, and caloriesAfter8PM.
    - If first meal started late (e.g. after 1:00 PM), assess whether delaying nutrition compressed the eating window, causing mid-day brain fog or late-night binge snacking.
    - If significant calories were consumed late (>8 PM), analyze how evening backloading impacts sleep, digestion, and next-morning satiety.
-   - Provide a concrete timing tweak for tomorrow.
-3. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
+   - Provide a concrete timing tweak for upcoming meals.
+5. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
    - Identify whether today (${payload.dayOfWeek}) or recent days reflect weekend drift, weekday slumps, or meal prep gaps.
-4. COMPENSATORY REBALANCING:
-   - Check rolling multi-day deficit and protein/fiber gaps. If the user was deficient today or over recent days, calculate practical micro-adjustments for tomorrow to keep the weekly target alive without crash dieting.
-5. WHOLE FOOD PRESCRIPTIONS:
+6. COMPENSATORY REBALANCING:
+   - If day is in progress, rebalance the REMAINING meals of today. If day is finished, check rolling multi-day deficit and protein/fiber gaps to calculate practical micro-adjustments for tomorrow without crash dieting.
+7. WHOLE FOOD PRESCRIPTIONS:
    - Name 2 to 3 specific healthy whole foods (e.g. Wild Salmon, Greek Yogurt, Edamame, Steel-Cut Oats with Chia, Lentil Soup).
    - If the user has elevated LDL or cholesterol context (isLdlElevated is true), prioritize cardio-protective foods rich in soluble fiber and omega-3s, and avoid high-saturated-fat choices.
    - Include realistic serving suggestions and the optimal time of day to eat them.
-6. TONE:
+8. TONE:
    - Direct, motivating, objective, and coach-like. No generic medical disclaimers.
 
 Respond strictly in valid JSON matching the requested schema.`;

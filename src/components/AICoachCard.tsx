@@ -39,6 +39,7 @@ import {
   clearCachedWeeklyInsight,
   getMealsForDate
 } from '../services/storageService';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface AICoachCardProps {
   selectedDate: string;
@@ -329,7 +330,14 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
               {/* Diagnosis Headline & Adherence Pill */}
               <div className="p-3.5 bg-slate-950/80 border border-indigo-500/30 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Diagnosis</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Diagnosis</span>
+                    {selectedDate === getLocalDateString() && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        Live Pacing
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm font-bold text-slate-100 leading-snug">
                     "{dailyInsight.headline}"
                   </p>

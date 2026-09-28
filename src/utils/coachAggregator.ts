@@ -5,11 +5,25 @@ import {
   WeightRecord, 
   BloodLipidRecord 
 } from '../types';
+import { getLocalDateString } from './dateUtils';
 
 export interface DailyCoachPayload {
   date: string;
   dayOfWeek: string;
   isWeekend: boolean;
+  dayPacingContext: {
+    isToday: boolean;
+    isDayInProgress: boolean;
+    currentLocalTime: string;
+    dayPhase: 'early_morning' | 'morning' | 'midday_lunch' | 'afternoon' | 'evening_dinner' | 'night_wrapup';
+    caloriesConsumedSoFar: number;
+    dailyCalorieTarget: number;
+    caloriesRemainingToday: number;
+    percentTargetConsumedSoFar: number;
+    burnRecordedSoFar: number;
+    interimNetBalance: number;
+    guidanceForAI: string;
+  };
   userProfile: {
     gender: string;
     age: number;
@@ -53,7 +67,7 @@ export interface DailyCoachPayload {
     percentCaloriesAfter8PM: number;
     mealsChronological: Array<{
       time: string;
-      mealType: string;
+      timeSlot: string;
       title: string;
       calories: number;
       protein: number;
@@ -195,7 +209,7 @@ export function buildDailyCoachPayload(
 
   const chronologicalMealSummaries: Array<{
     time: string;
-    mealType: string;
+    timeSlot: string;
     title: string;
     calories: number;
     protein: number;
@@ -218,9 +232,15 @@ export function buildDailyCoachPayload(
       caloriesAfter8PM += meal.totalCalories || 0;
     }
 
+    let timeSlot = 'Morning';
+    if (hour >= 11 && hour < 15) timeSlot = 'Midday';
+    else if (hour >= 15 && hour < 18) timeSlot = 'Afternoon';
+    else if (hour >= 18 && hour < 22) timeSlot = 'Evening';
+    else if (hour >= 22 || hour < 4) timeSlot = 'Late Night';
+
     chronologicalMealSummaries.push({
       time: timeStr,
-      mealType: meal.mealType,
+      timeSlot: `${timeSlot} (${timeStr})`,
       title: meal.title,
       calories: meal.totalCalories,
       protein: meal.totalProtein,
@@ -291,10 +311,53 @@ export function buildDailyCoachPayload(
   const totalBurned = summary.activity.totalCaloriesBurned || 2000;
   const netEnergyBalance = totalCalories - totalBurned;
 
+  // Real-time day pacing calculation (ensures AI Coach does not treat in-progress days as complete)
+  const now = new Date();
+  const todayStr = getLocalDateString(now);
+  const isToday = date === todayStr;
+  const currentHour = now.getHours();
+  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+  const currentLocalTime = `${String(currentHour).padStart(2, '0')}:${currentMinutes}`;
+
+  const isDayInProgress = isToday && (currentHour < 21 || (currentHour === 21 && now.getMinutes() < 30));
+
+  let dayPhase: 'early_morning' | 'morning' | 'midday_lunch' | 'afternoon' | 'evening_dinner' | 'night_wrapup' = 'night_wrapup';
+  if (currentHour >= 4 && currentHour < 9) dayPhase = 'early_morning';
+  else if (currentHour >= 9 && currentHour < 12) dayPhase = 'morning';
+  else if (currentHour >= 12 && currentHour < 15) dayPhase = 'midday_lunch';
+  else if (currentHour >= 15 && currentHour < 18) dayPhase = 'afternoon';
+  else if (currentHour >= 18 && currentHour < 22) dayPhase = 'evening_dinner';
+  else dayPhase = 'night_wrapup';
+
+  const caloriesTarget = settings.goals.dailyCaloriesTarget || 2000;
+  const caloriesRemainingToday = Math.max(0, caloriesTarget - totalCalories);
+  const percentTargetConsumedSoFar = caloriesTarget > 0
+    ? Math.round((totalCalories / caloriesTarget) * 100)
+    : 0;
+
+  const guidanceForAI = isDayInProgress
+    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning expenditure so far (${totalBurned} kcal recorded up to now), NOT 24-hour total burn. This is NOT a severe deficit or low intake. You MUST advise on upcoming meals for TODAY (lunch, dinner, afternoon/evening snacks) to budget the remaining ${caloriesRemainingToday} kcal and remaining protein/fiber. DO NOT tell the user to eat more tomorrow to fix an incomplete today!`
+    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal.`;
+
+  const dayPacingContext = {
+    isToday,
+    isDayInProgress,
+    currentLocalTime,
+    dayPhase,
+    caloriesConsumedSoFar: totalCalories,
+    dailyCalorieTarget: caloriesTarget,
+    caloriesRemainingToday,
+    percentTargetConsumedSoFar,
+    burnRecordedSoFar: totalBurned,
+    interimNetBalance: netEnergyBalance,
+    guidanceForAI
+  };
+
   return {
     date,
     dayOfWeek,
     isWeekend,
+    dayPacingContext,
     userProfile: {
       gender: settings.profile.gender,
       age: settings.profile.age,

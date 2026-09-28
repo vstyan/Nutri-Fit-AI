@@ -58,3 +58,21 @@ export function getPastNDaysDateStrings(count: number, baseDateStr: string = get
   }
   return dates;
 }
+
+import { MealType } from '../types';
+
+/**
+ * Returns default meal type based on local system clock time:
+ * - 04:00 to 10:59: 'breakfast'
+ * - 11:00 to 15:59: 'lunch'
+ * - 16:00 to 21:59: 'dinner'
+ * - 22:00 to 03:59: 'snack'
+ */
+export function getDefaultMealTypeByTime(date: Date = new Date()): MealType {
+  const hour = date.getHours();
+  if (hour >= 4 && hour < 11) return 'breakfast';
+  if (hour >= 11 && hour < 16) return 'lunch';
+  if (hour >= 16 && hour < 22) return 'dinner';
+  return 'snack';
+}
+
