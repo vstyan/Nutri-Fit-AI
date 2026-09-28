@@ -436,15 +436,15 @@ const DAILY_COACH_SCHEMA = {
       type: 'OBJECT',
       properties: {
         firstMealTime: { type: 'STRING', description: 'Detected time of first meal or note on fasting start' },
-        lastMealTime: { type: 'STRING', description: 'Detected time of last meal' },
+        lastMealTime: { type: 'STRING', description: 'Detected time of most recent meal logged' },
         eatingWindowHours: { type: 'NUMBER', description: 'Duration of eating window in hours' },
         timingDiagnosis: {
           type: 'STRING',
-          description: 'Deep analysis of how when the user ate impacted their hunger, energy, protein synthesis, or evening cravings (e.g., late start leading to rushed evening eating).'
+          description: 'Deep analysis of meal pacing and spacing. If day is in progress (isDayInProgress is true), note that the eating window is still ongoing/open and evaluate pacing up to now—DO NOT say the eating window has closed. If day is completed, evaluate full window.'
         },
         actionableAdjustment: {
           type: 'STRING',
-          description: 'Specific timing tweak for tomorrow (e.g., start eating within 90 mins of waking or shift 300 kcal earlier).'
+          description: 'Actionable timing advice. If day is in progress, give timing advice for remaining meals TODAY (e.g. snack or dinner spacing). If day is completed, give timing tweaks for tomorrow.'
         }
       },
       required: ['timingDiagnosis', 'actionableAdjustment']
@@ -468,7 +468,7 @@ const DAILY_COACH_SCHEMA = {
         headline: { type: 'STRING', description: 'What needs rebalancing over the next 24-48 hours' },
         dailyMicroAdjustment: {
           type: 'STRING',
-          description: 'Specific numbers to adjust tomorrow to keep the rolling weekly trajectory on target.'
+          description: 'Specific compensatory advice. If day is in progress, budget remaining calories and macros across the rest of today. If day is completed, specify adjustments for tomorrow.'
         }
       },
       required: ['status', 'headline', 'dailyMicroAdjustment']
@@ -589,10 +589,13 @@ CRITICAL COACHING INSTRUCTIONS:
    - Examine actual 24h meal timestamps (e.g., 08:15, 10:05, 13:20). Do NOT deduce behavior from meal labels like 'breakfast' or 'dinner'—users frequently eat multiple morning fuelings or log items under default tags. Evaluate the spacing and nutritional composition of meals chronologically.
 3. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
 4. CHRONO-NUTRITION & MEAL TIMING:
-   - Examine firstMealTime, lastMealTime, eatingWindowHours, and caloriesAfter8PM.
-   - If first meal started late (e.g. after 1:00 PM), assess whether delaying nutrition compressed the eating window, causing mid-day brain fog or late-night binge snacking.
-   - If significant calories were consumed late (>8 PM), analyze how evening backloading impacts sleep, digestion, and next-morning satiety.
-   - Provide a concrete timing tweak for upcoming meals.
+   - Examine firstMealTime, lastMealTime (the most recent meal logged), eatingWindowHours, and caloriesAfter8PM.
+   - If day is in progress (isDayInProgress is true):
+     * The eating window is STILL OPEN! lastMealTime (${payload.timingMetrics.lastMealTime}) is merely the most recent meal logged so far today, NOT the end of their eating window. Dinner and evening fuel are still ahead.
+     * NEVER state or imply that "your eating window closed at ${payload.timingMetrics.lastMealTime}".
+     * In 'actionableAdjustment', advise on timing for the REMAINING MEALS OF TODAY (e.g., when to have their next snack or dinner).
+   - If day is completed (isDayInProgress is false):
+     * Assess the full day eating window and give timing tweaks for TOMORROW.
 5. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
    - Identify whether today (${payload.dayOfWeek}) or recent days reflect weekend drift, weekday slumps, or meal prep gaps.
 6. COMPENSATORY REBALANCING:

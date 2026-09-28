@@ -62,7 +62,9 @@ export interface DailyCoachPayload {
     mealCount: number;
     firstMealTime?: string;
     lastMealTime?: string;
+    mostRecentMealTime?: string;
     eatingWindowHours?: number;
+    eatingWindowStatus?: 'ongoing_open' | 'closed_day_completed';
     caloriesAfter8PM: number;
     percentCaloriesAfter8PM: number;
     mealsChronological: Array<{
@@ -336,8 +338,8 @@ export function buildDailyCoachPayload(
     : 0;
 
   const guidanceForAI = isDayInProgress
-    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning expenditure so far (${totalBurned} kcal recorded up to now), NOT 24-hour total burn. This is NOT a severe deficit or low intake. You MUST advise on upcoming meals for TODAY (lunch, dinner, afternoon/evening snacks) to budget the remaining ${caloriesRemainingToday} kcal and remaining protein/fiber. DO NOT tell the user to eat more tomorrow to fix an incomplete today!`
-    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal.`;
+    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning/afternoon expenditure recorded so far (${totalBurned} kcal), NOT 24-hour total burn. This is NOT a severe deficit or low intake. The user's eating window is STILL ACTIVELY OPEN: their latest meal was at ${lastMealTime || 'N/A'}, but upcoming meals (afternoon fuel, dinner, evening snacks) are still ahead. DO NOT state or imply that 'the eating window closed at ${lastMealTime || 'N/A'}'. You MUST advise on upcoming meals for TODAY to budget the remaining ${caloriesRemainingToday} kcal and remaining protein/fiber. 'actionableAdjustment' must give timing advice for remaining meals TODAY (not tomorrow)!`
+    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal. 'actionableAdjustment' should suggest a timing tweak for tomorrow.`;
 
   const dayPacingContext = {
     isToday,
@@ -396,7 +398,9 @@ export function buildDailyCoachPayload(
       mealCount: summary.meals.length,
       firstMealTime,
       lastMealTime,
+      mostRecentMealTime: lastMealTime,
       eatingWindowHours,
+      eatingWindowStatus: isDayInProgress ? 'ongoing_open' : 'closed_day_completed',
       caloriesAfter8PM,
       percentCaloriesAfter8PM,
       mealsChronological: chronologicalMealSummaries

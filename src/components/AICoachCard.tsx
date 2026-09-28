@@ -89,6 +89,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
   const dateRangeStr = historyData.length > 0
     ? `${historyData[0].date} – ${historyData[historyData.length - 1].date}`
     : selectedDate;
+  const isToday = selectedDate === getLocalDateString();
 
   // Load cached insight whenever selected date or tab changes
   useEffect(() => {
@@ -356,7 +357,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Diagnosis</span>
-                    {selectedDate === getLocalDateString() && (
+                    {isToday && (
                       <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                         Live Pacing
                       </span>
@@ -382,7 +383,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                   </div>
                   {dailyInsight.chronoNutrition.eatingWindowHours !== undefined && (
                     <span className="text-[10px] font-semibold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
-                      Window: {dailyInsight.chronoNutrition.eatingWindowHours} hrs
+                      {isToday ? `Window so far: ${dailyInsight.chronoNutrition.eatingWindowHours} hrs` : `Window: ${dailyInsight.chronoNutrition.eatingWindowHours} hrs`}
                     </span>
                   )}
                 </div>
@@ -395,7 +396,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                   )}
                   {dailyInsight.chronoNutrition.lastMealTime && (
                     <span className="px-2 py-0.5 bg-purple-950/60 text-purple-300 rounded border border-purple-500/20 text-[11px]">
-                      Last: <span className="font-bold text-white">{dailyInsight.chronoNutrition.lastMealTime}</span>
+                      {isToday ? 'Latest: ' : 'Last: '}<span className="font-bold text-white">{dailyInsight.chronoNutrition.lastMealTime}</span>
                     </span>
                   )}
                 </div>
@@ -406,7 +407,12 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
 
                 <div className="pt-1 border-t border-slate-800/80 flex items-start space-x-2 text-xs text-purple-200">
                   <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span><strong className="text-white">Timing Tweak for Tomorrow:</strong> {dailyInsight.chronoNutrition.actionableAdjustment}</span>
+                  <span>
+                    <strong className="text-white">
+                      {isToday ? "Today's Timing Strategy:" : "Timing Tweak for Tomorrow:"}
+                    </strong>{' '}
+                    {dailyInsight.chronoNutrition.actionableAdjustment}
+                  </span>
                 </div>
               </div>
 
