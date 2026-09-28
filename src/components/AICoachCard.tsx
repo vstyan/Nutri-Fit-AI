@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, 
   Clock, 
@@ -74,6 +74,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Compute a week key for caching weekly insights (e.g., "2026-W39")
   const getWeekKey = (dateStr: string) => {
@@ -138,6 +139,8 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       return;
     }
 
+    // Smoothly scroll to the top of the coach card immediately
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setIsLoading(true);
     setError(null);
 
@@ -158,6 +161,10 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       const result = await generateDailyCoachInsight(payload, settings.geminiApiKey);
       await saveCachedDailyInsight(selectedDate, result);
       setDailyInsight(result);
+      // Ensure focus remains on coach card when fresh analysis completes
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
     } catch (err: any) {
       console.error('Error generating daily coach insight:', err);
       setError(err.message || 'Failed to generate daily insight. Please check your connection or API key.');
@@ -177,6 +184,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       return;
     }
 
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setIsLoading(true);
     setError(null);
 
@@ -220,7 +228,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
   ];
 
   return (
-    <div className="bg-slate-900/95 border border-indigo-500/25 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl relative overflow-hidden backdrop-blur-sm">
+    <div ref={cardRef} className="bg-slate-900/95 border border-indigo-500/25 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl relative overflow-hidden backdrop-blur-sm min-h-[220px]">
       {/* Background Accent Glow */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -289,9 +297,25 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
         </div>
       )}
 
-      {/* Loading State with animated status text */}
-      {isLoading && (
-        <div className="p-8 border border-indigo-500/20 bg-slate-950/60 rounded-xl flex flex-col items-center justify-center text-center space-y-3">
+      {/* Loading Overlay when re-analyzing an existing insight (preserves height & prevents scroll jumps) */}
+      {isLoading && ((tab === 'daily' && !!dailyInsight) || (tab === 'weekly' && !!weeklyInsight)) && (
+        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md rounded-2xl z-30 flex flex-col items-center justify-center text-center p-6 space-y-4 animate-in fade-in duration-200">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full border-2 border-indigo-500/20 border-t-indigo-400 animate-spin" />
+            <Sparkles className="w-6 h-6 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
+          </div>
+          <div className="max-w-xs space-y-1">
+            <p className="text-sm font-bold text-white">Analyzing Nutrition & Chrono-Pacing</p>
+            <p className="text-xs text-indigo-300 transition-opacity duration-300">
+              {loadingMessages[loadingStep]}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Loading Box when generating for the first time without cached content */}
+      {isLoading && ((tab === 'daily' && !dailyInsight) || (tab === 'weekly' && !weeklyInsight)) && (
+        <div className="min-h-[280px] p-8 border border-indigo-500/20 bg-slate-950/60 rounded-xl flex flex-col items-center justify-center text-center space-y-3">
           <div className="relative">
             <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-400 animate-spin" />
             <Sparkles className="w-5 h-5 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
@@ -306,7 +330,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       )}
 
       {/* TAB 1: DAILY INSIGHT */}
-      {!isLoading && tab === 'daily' && (
+      {(!isLoading || !!dailyInsight) && tab === 'daily' && (
         <>
           {!dailyInsight ? (
             <div className="p-6 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -462,7 +486,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       )}
 
       {/* TAB 2: WEEKLY DEEP DIVE */}
-      {!isLoading && tab === 'weekly' && (
+      {(!isLoading || !!weeklyInsight) && tab === 'weekly' && (
         <>
           {!weeklyInsight ? (
             <div className="p-6 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
