@@ -190,6 +190,7 @@ export function App() {
   const handleDisconnectGoogleFit = async () => {
     const updatedSettings: AppSettings = {
       ...settings,
+      includeRestingCalories: true,
       googleFitConnected: false,
       googleFitAccessToken: undefined,
       googleFitTokenExpiry: undefined,

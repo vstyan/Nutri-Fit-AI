@@ -475,121 +475,211 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <div className="text-xs font-bold text-white">Your Natural Base Burn (BMR)</div>
                   <div className="text-[11px] text-slate-400">
-                    {formData.includeRestingCalories !== false
-                      ? 'Mifflin-St Jeor Scientific Baseline'
-                      : 'Calculated baseline (excluded from total)'}
+                    Mifflin-St Jeor Scientific Baseline
                   </div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xl font-black text-amber-400">{currentBMR.toLocaleString()} <span className="text-xs font-normal text-slate-400">kcal/day</span></div>
                 <div className="text-[10px] text-slate-400">
-                  {formData.includeRestingCalories !== false ? 'Included in daily burn' : 'Excluded from daily burn'}
+                  Calories burned at complete rest
                 </div>
-              </div>
-            </div>
-
-            {/* Calories Burnt at Rest (BMR) Calculation Option */}
-            <div className="pt-3 border-t border-slate-700/60 space-y-2.5">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Calories Burnt at Rest Calculation</span>
-                </label>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Choose whether to include calories burnt at rest in your daily burned totals. Apps like Google Fit and smartwatches already calculate resting burn in their totals.
-                </p>
-              </div>
-
-              {settings.googleFitConnected && (
-                <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-emerald-300 text-[11px] flex items-center space-x-2">
-                  <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
-                  <span>
-                    <strong>Google Fit Active:</strong> Resting calories are automatically tracked by Google Fit in your daily total to avoid double counting.
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
-                <button
-                  type="button"
-                  disabled={settings.googleFitConnected}
-                  onClick={() => !settings.googleFitConnected && setFormData(prev => ({ ...prev, includeRestingCalories: true }))}
-                  className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
-                    settings.googleFitConnected
-                      ? 'opacity-40 cursor-not-allowed bg-slate-950/40 border-slate-800 text-slate-500'
-                      : formData.includeRestingCalories !== false
-                      ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50'
-                      : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-bold ${!settings.googleFitConnected && formData.includeRestingCalories !== false ? 'text-amber-400' : 'text-slate-400'}`}>
-                      Include at Rest (Default)
-                    </span>
-                    {settings.googleFitConnected ? (
-                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                        Disabled
-                      </span>
-                    ) : (
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        formData.includeRestingCalories !== false
-                          ? 'border-amber-400 bg-amber-400'
-                          : 'border-slate-600'
-                      }`}>
-                        {formData.includeRestingCalories !== false && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    {settings.googleFitConnected
-                      ? 'Disabled to prevent double-counting. Google Fit already tracks resting burn and NEAT.'
-                      : `Calculates full TDEE: BMR (${currentBMR} kcal) + Sedentary NEAT (${Math.round(currentBMR * 0.15)} kcal) + TEF (food) + Workouts.`}
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, includeRestingCalories: false }))}
-                  className={`p-3 rounded-xl border text-left flex flex-col justify-between transition ${
-                    formData.includeRestingCalories === false || settings.googleFitConnected
-                      ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
-                      : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-bold text-cyan-400">
-                      Exclude / In Fitness Tracker
-                    </span>
-                    {settings.googleFitConnected ? (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
-                        Google Fit Active
-                      </span>
-                    ) : (
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        formData.includeRestingCalories === false
-                          ? 'border-cyan-400 bg-cyan-400'
-                          : 'border-slate-600'
-                      }`}>
-                        {formData.includeRestingCalories === false && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-normal">
-                    {settings.googleFitConnected
-                      ? 'Active mode: Your total daily burn syncs live from Google Fit.'
-                      : 'For Google Fit & trackers that already calculate resting burn in their totals.'}
-                  </p>
-                </button>
               </div>
             </div>
           </div>
 
-          {/* 2. Daily Goals */}
+          {/* 2. Daily Burn Tracking Mode (Configuration 1 vs Configuration 2) */}
+          <div className="space-y-3 bg-slate-800/40 border border-slate-700/70 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <Flame className="w-4 h-4" />
+                <span>Daily Burn Tracking Mode</span>
+              </label>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                settings.googleFitConnected || formData.includeRestingCalories === false
+                  ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
+                  : 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+              }`}>
+                {settings.googleFitConnected || formData.includeRestingCalories === false
+                  ? 'Configuration 2 Active'
+                  : 'Configuration 1 Active'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Google Fit.
+            </p>
+
+            <div className="grid grid-cols-1 gap-3 pt-1">
+              {/* Configuration 1: No Fitness Tracker */}
+              <div
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                }}
+                className={`p-3.5 rounded-xl border text-left cursor-pointer transition ${
+                  formData.includeRestingCalories !== false && !settings.googleFitConnected
+                    ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50'
+                    : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center space-x-2.5">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      formData.includeRestingCalories !== false && !settings.googleFitConnected
+                        ? 'border-amber-400 bg-amber-400'
+                        : 'border-slate-600'
+                    }`}>
+                      {formData.includeRestingCalories !== false && !settings.googleFitConnected && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold ${
+                      formData.includeRestingCalories !== false && !settings.googleFitConnected
+                        ? 'text-amber-400'
+                        : 'text-slate-300'
+                    }`}>
+                      Configuration 1 — No Fitness Tracker
+                    </span>
+                  </div>
+                  {formData.includeRestingCalories !== false && !settings.googleFitConnected && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed pl-6.5">
+                  Standalone calculation using your body profile. The app automatically computes your full 24-hour burn from base metabolism (BMR: {currentBMR.toLocaleString()} kcal) + baseline daily movement (NEAT) + food thermics (TEF) + any workouts logged in the app. No external tracker required.
+                </p>
+
+                {settings.googleFitConnected && formData.includeRestingCalories !== false && (
+                  <div className="mt-2.5 ml-6.5 p-2 bg-amber-950/40 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
+                    <span>Google Fit is connected, but standalone calculation is selected.</span>
+                    {onDisconnectGoogleFit && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDisconnectGoogleFit();
+                        }}
+                        className="text-amber-200 underline font-semibold ml-2 hover:text-white"
+                      >
+                        Disconnect Fit
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Configuration 2: Google Fit Tracker */}
+              <div
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, includeRestingCalories: false }));
+                }}
+                className={`p-3.5 rounded-xl border text-left cursor-pointer transition space-y-3 ${
+                  settings.googleFitConnected || formData.includeRestingCalories === false
+                    ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
+                    : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      settings.googleFitConnected || formData.includeRestingCalories === false
+                        ? 'border-cyan-400 bg-cyan-400'
+                        : 'border-slate-600'
+                    }`}>
+                      {(settings.googleFitConnected || formData.includeRestingCalories === false) && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold ${
+                      settings.googleFitConnected || formData.includeRestingCalories === false
+                        ? 'text-cyan-400'
+                        : 'text-slate-300'
+                    }`}>
+                      Configuration 2 — Google Fit Tracker
+                    </span>
+                  </div>
+                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                    settings.googleFitConnected
+                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
+                    {settings.googleFitConnected ? '✓ Connected' : 'Not Connected'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed pl-6.5">
+                  Live auto-sync directly from Google Fit, Wear OS, Pixel Watch, or Galaxy Watch. Google Fit tracks both resting calories and daily activity together in its daily burned total.
+                </p>
+
+                {/* Integrated Google Fit Controls inside Configuration 2 */}
+                <div className="pl-6.5 space-y-2.5">
+                  {settings.googleFitConnected ? (
+                    <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+                      <div>
+                        <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
+                          <Activity className="w-3.5 h-3.5" />
+                          <span>Live Auto-Sync Active</span>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {settings.googleFitLastSync 
+                            ? `Last synced: ${new Date(settings.googleFitLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                            : 'Syncs automatically on app open'}
+                        </span>
+                      </div>
+                      {onDisconnectGoogleFit && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDisconnectGoogleFit();
+                            setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                          }}
+                          className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
+                        >
+                          Disconnect
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {onConnectGoogleFit && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConnectGoogleFit();
+                          }}
+                          disabled={isConnectingGoogleFit}
+                          className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
+                        >
+                          <Activity className="w-4 h-4" />
+                          <span>{isConnectingGoogleFit ? 'Connecting to Google...' : 'Connect with Google Fit'}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {onOpenDocumentation && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDocumentation('google-fit');
+                      }}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition pt-1"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>How Google Fit sync works &amp; tips for watch users &rarr;</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Daily Goals */}
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
               <Target className="w-4 h-4" />
@@ -665,7 +755,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Gemini API Key */}
+          {/* 4. Gemini API Key */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
@@ -692,7 +782,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[11px] text-slate-400">Used by Gemini AI to analyze meal photos and descriptions.</p>
           </div>
 
-          {/* 4. Storage Destination */}
+          {/* 5. Storage Destination */}
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
               <Cloud className="w-4 h-4" />
@@ -741,74 +831,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </button>
             </div>
-          </div>
-
-          {/* 5. Google Fit Integration */}
-          <div className="space-y-3 bg-slate-800/40 border border-slate-700/70 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Activity className="w-4 h-4" />
-                <span>Google Fit Integration</span>
-              </label>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                settings.googleFitConnected 
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40' 
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
-              }`}>
-                {settings.googleFitConnected ? '✓ Connected' : 'Not Connected'}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-300">
-              Automatically sync your total calories burned (Rest + Exercise) throughout the day directly from Google Fit, Wear OS, and fitness trackers.
-            </p>
-
-            {onOpenDocumentation && (
-              <button
-                type="button"
-                onClick={() => onOpenDocumentation('google-fit')}
-                className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>How Google Fit sync works &amp; tips for watch users &rarr;</span>
-              </button>
-            )}
-
-            {settings.googleFitConnected ? (
-              <div className="flex items-center justify-between p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
-                <div>
-                  <span className="text-slate-200 font-semibold block">Live Auto-Sync Active</span>
-                  <span className="text-[11px] text-slate-400">
-                    {settings.googleFitLastSync 
-                      ? `Last synced: ${new Date(settings.googleFitLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                      : 'Syncs automatically on app open'}
-                  </span>
-                </div>
-                {onDisconnectGoogleFit && (
-                  <button
-                    type="button"
-                    onClick={onDisconnectGoogleFit}
-                    className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
-                  >
-                    Disconnect
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div>
-                {onConnectGoogleFit && (
-                  <button
-                    type="button"
-                    onClick={onConnectGoogleFit}
-                    disabled={isConnectingGoogleFit}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
-                  >
-                    <Activity className="w-4 h-4" />
-                    <span>{isConnectingGoogleFit ? 'Connecting to Google...' : 'Connect with Google Fit'}</span>
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           {/* 6. Backup, Restore & Clear Data Management */}
