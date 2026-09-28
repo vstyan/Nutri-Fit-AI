@@ -1,5 +1,5 @@
 {
-  "version": "1.5.2",
+  "version": "1.5.3",
   "releaseDate": "2026-09-28",
-  "notes": "Optimized Gemini meal and workout lookup speed by disabling thinking deliberation and prioritizing low-latency Flash-Lite models."
+  "notes": "Streamlined sync status with last sync timestamp directly beside the Sync button, removing top toast clutter."
 }

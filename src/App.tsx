@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { WifiOff, X, Check } from 'lucide-react';
+import { WifiOff, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { CameraCapture } from './components/CameraCapture';
@@ -60,9 +60,7 @@ export function App() {
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync feedback toast and documentation modal state
-  const [syncToast, setSyncToast] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
-  const syncToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Documentation modal state
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false);
   const [documentationSection, setDocumentationSection] = useState('google-fit');
 
@@ -308,18 +306,6 @@ export function App() {
         };
         await saveAppSettings(updatedSettings);
         setSettings(updatedSettings);
-
-        if (isManual) {
-          if (syncToastTimerRef.current) clearTimeout(syncToastTimerRef.current);
-          const timeStr = new Date(fitResult.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          setSyncToast({
-            message: `Up to date with Google Fit (${fitResult.totalCalories.toLocaleString()} kcal) • ${timeStr}`,
-            type: 'success'
-          });
-          syncToastTimerRef.current = setTimeout(() => {
-            setSyncToast(null);
-          }, 3500);
-        }
       }
     } catch (err: any) {
       console.warn('Google Fit sync notice:', err);
@@ -802,31 +788,6 @@ export function App() {
             onClick={() => setOfflineNotice(null)}
             className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
             aria-label="Dismiss notice"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Sync Success / Info Toast Notification */}
-      {syncToast && (
-        <div 
-          role="status"
-          aria-live="polite"
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-slate-900/95 backdrop-blur-md border border-emerald-500/40 text-slate-100 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-200"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
-              <Check className="w-5 h-5" />
-            </div>
-            <p className="text-xs sm:text-sm font-medium leading-snug text-emerald-200">
-              {syncToast.message}
-            </p>
-          </div>
-          <button
-            onClick={() => setSyncToast(null)}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
-            aria-label="Dismiss notification"
           >
             <X className="w-4 h-4" />
           </button>
