@@ -1,4 +1,11 @@
-import { GeminiAnalysisResult, UserProfile, WorkoutEstimationResult } from '../types';
+import { 
+  GeminiAnalysisResult, 
+  UserProfile, 
+  WorkoutEstimationResult,
+  DailyCoachInsight,
+  WeeklyCoachInsight 
+} from '../types';
+import { DailyCoachPayload, WeeklyCoachPayload } from '../utils/coachAggregator';
 
 const FALLBACK_MODELS = [
   'gemini-2.5-flash-lite',
@@ -412,4 +419,305 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
   }
 
   throw lastError || new Error(`Failed to process request with Gemini models. (${errorSummaries.join('; ')})`);
+}
+
+const DAILY_COACH_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    headline: {
+      type: 'STRING',
+      description: '1-2 sentence sharp behavioral & metabolic diagnosis. Do NOT just repeat numbers visible on a dashboard; diagnose the cause-and-effect relationship between timing, hunger, and targets.'
+    },
+    adherenceScore: {
+      type: 'NUMBER',
+      description: 'Adherence score from 0 to 100 assessing how well nutritional timing and targets matched the user goal.'
+    },
+    chronoNutrition: {
+      type: 'OBJECT',
+      properties: {
+        firstMealTime: { type: 'STRING', description: 'Detected time of first meal or note on fasting start' },
+        lastMealTime: { type: 'STRING', description: 'Detected time of last meal' },
+        eatingWindowHours: { type: 'NUMBER', description: 'Duration of eating window in hours' },
+        timingDiagnosis: {
+          type: 'STRING',
+          description: 'Deep analysis of how when the user ate impacted their hunger, energy, protein synthesis, or evening cravings (e.g., late start leading to rushed evening eating).'
+        },
+        actionableAdjustment: {
+          type: 'STRING',
+          description: 'Specific timing tweak for tomorrow (e.g., start eating within 90 mins of waking or shift 300 kcal earlier).'
+        }
+      },
+      required: ['timingDiagnosis', 'actionableAdjustment']
+    },
+    patternDiscovery: {
+      type: 'OBJECT',
+      properties: {
+        patternTitle: { type: 'STRING', description: 'Concise title of hidden trend detected' },
+        observation: {
+          type: 'STRING',
+          description: 'Non-obvious trend or day-of-week pattern that a human would miss looking at raw numbers.'
+        },
+        underlyingDriver: { type: 'STRING', description: 'Probable behavioral cause' }
+      },
+      required: ['patternTitle', 'observation']
+    },
+    rebalancePlan: {
+      type: 'OBJECT',
+      properties: {
+        status: { type: 'STRING', enum: ['on_track', 'deficit_recovery', 'surplus_moderation'] },
+        headline: { type: 'STRING', description: 'What needs rebalancing over the next 24-48 hours' },
+        dailyMicroAdjustment: {
+          type: 'STRING',
+          description: 'Specific numbers to adjust tomorrow to keep the rolling weekly trajectory on target.'
+        }
+      },
+      required: ['status', 'headline', 'dailyMicroAdjustment']
+    },
+    recommendedFoods: {
+      type: 'ARRAY',
+      description: '2 to 3 specific whole-food recommendations addressing the exact nutritional gaps or biometric context.',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          foodName: { type: 'STRING', description: 'Exact whole food name, e.g. Wild Atlantic Salmon or Steel-Cut Oats with Chia Seeds' },
+          portionSuggestion: { type: 'STRING', description: 'Realistic portion suggestion, e.g. 6 oz fillet with steamed broccoli' },
+          targetBenefit: { type: 'STRING', description: 'Specific metabolic reason why this food fixes today/tomorrow gap' },
+          bestTiming: { type: 'STRING', description: 'Recommended meal or time slot, e.g. Lunch (12:30 PM) or Post-Workout' }
+        },
+        required: ['foodName', 'portionSuggestion', 'targetBenefit', 'bestTiming']
+      }
+    }
+  },
+  required: ['headline', 'adherenceScore', 'chronoNutrition', 'patternDiscovery', 'rebalancePlan', 'recommendedFoods']
+};
+
+const WEEKLY_COACH_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    weeklyScore: { type: 'NUMBER', description: 'Weekly adherence score 0-100' },
+    executiveDiagnosis: {
+      type: 'STRING',
+      description: '2-sentence macro analysis explaining the week’s metabolic trajectory and behavioral rhythm.'
+    },
+    metabolicTrajectory: {
+      type: 'OBJECT',
+      properties: {
+        avgDailyConsumed: { type: 'NUMBER', description: 'Average daily calories consumed' },
+        avgDailyBurned: { type: 'NUMBER', description: 'Average daily calories burned' },
+        weeklyNetCalories: { type: 'NUMBER', description: 'Total weekly net energy balance (negative is deficit)' },
+        projectedWeightShift: { type: 'STRING', description: 'Estimated theoretical fat loss/gain (e.g. -0.7 lbs fat)' },
+        actualWeightShift: { type: 'STRING', description: 'Actual scale weight change over the 7 days if logged' }
+      },
+      required: ['avgDailyConsumed', 'avgDailyBurned', 'weeklyNetCalories', 'projectedWeightShift']
+    },
+    macroAdherenceConsistency: {
+      type: 'STRING',
+      description: 'Analysis of how consistently protein, carbs, fiber, and cholesterol targets were met across days.'
+    },
+    chronoPatternTrends: {
+      type: 'STRING',
+      description: 'Analysis of eating windows across the week (e.g. weekday consistency vs weekend drift, late dinners).'
+    },
+    topPatternsDetected: {
+      type: 'ARRAY',
+      description: '2 key hidden patterns observed across the 7-day period',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          patternTitle: { type: 'STRING', description: 'Title of pattern' },
+          observation: { type: 'STRING', description: 'Detailed trend observation' },
+          underlyingDriver: { type: 'STRING', description: 'Root behavioral driver' }
+        },
+        required: ['patternTitle', 'observation']
+      }
+    },
+    weeklyRebalanceStrategy: {
+      type: 'OBJECT',
+      properties: {
+        focusArea: { type: 'STRING', description: 'Primary focal theme for next week' },
+        actionSteps: {
+          type: 'ARRAY',
+          items: { type: 'STRING' },
+          description: '2 to 3 concrete strategic action steps for the upcoming week'
+        }
+      },
+      required: ['focusArea', 'actionSteps']
+    },
+    recommendedFoods: {
+      type: 'ARRAY',
+      description: '2 to 3 whole food staples to prioritize next week to cure the observed nutritional deficiencies',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          foodName: { type: 'STRING', description: 'Food name' },
+          portionSuggestion: { type: 'STRING', description: 'Portion / meal idea' },
+          targetBenefit: { type: 'STRING', description: 'Why this supports next week strategy' },
+          bestTiming: { type: 'STRING', description: 'Strategic timing' }
+        },
+        required: ['foodName', 'portionSuggestion', 'targetBenefit', 'bestTiming']
+      }
+    }
+  },
+  required: ['weeklyScore', 'executiveDiagnosis', 'metabolicTrajectory', 'macroAdherenceConsistency', 'chronoPatternTrends', 'topPatternsDetected', 'weeklyRebalanceStrategy', 'recommendedFoods']
+};
+
+/**
+ * Generates in-depth Daily AI Coach Insights focusing on chrono-nutrition,
+ * hidden behavioral patterns, compensatory rebalancing, and whole-food recommendations.
+ */
+export async function generateDailyCoachInsight(
+  payload: DailyCoachPayload,
+  apiKey: string
+): Promise<DailyCoachInsight> {
+  const prompt = `You are NutriFit AI Coach, an elite sports dietitian, chrono-nutrition specialist, and behavioral scientist.
+Analyze the user's daily telemetry data provided in JSON format below:
+
+${JSON.stringify(payload, null, 2)}
+
+CRITICAL COACHING INSTRUCTIONS:
+1. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
+2. CHRONO-NUTRITION & MEAL TIMING:
+   - Examine firstMealTime, lastMealTime, eatingWindowHours, and caloriesAfter8PM.
+   - If first meal started late (e.g. after 1:00 PM), assess whether delaying nutrition compressed the eating window, causing mid-day brain fog or late-night binge snacking.
+   - If significant calories were consumed late (>8 PM), analyze how evening backloading impacts sleep, digestion, and next-morning satiety.
+   - Provide a concrete timing tweak for tomorrow.
+3. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
+   - Identify whether today (${payload.dayOfWeek}) or recent days reflect weekend drift, weekday slumps, or meal prep gaps.
+4. COMPENSATORY REBALANCING:
+   - Check rolling multi-day deficit and protein/fiber gaps. If the user was deficient today or over recent days, calculate practical micro-adjustments for tomorrow to keep the weekly target alive without crash dieting.
+5. WHOLE FOOD PRESCRIPTIONS:
+   - Name 2 to 3 specific healthy whole foods (e.g. Wild Salmon, Greek Yogurt, Edamame, Steel-Cut Oats with Chia, Lentil Soup).
+   - If the user has elevated LDL or cholesterol context (isLdlElevated is true), prioritize cardio-protective foods rich in soluble fiber and omega-3s, and avoid high-saturated-fat choices.
+   - Include realistic serving suggestions and the optimal time of day to eat them.
+6. TONE:
+   - Direct, motivating, objective, and coach-like. No generic medical disclaimers.
+
+Respond strictly in valid JSON matching the requested schema.`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+      responseSchema: DAILY_COACH_SCHEMA
+    }
+  };
+
+  const raw = await callGeminiWithFallbacks<any>(requestBody, apiKey);
+
+  return {
+    date: payload.date,
+    generatedAt: new Date().toISOString(),
+    headline: raw.headline || 'Daily Nutritional & Metabolic Diagnosis',
+    adherenceScore: Math.min(100, Math.max(0, Math.round(Number(raw.adherenceScore) || 75))),
+    chronoNutrition: {
+      firstMealTime: raw.chronoNutrition?.firstMealTime || payload.timingMetrics.firstMealTime,
+      lastMealTime: raw.chronoNutrition?.lastMealTime || payload.timingMetrics.lastMealTime,
+      eatingWindowHours: raw.chronoNutrition?.eatingWindowHours ?? payload.timingMetrics.eatingWindowHours,
+      timingDiagnosis: raw.chronoNutrition?.timingDiagnosis || 'Meals were distributed across your eating window.',
+      actionableAdjustment: raw.chronoNutrition?.actionableAdjustment || 'Maintain a regular eating cadence.'
+    },
+    patternDiscovery: {
+      patternTitle: raw.patternDiscovery?.patternTitle || 'Behavioral Trend',
+      observation: raw.patternDiscovery?.observation || 'Consistency is the primary driver of body composition progress.',
+      underlyingDriver: raw.patternDiscovery?.underlyingDriver
+    },
+    rebalancePlan: {
+      status: raw.rebalancePlan?.status || 'on_track',
+      headline: raw.rebalancePlan?.headline || 'Stay the course on current targets',
+      dailyMicroAdjustment: raw.rebalancePlan?.dailyMicroAdjustment || 'Continue with current daily targets tomorrow.'
+    },
+    recommendedFoods: Array.isArray(raw.recommendedFoods)
+      ? raw.recommendedFoods.map((f: any) => ({
+          foodName: f.foodName || 'Whole Food Option',
+          portionSuggestion: f.portionSuggestion || 'Standard serving',
+          targetBenefit: f.targetBenefit || 'Supports nutrient goals',
+          bestTiming: f.bestTiming || 'Lunch or Snack'
+        }))
+      : []
+  };
+}
+
+/**
+ * Generates in-depth Weekly AI Coach Insights focusing on 7-day pattern discovery,
+ * weekday vs weekend trends, trajectory balance, and strategic next-week gameplan.
+ */
+export async function generateWeeklyCoachInsight(
+  payload: WeeklyCoachPayload,
+  apiKey: string
+): Promise<WeeklyCoachInsight> {
+  const prompt = `You are NutriFit AI Coach, an elite sports dietitian and behavioral scientist.
+Analyze the user's 7-day rolling performance data provided in JSON format below:
+
+${JSON.stringify(payload, null, 2)}
+
+CRITICAL COACHING INSTRUCTIONS:
+1. Extract subtle patterns that a human cannot see on static charts:
+   - Weekday vs weekend variances in calories, eating windows, and nutrient density.
+   - Chrono-nutrition shifts (e.g. tight 8h weekday windows vs 13h weekend grazing).
+   - Multi-day consistency of protein and fiber.
+2. Compare the weekly cumulative energy balance (deficit or surplus) to actual scale weight shifts.
+3. Formulate a 2-3 step strategic game plan for the upcoming week.
+4. Recommend 2 to 3 whole food staples to prioritize next week to fix the week's biggest nutritional deficiencies.
+5. TONE:
+   - Analytical, inspiring, objective, and strategic.
+
+Respond strictly in valid JSON matching the requested schema.`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+      responseSchema: WEEKLY_COACH_SCHEMA
+    }
+  };
+
+  const raw = await callGeminiWithFallbacks<any>(requestBody, apiKey);
+
+  return {
+    weekKey: payload.weekKey,
+    dateRange: payload.dateRange,
+    generatedAt: new Date().toISOString(),
+    weeklyScore: Math.min(100, Math.max(0, Math.round(Number(raw.weeklyScore) || 75))),
+    executiveDiagnosis: raw.executiveDiagnosis || 'Weekly metabolic and nutritional trajectory analyzed.',
+    metabolicTrajectory: {
+      avgDailyConsumed: Math.round(Number(raw.metabolicTrajectory?.avgDailyConsumed) || payload.weeklyAverages.avgDailyConsumed),
+      avgDailyBurned: Math.round(Number(raw.metabolicTrajectory?.avgDailyBurned) || payload.weeklyAverages.avgDailyBurned),
+      weeklyNetCalories: Math.round(Number(raw.metabolicTrajectory?.weeklyNetCalories) || payload.weeklyAverages.totalWeeklyDeficitOrSurplus),
+      projectedWeightShift: raw.metabolicTrajectory?.projectedWeightShift || 'On track with maintenance',
+      actualWeightShift: raw.metabolicTrajectory?.actualWeightShift
+    },
+    macroAdherenceConsistency: raw.macroAdherenceConsistency || 'Macro adherence maintained across logged days.',
+    chronoPatternTrends: raw.chronoPatternTrends || 'Meal timing patterns recorded across the week.',
+    topPatternsDetected: Array.isArray(raw.topPatternsDetected)
+      ? raw.topPatternsDetected.map((p: any) => ({
+          patternTitle: p.patternTitle || 'Observed Trend',
+          observation: p.observation || 'Pattern detected across recent days.',
+          underlyingDriver: p.underlyingDriver
+        }))
+      : [],
+    weeklyRebalanceStrategy: {
+      focusArea: raw.weeklyRebalanceStrategy?.focusArea || 'Consistency & Nutrient Density',
+      actionSteps: Array.isArray(raw.weeklyRebalanceStrategy?.actionSteps)
+        ? raw.weeklyRebalanceStrategy.actionSteps
+        : ['Maintain balanced meals throughout the day']
+    },
+    recommendedFoods: Array.isArray(raw.recommendedFoods)
+      ? raw.recommendedFoods.map((f: any) => ({
+          foodName: f.foodName || 'Whole Food Staple',
+          portionSuggestion: f.portionSuggestion || 'Standard serving',
+          targetBenefit: f.targetBenefit || 'Supports weekly goal',
+          bestTiming: f.bestTiming || 'Lunch or Dinner'
+        }))
+      : []
+  };
 }

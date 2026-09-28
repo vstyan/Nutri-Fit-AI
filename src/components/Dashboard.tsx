@@ -34,6 +34,7 @@ import { WeightTrackerCard } from './WeightTrackerCard';
 import { LipidTrackerCard } from './LipidTrackerCard';
 import { LipidTrackerModal } from './LipidTrackerModal';
 import { VoiceWorkoutModal } from './VoiceWorkoutModal';
+import { AICoachCard } from './AICoachCard';
 
 interface DashboardProps {
   summary: DailySummary;
@@ -814,7 +815,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
         })()}
       </div>
 
-      {/* 5. Meals Timeline with Quick Favorites */}
+      {/* 5. AI Nutrition Coach: Deep Behavioral Insights, Chrono-Nutrition & Recommendations */}
+      <AICoachCard
+        selectedDate={summary.date}
+        summary={summary}
+        settings={settings}
+        historyData={historyData}
+        weightHistory={weightHistory}
+        lipidHistory={lipidHistory}
+        onOpenSettings={onOpenSettings}
+      />
+
+      {/* 6. Meals Timeline with Quick Favorites */}
       <MealHistory
         meals={summary.meals}
         favoriteMeals={favoriteMeals}

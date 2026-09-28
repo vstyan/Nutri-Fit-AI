@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "releaseDate": "2026-09-28",
-  "notes": "Added comprehensive cholesterol tracking: dietary cholesterol AI estimation & daily targets, plus fasting blood lipid panel tracking (Total, LDL, HDL, Triglycerides) with cardiovascular risk ratios and historical trend charting."
+  "notes": "Introduced NutriFit AI Coach with deep behavioral insights, chrono-nutrition & meal timing window analysis, hidden day-of-week pattern discovery, multi-day compensatory rebalancing, and prescriptive whole-food recommendations."
 }

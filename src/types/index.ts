@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -194,4 +194,65 @@ export interface WorkoutEstimationResult {
   durationMinutes?: number;
   intensity?: 'low' | 'moderate' | 'high' | 'vigorous';
   explanation?: string;
+}
+
+export interface ChronoNutritionInsight {
+  firstMealTime?: string; // e.g. "14:15"
+  lastMealTime?: string; // e.g. "21:45"
+  eatingWindowHours?: number; // duration in hours
+  timingDiagnosis: string; // deep analysis of when meals were eaten
+  actionableAdjustment: string; // specific timing shift for tomorrow
+}
+
+export interface BehavioralPatternDiscovery {
+  patternTitle: string; // concise title of hidden trend
+  observation: string; // detailed observation
+  underlyingDriver?: string; // probable behavioral cause
+}
+
+export interface CompensatoryRebalancePlan {
+  status: 'on_track' | 'deficit_recovery' | 'surplus_moderation';
+  headline: string; // what needs rebalancing
+  dailyMicroAdjustment: string; // specific numbers/macros to adjust tomorrow
+}
+
+export interface RecommendedFood {
+  foodName: string; // e.g. "Wild Atlantic Salmon"
+  portionSuggestion: string; // e.g. "6 oz fillet with steamed greens"
+  targetBenefit: string; // specific metabolic/biometric reason
+  bestTiming: string; // e.g. "Lunch (12:30 PM)"
+}
+
+export interface DailyCoachInsight {
+  date: string; // YYYY-MM-DD
+  generatedAt: string; // ISO string
+  headline: string; // 1-2 sentence sharp behavioral diagnosis
+  adherenceScore: number; // 0-100
+  chronoNutrition: ChronoNutritionInsight;
+  patternDiscovery: BehavioralPatternDiscovery;
+  rebalancePlan: CompensatoryRebalancePlan;
+  recommendedFoods: RecommendedFood[];
+}
+
+export interface WeeklyCoachInsight {
+  weekKey: string; // e.g. "2026-W39"
+  dateRange: string; // e.g. "Sep 22 – Sep 28, 2026"
+  generatedAt: string; // ISO string
+  weeklyScore: number; // 0-100
+  executiveDiagnosis: string; // 2-sentence macro analysis
+  metabolicTrajectory: {
+    avgDailyConsumed: number;
+    avgDailyBurned: number;
+    weeklyNetCalories: number; // negative = deficit, positive = surplus
+    projectedWeightShift: string; // e.g. "-0.7 lbs fat"
+    actualWeightShift?: string; // e.g. "-0.8 lbs on scale"
+  };
+  macroAdherenceConsistency: string; // analysis of protein, carbs, fiber, cholesterol
+  chronoPatternTrends: string; // analysis of eating windows across week
+  topPatternsDetected: BehavioralPatternDiscovery[];
+  weeklyRebalanceStrategy: {
+    focusArea: string; // primary focus theme
+    actionSteps: string[]; // concrete gameplan steps
+  };
+  recommendedFoods: RecommendedFood[];
 }

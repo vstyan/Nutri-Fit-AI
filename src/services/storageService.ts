@@ -1,5 +1,14 @@
 import { get, set, entries, clear as clearIdb } from 'idb-keyval';
-import { AppSettings, MealRecord, DailyActivity, UserProfile, WeightRecord, BloodLipidRecord } from '../types';
+import { 
+  AppSettings, 
+  MealRecord, 
+  DailyActivity, 
+  UserProfile, 
+  WeightRecord, 
+  BloodLipidRecord,
+  DailyCoachInsight,
+  WeeklyCoachInsight
+} from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { getPastNDaysDateStrings } from '../utils/dateUtils';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
@@ -9,6 +18,8 @@ const MEALS_PREFIX = 'nutrifit_meals_';
 const ACTIVITY_PREFIX = 'nutrifit_activity_';
 const WEIGHT_PREFIX = 'nutrifit_weight_';
 const LIPID_HISTORY_KEY = 'nutrifit_lipid_history';
+const DAILY_INSIGHT_PREFIX = 'nutrifit_daily_insight_';
+const WEEKLY_INSIGHT_PREFIX = 'nutrifit_weekly_insight_';
 
 export const DEFAULT_PROFILE: UserProfile = {
   gender: 'male',
@@ -894,5 +905,76 @@ export async function clearAllAppData(keepSettings = true): Promise<void> {
     }
   } catch (e) {
     console.error('Error clearing IndexedDB:', e);
+  }
+}
+
+/**
+ * AI Coach Insights Cache (IndexedDB & LocalStorage)
+ */
+export async function getCachedDailyInsight(date: string): Promise<DailyCoachInsight | null> {
+  try {
+    const key = `${DAILY_INSIGHT_PREFIX}${date}`;
+    const idbVal = await get<DailyCoachInsight>(key);
+    if (idbVal) return idbVal;
+    const lsVal = localStorage.getItem(key);
+    if (lsVal) return JSON.parse(lsVal);
+    return null;
+  } catch (err) {
+    console.warn('Failed to retrieve cached daily insight:', err);
+    return null;
+  }
+}
+
+export async function saveCachedDailyInsight(date: string, insight: DailyCoachInsight): Promise<void> {
+  try {
+    const key = `${DAILY_INSIGHT_PREFIX}${date}`;
+    localStorage.setItem(key, JSON.stringify(insight));
+    await set(key, insight);
+  } catch (err) {
+    console.warn('Failed to save cached daily insight:', err);
+  }
+}
+
+export async function clearCachedDailyInsight(date: string): Promise<void> {
+  try {
+    const key = `${DAILY_INSIGHT_PREFIX}${date}`;
+    localStorage.removeItem(key);
+    await set(key, undefined);
+  } catch (err) {
+    console.warn('Failed to clear cached daily insight:', err);
+  }
+}
+
+export async function getCachedWeeklyInsight(weekKey: string): Promise<WeeklyCoachInsight | null> {
+  try {
+    const key = `${WEEKLY_INSIGHT_PREFIX}${weekKey}`;
+    const idbVal = await get<WeeklyCoachInsight>(key);
+    if (idbVal) return idbVal;
+    const lsVal = localStorage.getItem(key);
+    if (lsVal) return JSON.parse(lsVal);
+    return null;
+  } catch (err) {
+    console.warn('Failed to retrieve cached weekly insight:', err);
+    return null;
+  }
+}
+
+export async function saveCachedWeeklyInsight(weekKey: string, insight: WeeklyCoachInsight): Promise<void> {
+  try {
+    const key = `${WEEKLY_INSIGHT_PREFIX}${weekKey}`;
+    localStorage.setItem(key, JSON.stringify(insight));
+    await set(key, insight);
+  } catch (err) {
+    console.warn('Failed to save cached weekly insight:', err);
+  }
+}
+
+export async function clearCachedWeeklyInsight(weekKey: string): Promise<void> {
+  try {
+    const key = `${WEEKLY_INSIGHT_PREFIX}${weekKey}`;
+    localStorage.removeItem(key);
+    await set(key, undefined);
+  } catch (err) {
+    console.warn('Failed to clear cached weekly insight:', err);
   }
 }
