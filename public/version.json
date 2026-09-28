@@ -1,5 +1,5 @@
 {
-  "version": "1.5.5",
+  "version": "1.6.0",
   "releaseDate": "2026-09-28",
-  "notes": "Added 7-day average metrics and weekly balance summary to Historical Charts, with centered and balanced navigation buttons."
+  "notes": "Added comprehensive cholesterol tracking: dietary cholesterol AI estimation & daily targets, plus fasting blood lipid panel tracking (Total, LDL, HDL, Triglycerides) with cardiovascular risk ratios and historical trend charting."
 }

@@ -43,6 +43,7 @@ const NUTRITION_RESPONSE_SCHEMA = {
           unsaturatedFat: { type: 'NUMBER', description: 'Estimated healthy unsaturated fats (monounsaturated + polyunsaturated) in grams' },
           saturatedFat: { type: 'NUMBER', description: 'Estimated saturated fats in grams' },
           transFat: { type: 'NUMBER', description: 'Estimated trans fats in grams' },
+          cholesterol: { type: 'NUMBER', description: 'Estimated dietary cholesterol in milligrams (mg). Plant foods are 0mg. Animal products (meat, poultry, seafood, eggs, dairy, butter) contain cholesterol.' },
           calories: { type: 'NUMBER', description: 'Calories in kcal' },
           confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] }
         },
@@ -56,6 +57,7 @@ const NUTRITION_RESPONSE_SCHEMA = {
     totalUnsaturatedFat: { type: 'NUMBER', description: 'Sum of heart-healthy unsaturated fats in grams' },
     totalSaturatedFat: { type: 'NUMBER', description: 'Sum of saturated fats in grams' },
     totalTransFat: { type: 'NUMBER', description: 'Sum of trans fats in grams' },
+    totalCholesterol: { type: 'NUMBER', description: 'Sum of dietary cholesterol in milligrams (mg)' },
     totalCalories: { type: 'NUMBER', description: 'Total calories in kcal' },
     dietaryNotes: { type: 'STRING', description: 'Brief health or nutrition note' }
   },
@@ -72,6 +74,7 @@ function formatNutritionResult(result: any): GeminiAnalysisResult {
         let saturatedFat = item.saturatedFat !== undefined ? Math.round((Number(item.saturatedFat) || 0) * 10) / 10 : undefined;
         let unsaturatedFat = item.unsaturatedFat !== undefined ? Math.round((Number(item.unsaturatedFat) || 0) * 10) / 10 : undefined;
         const transFat = item.transFat !== undefined ? Math.round((Number(item.transFat) || 0) * 10) / 10 : 0;
+        const cholesterol = item.cholesterol !== undefined ? Math.round(Number(item.cholesterol) || 0) : 0;
 
         // Fallback calculation if model returned total fat but omitted sub-classification
         if (fat > 0 && saturatedFat === undefined && unsaturatedFat === undefined) {
@@ -94,6 +97,7 @@ function formatNutritionResult(result: any): GeminiAnalysisResult {
           unsaturatedFat,
           saturatedFat,
           transFat,
+          cholesterol,
           calories: Math.round(Number(item.calories) || 0),
           confidence: item.confidence || 'high'
         };
@@ -114,6 +118,10 @@ function formatNutritionResult(result: any): GeminiAnalysisResult {
     ? Math.round((Number(result.totalTransFat) || 0) * 10) / 10
     : Math.round(items.reduce((s: number, it: any) => s + (it.transFat || 0), 0) * 10) / 10;
 
+  const totalCholesterol = result.totalCholesterol !== undefined
+    ? Math.round(Number(result.totalCholesterol) || 0)
+    : Math.round(items.reduce((s: number, it: any) => s + (it.cholesterol || 0), 0));
+
   return {
     ...result,
     items,
@@ -125,6 +133,7 @@ function formatNutritionResult(result: any): GeminiAnalysisResult {
     totalUnsaturatedFat,
     totalSaturatedFat,
     totalTransFat,
+    totalCholesterol,
     totalCalories: Math.round(Number(result.totalCalories) || 0)
   };
 }
@@ -149,8 +158,8 @@ export async function analyzeFoodImage(
 Analyze the provided food photo with high precision:
 1. Identify all visible dishes and components.
 2. Estimate the realistic portion size and weight in grams for each item.
-3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Calories).
+3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), Dietary Cholesterol (mg - plant foods are 0mg, estimate for meats/eggs/dairy), and Total Calories (kcal).
+4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Cholesterol, Total Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack) based on the food type.
 ${userNotes ? `User context/notes: "${userNotes}"` : ''}
 
@@ -195,8 +204,8 @@ The user describes a meal they ate (or transcribed from voice):
 
 1. Identify all ingredients, dishes, and portion descriptions mentioned.
 2. Estimate the realistic weight in grams and portions for each component.
-3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), and Total Calories (kcal).
-4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Calories).
+3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), Dietary Cholesterol (mg - plant foods are 0mg, estimate for meats/eggs/dairy), and Total Calories (kcal).
+4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Cholesterol, Total Calories).
 5. Suggest the most likely meal type (breakfast, lunch, dinner, snack).
 
 Respond strictly in valid JSON matching the requested schema.`;

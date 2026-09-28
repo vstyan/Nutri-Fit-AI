@@ -95,6 +95,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                 unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
                 saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
                 transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
+                cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
                 calories: Number(item.calories) || 0,
                 confidence: item.confidence || 'high'
               }))
@@ -120,6 +121,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                 unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
                 saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
                 transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
+                cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
                 calories: Number(item.calories) || 0,
                 confidence: item.confidence || 'high'
               }))
@@ -142,6 +144,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const totalUnsaturatedFat = Math.round(items.reduce((sum, item) => sum + (Number(item.unsaturatedFat) || 0), 0) * 10) / 10;
   const totalSaturatedFat = Math.round(items.reduce((sum, item) => sum + (Number(item.saturatedFat) || 0), 0) * 10) / 10;
   const totalTransFat = Math.round(items.reduce((sum, item) => sum + (Number(item.transFat) || 0), 0) * 10) / 10;
+  const totalCholesterol = Math.round(items.reduce((sum, item) => sum + (Number(item.cholesterol) || 0), 0));
   const totalCalories = Math.round(items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0));
 
   const [isReanalyzing, setIsReanalyzing] = useState(false);
@@ -173,6 +176,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
             unsaturatedFat: item.unsaturatedFat,
             saturatedFat: item.saturatedFat,
             transFat: item.transFat,
+            cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
             calories: item.calories,
             confidence: item.confidence
           }))
@@ -229,6 +233,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       fat: 2,
       unsaturatedFat: 1.5,
       saturatedFat: 0.5,
+      cholesterol: 0,
       calories: 78,
       confidence: 'medium'
     };
@@ -245,7 +250,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
     setSaveError(null);
 
     try {
-      const finalItems = items.length > 0 ? items : [{
+      const finalItems: FoodItem[] = items.length > 0 ? items : [{
         id: `item-${Date.now()}-0`,
         name: title.trim() || 'Meal Entry',
         portion: '1 serving',
@@ -254,6 +259,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         fiber: totalFiber || 0,
         protein: totalProtein || 0,
         fat: totalFat || 0,
+        cholesterol: totalCholesterol || 0,
         calories: totalCalories || 0,
         confidence: 'high' as const
       }];
@@ -274,6 +280,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         totalUnsaturatedFat,
         totalSaturatedFat,
         totalTransFat,
+        totalCholesterol,
         totalCalories,
         photoUrl: currentPhoto || undefined,
         isFavorite: !!isFavorite
@@ -459,6 +466,11 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         Fat Quality: <strong className="text-emerald-300">{totalUnsaturatedFat}g Healthy</strong> • <strong className="text-amber-300">{totalSaturatedFat}g Sat</strong>
                       </span>
                     )}
+                    {totalCholesterol > 0 && (
+                      <span>
+                        Dietary Cholesterol: <strong className="text-violet-300">{totalCholesterol}mg</strong>
+                      </span>
+                    )}
                   </div>
                   <span className="text-orange-400 font-mono flex items-center gap-1 font-semibold" title="Thermic Effect of Food: Estimated energy burned digesting this meal">
                     <Sparkles className="w-3 h-3 text-orange-400 shrink-0" />
@@ -556,7 +568,7 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-5 gap-1.5 text-center text-xs">
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-center text-xs">
                       <div>
                         <span className="text-[10px] text-sky-400 font-medium block">Carbs (g)</span>
                         <input
@@ -602,6 +614,17 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                         />
                       </div>
                       <div>
+                        <span className="text-[10px] text-violet-400 font-medium block">Chol (mg)</span>
+                        <input
+                          type="number"
+                          value={item.cholesterol === 0 ? '' : item.cholesterol}
+                          placeholder="0"
+                          onFocus={e => e.target.select()}
+                          onChange={e => handleUpdateItem(item.id, 'cholesterol', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-center text-white text-xs"
+                        />
+                      </div>
+                      <div>
                         <span className="text-[10px] text-emerald-400 font-medium block">Calories</span>
                         <input
                           type="number"
@@ -614,19 +637,26 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                       </div>
                     </div>
 
-                    {item.fat > 0 && (item.unsaturatedFat !== undefined || item.saturatedFat !== undefined) && (
-                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-700/50">
-                        <span className="text-slate-400 text-[10px]">Fat Quality Breakdown:</span>
-                        <div className="flex items-center gap-1.5 font-medium">
-                          <span className="text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[10px]" title="Heart-healthy unsaturated fat">
-                            ✓ {item.unsaturatedFat ?? Math.max(0, item.fat - (item.saturatedFat || 0))}g Good
-                          </span>
-                          <span className="text-amber-300 bg-amber-950/80 border border-amber-500/30 px-1.5 py-0.5 rounded text-[10px]" title="Saturated fat to monitor">
-                            {item.saturatedFat ?? 0}g Sat
-                          </span>
-                        </div>
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-700/50 flex-wrap gap-1.5">
+                      <div className="flex items-center gap-1.5 font-medium flex-wrap">
+                        {item.fat > 0 && (item.unsaturatedFat !== undefined || item.saturatedFat !== undefined) && (
+                          <>
+                            <span className="text-slate-400 text-[10px]">Fat Quality:</span>
+                            <span className="text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[10px]" title="Heart-healthy unsaturated fat">
+                              ✓ {item.unsaturatedFat ?? Math.max(0, item.fat - (item.saturatedFat || 0))}g Good
+                            </span>
+                            <span className="text-amber-300 bg-amber-950/80 border border-amber-500/30 px-1.5 py-0.5 rounded text-[10px]" title="Saturated fat to monitor">
+                              {item.saturatedFat ?? 0}g Sat
+                            </span>
+                          </>
+                        )}
                       </div>
-                    )}
+                      {item.cholesterol !== undefined && item.cholesterol > 0 && (
+                        <span className="text-violet-300 bg-violet-950/80 border border-violet-500/30 px-1.5 py-0.5 rounded text-[10px]" title="Dietary cholesterol">
+                          {item.cholesterol}mg Chol
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
 

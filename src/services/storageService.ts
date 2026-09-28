@@ -1,5 +1,5 @@
 import { get, set, entries, clear as clearIdb } from 'idb-keyval';
-import { AppSettings, MealRecord, DailyActivity, UserProfile, WeightRecord } from '../types';
+import { AppSettings, MealRecord, DailyActivity, UserProfile, WeightRecord, BloodLipidRecord } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { getPastNDaysDateStrings } from '../utils/dateUtils';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
@@ -8,6 +8,7 @@ const SETTINGS_KEY = 'nutrifit_settings_v4';
 const MEALS_PREFIX = 'nutrifit_meals_';
 const ACTIVITY_PREFIX = 'nutrifit_activity_';
 const WEIGHT_PREFIX = 'nutrifit_weight_';
+const LIPID_HISTORY_KEY = 'nutrifit_lipid_history';
 
 export const DEFAULT_PROFILE: UserProfile = {
   gender: 'male',
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dailyFiberTarget: 30,
     dailyProteinTarget: 140,
     dailyFatTarget: 65,
+    dailyCholesterolTarget: 300,
   }
 };
 
@@ -40,6 +42,7 @@ export interface FullBackupData {
   mealsByDate: Record<string, MealRecord[]>;
   activityByDate: Record<string, DailyActivity>;
   weightByDate?: Record<string, WeightRecord>;
+  lipidHistory?: BloodLipidRecord[];
 }
 
 export interface ImportResult {
@@ -651,11 +654,86 @@ export async function getWeightHistory(days = 14): Promise<WeightRecord[]> {
   return list;
 }
 
+export async function getLipidHistory(): Promise<BloodLipidRecord[]> {
+  try {
+    const localStr = localStorage.getItem(LIPID_HISTORY_KEY);
+    if (localStr) {
+      const parsed = JSON.parse(localStr);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => b.date.localeCompare(a.date));
+      }
+    }
+    const saved = await withIdbTimeout(get<BloodLipidRecord[]>(LIPID_HISTORY_KEY), undefined);
+    if (saved && Array.isArray(saved)) {
+      try {
+        localStorage.setItem(LIPID_HISTORY_KEY, JSON.stringify(saved));
+      } catch {}
+      return saved.sort((a, b) => b.date.localeCompare(a.date));
+    }
+  } catch (e) {
+    console.error('Error fetching lipid history:', e);
+  }
+  return [];
+}
+
+export async function saveLipidRecord(record: BloodLipidRecord, settings: AppSettings): Promise<void> {
+  const history = await getLipidHistory();
+  const filtered = history.filter(r => r.id !== record.id && r.date !== record.date);
+  const updated = [record, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
+
+  try {
+    localStorage.setItem(LIPID_HISTORY_KEY, JSON.stringify(updated));
+  } catch (e) {
+    cleanOldPhotosFromLocalStorage();
+    try {
+      localStorage.setItem(LIPID_HISTORY_KEY, JSON.stringify(updated));
+    } catch {}
+  }
+
+  try {
+    await withIdbTimeout(set(LIPID_HISTORY_KEY, updated), undefined);
+  } catch (idbErr) {
+    console.error('IndexedDB save failed for lipid record:', idbErr);
+  }
+
+  if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
+    try {
+      await saveJsonToDrive('lipid-history.json', updated, settings.googleAccessToken);
+    } catch (e) {
+      console.warn('Could not sync lipid history to Google Drive:', e);
+    }
+  }
+}
+
+export async function deleteLipidRecord(id: string, settings: AppSettings): Promise<void> {
+  const history = await getLipidHistory();
+  const updated = history.filter(r => r.id !== id);
+
+  try {
+    localStorage.setItem(LIPID_HISTORY_KEY, JSON.stringify(updated));
+  } catch {}
+
+  try {
+    await withIdbTimeout(set(LIPID_HISTORY_KEY, updated), undefined);
+  } catch (idbErr) {
+    console.error('IndexedDB delete failed for lipid record:', idbErr);
+  }
+
+  if (settings.storageLocation === 'google_drive' && settings.googleAccessToken) {
+    try {
+      await saveJsonToDrive('lipid-history.json', updated, settings.googleAccessToken);
+    } catch (e) {
+      console.warn('Could not sync deleted lipid history to Google Drive:', e);
+    }
+  }
+}
+
 export async function exportAllDataAsJson(): Promise<string> {
   const settings = await getAppSettings();
   const mealsByDate: Record<string, MealRecord[]> = {};
   const activityByDate: Record<string, DailyActivity> = {};
   const weightByDate: Record<string, WeightRecord> = {};
+  const lipidHistory = await getLipidHistory();
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -709,7 +787,8 @@ export async function exportAllDataAsJson(): Promise<string> {
     settings,
     mealsByDate,
     activityByDate,
-    weightByDate
+    weightByDate,
+    lipidHistory
   };
 
   return JSON.stringify(exportData, null, 2);
@@ -768,6 +847,11 @@ export async function importBackupJson(jsonString: string): Promise<ImportResult
           restoredDates.add(date);
         }
       }
+    }
+
+    if (Array.isArray(data.lipidHistory) && data.lipidHistory.length > 0) {
+      localStorage.setItem(LIPID_HISTORY_KEY, JSON.stringify(data.lipidHistory));
+      await set(LIPID_HISTORY_KEY, data.lipidHistory);
     }
 
     return {

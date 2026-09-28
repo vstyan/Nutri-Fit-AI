@@ -16,19 +16,23 @@ import {
   Trash2,
   Sparkles,
   Clock,
-  HelpCircle
+  HelpCircle,
+  Heart
 } from 'lucide-react';
 import { 
   DailySummary, 
   AppSettings, 
   MealRecord, 
   WeightRecord,
-  WorkoutEntry
+  WorkoutEntry,
+  BloodLipidRecord
 } from '../types';
 import { calculateBMR, calculateTDEE, calculateTEFBreakdown } from '../utils/calorieEngine';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
 import { WeightTrackerCard } from './WeightTrackerCard';
+import { LipidTrackerCard } from './LipidTrackerCard';
+import { LipidTrackerModal } from './LipidTrackerModal';
 import { VoiceWorkoutModal } from './VoiceWorkoutModal';
 
 interface DashboardProps {
@@ -44,6 +48,7 @@ interface DashboardProps {
     caloriesBurned: number;
   }>;
   weightHistory: WeightRecord[];
+  lipidHistory?: BloodLipidRecord[];
   favoriteMeals: MealRecord[];
   yesterdayMeals: MealRecord[];
   isSyncingGoogleFit?: boolean;
@@ -56,6 +61,8 @@ interface DashboardProps {
   onAddWorkout?: (workout: WorkoutEntry) => void;
   onDeleteWorkout?: (workoutId: string) => void;
   onSaveWeight: (weight: WeightRecord) => void;
+  onSaveLipidRecord?: (record: BloodLipidRecord) => void;
+  onDeleteLipidRecord?: (id: string) => void;
   onOpenSettings: () => void;
   onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
@@ -67,6 +74,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   settings,
   historyData,
   weightHistory,
+  lipidHistory = [],
   favoriteMeals,
   yesterdayMeals,
   isSyncingGoogleFit = false,
@@ -79,11 +87,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddWorkout,
   onDeleteWorkout,
   onSaveWeight,
+  onSaveLipidRecord,
+  onDeleteLipidRecord,
   onOpenSettings,
   onOpenDocumentation,
   onConnectGoogleFit,
   onSyncGoogleFit
 }) => {
+  const [isLipidModalOpen, setIsLipidModalOpen] = useState(false);
+  const [lipidModalTab, setLipidModalTab] = useState<'log' | 'history'>('log');
+
+  const handleOpenLipidModal = (tab: 'log' | 'history' = 'log') => {
+    setLipidModalTab(tab);
+    setIsLipidModalOpen(true);
+  };
   const { totals, activity } = summary;
   const { goals } = settings;
 
@@ -241,14 +258,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. Weight Scale & Rolling Trend Tracker Card */}
-      <WeightTrackerCard
-        currentDate={summary.date}
-        weightRecord={summary.weightRecord}
-        settings={settings}
-        weightHistory={weightHistory}
-        onSaveWeight={onSaveWeight}
-      />
+      {/* 2. Weight Scale & Lipid Panel Biometrics Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <WeightTrackerCard
+          currentDate={summary.date}
+          weightRecord={summary.weightRecord}
+          settings={settings}
+          weightHistory={weightHistory}
+          onSaveWeight={onSaveWeight}
+        />
+        <LipidTrackerCard
+          lipidHistory={lipidHistory || []}
+          onOpenModal={handleOpenLipidModal}
+          userGender={settings.profile?.gender || 'male'}
+        />
+      </div>
 
       {/* 3. Daily Exercise & Energy Burn Breakdown Card */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
@@ -734,6 +758,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span>P: {tefBreakdown.proteinTef} kcal • C: {tefBreakdown.carbsTef} kcal • F: {tefBreakdown.fatTef} kcal</span>
           </div>
         </div>
+
+        {/* Heart Health & Dietary Cholesterol Intake */}
+        {(() => {
+          const cholMg = totals.cholesterol || 0;
+          const cholTarget = goals.dailyCholesterolTarget || 300;
+          const cholPct = Math.round((cholMg / cholTarget) * 100);
+          return (
+            <div className="bg-slate-950/60 border border-violet-500/20 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1.5 bg-violet-500/10 border border-violet-500/20 rounded-lg text-violet-400 shrink-0">
+                  <Heart className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                    <span>Dietary Cholesterol Intake</span>
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                      cholPct > 100 
+                        ? 'bg-rose-950/60 text-rose-300 border-rose-500/30' 
+                        : 'bg-violet-950/60 text-violet-300 border-violet-500/30'
+                    }`}>
+                      {cholMg} mg / {cholTarget} mg guideline
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    {cholPct > 100 
+                      ? 'Exceeded standard daily dietary cholesterol ceiling (300 mg)' 
+                      : `${cholPct}% of daily limit (${Math.max(0, cholTarget - cholMg)} mg remaining today)`}
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full sm:w-48 shrink-0 space-y-1">
+                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-500 rounded-full ${
+                      cholPct > 100 
+                        ? 'bg-rose-400' 
+                        : cholPct > 80 
+                        ? 'bg-amber-400' 
+                        : 'bg-gradient-to-r from-violet-500 to-fuchsia-400'
+                    }`} 
+                    style={{ width: `${Math.min(100, cholPct)}%` }} 
+                  />
+                </div>
+                <div className="text-[10px] text-slate-400 flex justify-between">
+                  <span>{cholPct}% consumed</span>
+                  <span className={cholPct > 100 ? 'text-rose-400 font-semibold' : 'text-slate-400'}>
+                    {cholPct > 100 ? 'Ceiling exceeded' : 'Within limit'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 5. Meals Timeline with Quick Favorites */}
@@ -748,10 +826,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         onOpenCapture={onOpenCapture}
       />
 
-      {/* 6. Historical Comparison Charts (Calories, Net Carbs, Weight) */}
+      {/* 6. Historical Comparison Charts (Calories, Net Carbs, Weight, Lipids) */}
       <HistoryCharts
         historyData={historyData}
         weightHistory={weightHistory}
+        lipidHistory={lipidHistory}
         isImperial={settings.profile.unitSystem === 'imperial'}
         includeResting={includeResting}
       />
@@ -793,6 +872,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             }
           }}
           onClose={() => setIsVoiceWorkoutOpen(false)}
+        />
+      )}
+
+      {/* Lipid Tracker Modal */}
+      {isLipidModalOpen && (
+        <LipidTrackerModal
+          isOpen={isLipidModalOpen}
+          onClose={() => setIsLipidModalOpen(false)}
+          lipidHistory={lipidHistory || []}
+          onSaveRecord={onSaveLipidRecord || (() => {})}
+          onDeleteRecord={onDeleteLipidRecord || (() => {})}
+          userGender={settings.profile?.gender || 'male'}
+          initialTab={lipidModalTab}
         />
       )}
     </div>

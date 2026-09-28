@@ -595,7 +595,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Target className="w-4 h-4" />
               <span>Daily Target Goals</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
               <div>
                 <span className="text-[10px] text-emerald-400 font-semibold block mb-1">Calories (kcal)</span>
                 <input
@@ -648,6 +648,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   placeholder="65"
                   onFocus={e => e.target.select()}
                   onChange={e => handleGoalChange('dailyFatTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-violet-400 font-semibold block mb-1">Chol (mg)</span>
+                <input
+                  type="number"
+                  value={formData.goals.dailyCholesterolTarget === 0 ? '' : (formData.goals.dailyCholesterolTarget || 300)}
+                  placeholder="300"
+                  onFocus={e => e.target.select()}
+                  onChange={e => handleGoalChange('dailyCholesterolTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
               </div>

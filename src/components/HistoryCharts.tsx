@@ -12,8 +12,8 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
-import { TrendingUp, TrendingDown, Scale, Zap, Wheat, Flame } from 'lucide-react';
-import { WeightRecord } from '../types';
+import { TrendingUp, TrendingDown, Scale, Zap, Wheat, Flame, Heart } from 'lucide-react';
+import { WeightRecord, BloodLipidRecord } from '../types';
 
 ChartJS.register(
   CategoryScale,
@@ -38,6 +38,7 @@ interface HistoryChartsProps {
     caloriesBurned: number;
   }>;
   weightHistory?: WeightRecord[];
+  lipidHistory?: BloodLipidRecord[];
   isImperial?: boolean;
   includeResting?: boolean;
 }
@@ -45,10 +46,11 @@ interface HistoryChartsProps {
 export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   historyData,
   weightHistory = [],
+  lipidHistory = [],
   isImperial = true,
   includeResting = true
 }) => {
-  const [metric, setMetric] = useState<'calories' | 'carbs' | 'weight'>('calories');
+  const [metric, setMetric] = useState<'calories' | 'carbs' | 'weight' | 'lipids'>('calories');
 
   const labels = historyData.map(d => {
     const dt = new Date(d.date + 'T00:00:00');
@@ -171,6 +173,60 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
     ]
   };
 
+  // Blood Lipid Lab Trend Dataset & Statistics
+  const sortedLipids = [...(lipidHistory || [])].sort((a, b) => a.date.localeCompare(b.date));
+  const latestLipid = sortedLipids.length > 0 ? sortedLipids[sortedLipids.length - 1] : null;
+  const lipidLabels = sortedLipids.map(l => {
+    const dt = new Date(l.date + 'T00:00:00');
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
+  });
+
+  const lipidLineData = {
+    labels: lipidLabels,
+    datasets: [
+      {
+        label: 'Total (mg/dL)',
+        data: sortedLipids.map(l => l.totalCholesterol),
+        borderColor: '#f59e0b',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointBackgroundColor: '#f59e0b',
+        pointRadius: 4,
+        tension: 0.2,
+      },
+      {
+        label: 'LDL "Bad" (mg/dL)',
+        data: sortedLipids.map(l => l.ldl),
+        borderColor: '#f43f5e',
+        backgroundColor: 'rgba(244, 63, 94, 0.1)',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#f43f5e',
+        pointRadius: 5,
+        tension: 0.2,
+      },
+      {
+        label: 'HDL "Good" (mg/dL)',
+        data: sortedLipids.map(l => l.hdl),
+        borderColor: '#10b981',
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#10b981',
+        pointRadius: 5,
+        tension: 0.2,
+      },
+      {
+        label: 'Triglycerides (mg/dL)',
+        data: sortedLipids.map(l => l.triglycerides),
+        borderColor: '#0284c7',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointBackgroundColor: '#0284c7',
+        pointRadius: 4,
+        tension: 0.2,
+      }
+    ]
+  };
+
   const isMidnight = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-midnight');
 
   // Custom Chart.js plugin to add breathing room between top legend and the chart plot area
@@ -230,7 +286,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
       y: {
         grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
         ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } },
-        beginAtZero: metric !== 'weight',
+        beginAtZero: metric !== 'weight' && metric !== 'lipids',
         grace: '6%'
       }
     }
@@ -245,7 +301,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-bold text-white truncate">Historical Trends & Charts</h2>
-            <p className="text-xs text-slate-400 truncate">Calories, net carbs, and body weight progression</p>
+            <p className="text-xs text-slate-400 truncate">Calories, net carbs, weight, and blood lipids progression</p>
           </div>
         </div>
 
@@ -254,7 +310,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           <button
             type="button"
             onClick={() => setMetric('calories')}
-            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
               metric === 'calories'
                 ? 'bg-cyan-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -265,7 +321,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           <button
             type="button"
             onClick={() => setMetric('carbs')}
-            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
               metric === 'carbs'
                 ? 'bg-cyan-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -276,13 +332,24 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           <button
             type="button"
             onClick={() => setMetric('weight')}
-            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
               metric === 'weight'
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
             Weight
+          </button>
+          <button
+            type="button"
+            onClick={() => setMetric('lipids')}
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
+              metric === 'lipids'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+            }`}
+          >
+            Lipids
           </button>
         </div>
       </div>
@@ -484,8 +551,76 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         </div>
       )}
 
+      {metric === 'lipids' && sortedLipids.length > 0 && latestLipid && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* Latest LDL */}
+          <div className="bg-slate-950/70 border border-rose-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                <span className="sm:hidden">LDL</span>
+                <span className="hidden sm:inline">Latest LDL ("Bad")</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">&lt;100 target</span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-rose-300">
+                {latestLipid.ldl}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">mg/dL</span>
+            </div>
+          </div>
+
+          {/* Latest HDL */}
+          <div className="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="sm:hidden">HDL</span>
+                <span className="hidden sm:inline">Latest HDL ("Good")</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">&gt;50 target</span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-emerald-300">
+                {latestLipid.hdl}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">mg/dL</span>
+            </div>
+          </div>
+
+          {/* Latest Triglycerides */}
+          <div className="bg-slate-950/70 border border-sky-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                <span className="sm:hidden">Trigs</span>
+                <span className="hidden sm:inline">Triglycerides</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">&lt;150 target</span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-sky-300">
+                {latestLipid.triglycerides}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">mg/dL</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="h-72 sm:h-80 w-full pt-2">
-        {metric === 'weight' ? (
+        {metric === 'lipids' ? (
+          sortedLipids.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs space-y-1">
+              <Heart className="w-8 h-8 text-rose-500/50 mb-1" />
+              <span>No lipid panel tests logged yet</span>
+              <span className="text-[11px] text-slate-600">Log your blood test results above to track cholesterol trends!</span>
+            </div>
+          ) : (
+            <Line data={lipidLineData} options={chartOptions} plugins={[legendMarginPlugin]} />
+          )
+        ) : metric === 'weight' ? (
           sortedWeight.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs space-y-1">
               <Scale className="w-8 h-8 text-slate-600 mb-1" />

@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.5.5';
+export const APP_VERSION = '1.6.0';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -20,6 +20,20 @@ export interface WeightRecord {
   notes?: string;
 }
 
+export type LipidUnit = 'mg_dl' | 'mmol_l';
+
+export interface BloodLipidRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  timestamp: string; // ISO string
+  unit: LipidUnit;
+  totalCholesterol: number; // in mg/dL (canonical storage)
+  ldl: number; // in mg/dL (canonical storage)
+  hdl: number; // in mg/dL (canonical storage)
+  triglycerides: number; // in mg/dL (canonical storage)
+  notes?: string;
+}
+
 export interface FoodItem {
   id: string;
   name: string;
@@ -32,6 +46,7 @@ export interface FoodItem {
   unsaturatedFat?: number; // healthy unsaturated fat (mono + poly) in grams
   saturatedFat?: number;   // saturated fat in grams
   transFat?: number;       // trans fat in grams
+  cholesterol?: number;    // dietary cholesterol in milligrams (mg)
   calories: number;
   confidence?: 'high' | 'medium' | 'low';
 }
@@ -52,6 +67,7 @@ export interface MealRecord {
   totalUnsaturatedFat?: number; // sum of healthy unsaturated fats in grams
   totalSaturatedFat?: number;   // sum of saturated fats in grams
   totalTransFat?: number;       // sum of trans fats in grams
+  totalCholesterol?: number;    // sum of dietary cholesterol in milligrams (mg)
   totalCalories: number;
   photoUrl?: string; // base64
   isFavorite?: boolean;
@@ -96,6 +112,7 @@ export interface UserGoals {
   dailyFiberTarget: number; // g
   dailyProteinTarget: number; // g
   dailyFatTarget: number; // g
+  dailyCholesterolTarget?: number; // mg (e.g. 300)
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
@@ -133,6 +150,7 @@ export interface DailySummary {
     unsaturatedFat?: number;
     saturatedFat?: number;
     transFat?: number;
+    cholesterol?: number; // dietary cholesterol in mg
     tef?: number; // Thermic Effect of Food (TEF) dynamically calculated
   };
   burnBreakdown?: BurnBreakdown;
@@ -153,6 +171,7 @@ export interface GeminiAnalysisResult {
     unsaturatedFat?: number;
     saturatedFat?: number;
     transFat?: number;
+    cholesterol?: number; // dietary cholesterol in mg
     calories: number;
     confidence: 'high' | 'medium' | 'low';
   }>;
@@ -164,6 +183,7 @@ export interface GeminiAnalysisResult {
   totalUnsaturatedFat?: number;
   totalSaturatedFat?: number;
   totalTransFat?: number;
+  totalCholesterol?: number; // total dietary cholesterol in mg
   totalCalories: number;
   dietaryNotes?: string;
 }

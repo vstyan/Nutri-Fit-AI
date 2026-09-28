@@ -16,7 +16,8 @@ import {
   GeminiAnalysisResult,
   StorageLocation,
   WeightRecord,
-  WorkoutEntry
+  WorkoutEntry,
+  BloodLipidRecord
 } from './types';
 import { 
   getAppSettings, 
@@ -29,6 +30,9 @@ import {
   getWeightForDate,
   saveWeightForDate,
   getWeightHistory,
+  getLipidHistory,
+  saveLipidRecord,
+  deleteLipidRecord,
   getAllFavoriteMeals,
   toggleFavoriteMeal,
   DEFAULT_SETTINGS,
@@ -51,6 +55,7 @@ export function App() {
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [currentWeight, setCurrentWeight] = useState<WeightRecord | null>(null);
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
+  const [lipidHistory, setLipidHistory] = useState<BloodLipidRecord[]>([]);
   const [favoriteMeals, setFavoriteMeals] = useState<MealRecord[]>([]);
   const [yesterdayMeals, setYesterdayMeals] = useState<MealRecord[]>([]);
 
@@ -398,6 +403,7 @@ export function App() {
     const dayActivity = await getActivityForDate(date, currentSettings);
     const dayWeight = await getWeightForDate(date);
     const wHistory = await getWeightHistory(14);
+    const lHistory = await getLipidHistory();
     const allFavs = await getAllFavoriteMeals();
 
     // Load yesterday's meals for 1-tap quick copying
@@ -438,6 +444,7 @@ export function App() {
     setActivity(synchedActivity);
     setCurrentWeight(dayWeight);
     setWeightHistory(wHistory);
+    setLipidHistory(lHistory);
     setFavoriteMeals(allFavs);
     setYesterdayMeals(yMeals);
 
@@ -566,6 +573,20 @@ export function App() {
       await saveAppSettings(updatedSettings);
     }
     loadDayData(selectedDate, settings);
+  };
+
+  // Save blood lipid lab test record
+  const handleSaveLipidRecord = async (record: BloodLipidRecord) => {
+    await saveLipidRecord(record, settings);
+    const updated = await getLipidHistory();
+    setLipidHistory(updated);
+  };
+
+  // Delete blood lipid lab test record
+  const handleDeleteLipidRecord = async (id: string) => {
+    await deleteLipidRecord(id, settings);
+    const updated = await getLipidHistory();
+    setLipidHistory(updated);
   };
 
   // Update active exercise calories
@@ -716,6 +737,7 @@ export function App() {
   const totalUnsaturatedFat = Math.round(meals.reduce((sum, m) => sum + (m.totalUnsaturatedFat ?? 0), 0) * 10) / 10;
   const totalSaturatedFat = Math.round(meals.reduce((sum, m) => sum + (m.totalSaturatedFat ?? 0), 0) * 10) / 10;
   const totalTransFat = Math.round(meals.reduce((sum, m) => sum + (m.totalTransFat ?? 0), 0) * 10) / 10;
+  const totalCholesterol = Math.round(meals.reduce((sum, m) => sum + (m.totalCholesterol ?? 0), 0));
   const totalCalories = Math.round(meals.reduce((sum, m) => sum + (m.totalCalories || 0), 0));
   const tef = calculateDailyTEF(meals);
 
@@ -729,6 +751,7 @@ export function App() {
     unsaturatedFat: totalUnsaturatedFat,
     saturatedFat: totalSaturatedFat,
     transFat: totalTransFat,
+    cholesterol: totalCholesterol,
     tef
   };
 
@@ -811,6 +834,7 @@ export function App() {
           settings={settings}
           historyData={historyData}
           weightHistory={weightHistory}
+          lipidHistory={lipidHistory}
           favoriteMeals={favoriteMeals}
           yesterdayMeals={yesterdayMeals}
           isSyncingGoogleFit={isSyncingGoogleFit}
@@ -823,6 +847,8 @@ export function App() {
           onAddWorkout={handleAddWorkout}
           onDeleteWorkout={handleDeleteWorkout}
           onSaveWeight={handleSaveWeight}
+          onSaveLipidRecord={handleSaveLipidRecord}
+          onDeleteLipidRecord={handleDeleteLipidRecord}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenDocumentation={handleOpenDocumentation}
           onConnectGoogleFit={handleConnectGoogleFit}
