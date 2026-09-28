@@ -1,10 +1,10 @@
 import { GeminiAnalysisResult, UserProfile, WorkoutEstimationResult } from '../types';
 
 const FALLBACK_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-2.5-flash',
-  'gemini-3.5-flash-lite',
   'gemini-2.5-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-3.5-flash',
   'gemini-flash-lite-latest',
 ];
 
@@ -276,13 +276,16 @@ Respond strictly in valid JSON matching the requested schema.`;
 }
 
 function getThinkingConfig(model: string) {
-  // Gemini 2.5 series uses thinkingBudget (token count limit).
-  // 1024 tokens allows quick portion & macro sanity check without long deliberation.
+  // Gemini 2.5 series: setting thinkingBudget to 0 explicitly disables thinking for lowest latency
   if (model.includes('2.5')) {
-    return { thinkingBudget: 1024 };
+    return { thinkingBudget: 0 };
   }
-  // Gemini 3.x models use thinkingLevel ('low' provides fast reasoning with sanity checks).
-  return { thinkingLevel: 'low' };
+  // Gemini 3.x series: 'minimal' is the lowest latency setting (near zero thinking tokens)
+  if (model.includes('3.') || model.includes('3-')) {
+    return { thinkingLevel: 'minimal' };
+  }
+  // Older models (e.g. Gemini 2.0 / legacy): do not support thinkingConfig
+  return undefined;
 }
 
 async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string): Promise<T> {
@@ -293,6 +296,7 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
     for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 14000);
+      const startTime = performance.now();
 
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -301,7 +305,7 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
           ...requestBody,
           generationConfig: {
             ...requestBody.generationConfig,
-            thinkingConfig
+            ...(thinkingConfig ? { thinkingConfig } : {})
           }
         };
 
@@ -322,6 +326,8 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
               cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
             }
             const parsed: T = JSON.parse(cleanText);
+            const durationMs = Math.round(performance.now() - startTime);
+            console.log(`[Gemini] Model ${model} responded successfully in ${durationMs}ms`);
             return parsed;
           }
         } else {
@@ -372,6 +378,8 @@ async function callGeminiWithFallbacks<T = any>(requestBody: any, apiKey: string
                     cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
                   }
                   const parsed: T = JSON.parse(cleanText);
+                  const durationMs = Math.round(performance.now() - startTime);
+                  console.log(`[Gemini] Model ${model} (fallback retry) responded successfully in ${durationMs}ms`);
                   return parsed;
                 }
               }
