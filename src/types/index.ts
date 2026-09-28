@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.7.1';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -116,7 +116,7 @@ export interface UserGoals {
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
-export type ThemeMode = 'pure_black' | 'midnight_slate' | 'apple_dark';
+export type ThemeMode = 'pure_black' | 'midnight_slate' | 'teal_breeze' | 'nordic_teal' | 'apple_dark';
 
 export interface AppSettings {
   geminiApiKey: string;

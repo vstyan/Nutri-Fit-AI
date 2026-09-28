@@ -126,17 +126,23 @@ export function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoragePromptOpen, setIsStoragePromptOpen] = useState(false);
 
-  // Theme mode sync (Pure Black OLED vs Midnight Slate)
+  // Theme mode sync (Pure Black OLED vs Teal Breeze vs Nordic Frost vs Midnight Slate)
   useEffect(() => {
     const theme = settings.themeMode || 'pure_black';
     const root = document.documentElement;
     const metaThemeColor = document.getElementById('app-theme-color');
-    if (theme === 'midnight_slate') {
-      root.classList.remove('theme-pure-black', 'theme-apple');
+    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
+    
+    if (theme === 'teal_breeze') {
+      root.classList.add('theme-teal-breeze');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
+    } else if (theme === 'nordic_teal') {
+      root.classList.add('theme-nordic-teal');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F8FAFC');
+    } else if (theme === 'midnight_slate') {
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
     } else {
-      root.classList.remove('theme-midnight');
       root.classList.add('theme-pure-black');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
     }

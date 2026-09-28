@@ -1,5 +1,5 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "releaseDate": "2026-09-28",
-  "notes": "Introduced NutriFit AI Coach with deep behavioral insights, chrono-nutrition & meal timing window analysis, hidden day-of-week pattern discovery, multi-day compensatory rebalancing, and prescriptive whole-food recommendations."
+  "notes": "Streamlined Settings into intuitive Configuration 1 (No Tracker) and Configuration 2 (Google Fit Tracker). Added crisp light mode theme options: 'Teal Breeze' and 'Nordic Frost' alongside Pure Black OLED."
 }

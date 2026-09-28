@@ -21,7 +21,7 @@ import {
   Palette,
   BookOpen
 } from 'lucide-react';
-import { AppSettings, Gender, UnitSystem, APP_VERSION } from '../types';
+import { AppSettings, Gender, UnitSystem, ThemeMode, APP_VERSION } from '../types';
 import { 
   calculateBMR, 
   kgToLbs, 
@@ -261,16 +261,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }, 1000);
   };
 
-  const handleThemeChange = (mode: 'pure_black' | 'midnight_slate') => {
+  const handleThemeChange = (mode: ThemeMode) => {
     setFormData(prev => ({ ...prev, themeMode: mode }));
     const root = document.documentElement;
     const metaThemeColor = document.getElementById('app-theme-color');
-    if (mode === 'midnight_slate') {
-      root.classList.remove('theme-pure-black', 'theme-apple');
+    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
+    
+    if (mode === 'teal_breeze') {
+      root.classList.add('theme-teal-breeze');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
+    } else if (mode === 'nordic_teal') {
+      root.classList.add('theme-nordic-teal');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F8FAFC');
+    } else if (mode === 'midnight_slate') {
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
     } else {
-      root.classList.remove('theme-midnight');
       root.classList.add('theme-pure-black');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
     }
@@ -281,12 +287,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const activeTheme = settings.themeMode || 'pure_black';
     const root = document.documentElement;
     const metaThemeColor = document.getElementById('app-theme-color');
-    if (activeTheme === 'midnight_slate') {
-      root.classList.remove('theme-pure-black', 'theme-apple');
+    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
+    
+    if (activeTheme === 'teal_breeze') {
+      root.classList.add('theme-teal-breeze');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
+    } else if (activeTheme === 'nordic_teal') {
+      root.classList.add('theme-nordic-teal');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F8FAFC');
+    } else if (activeTheme === 'midnight_slate') {
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
     } else {
-      root.classList.remove('theme-midnight');
       root.classList.add('theme-pure-black');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
     }
@@ -894,75 +906,112 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* Appearance & Theme (Pure Black OLED vs Midnight Slate) */}
+            {/* 7. Appearance & Theme (Pure Black OLED vs Teal Breeze vs Nordic Frost) */}
             <div className="space-y-3 pt-3 border-t border-slate-800">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Palette className="w-4 h-4 text-cyan-400" />
                   Appearance & Theme
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">OLED vs Slate</span>
+                <span className="text-[10px] text-slate-400 font-medium">Dark & Light Modes</span>
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* Pure Black option */}
                 <button
                   type="button"
                   onClick={() => handleThemeChange('pure_black')}
-                  className={`p-3 rounded-2xl border text-left transition flex items-start space-x-3 ${
-                    (formData.themeMode || 'pure_black') !== 'midnight_slate'
+                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                    (formData.themeMode || 'pure_black') === 'pure_black'
                       ? 'bg-black/90 border-cyan-500 ring-1 ring-cyan-500/60 shadow-lg'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-black border border-slate-700 flex items-center justify-center shrink-0 shadow-inner">
-                    <div className="w-4 h-4 rounded-lg bg-[#1C1C1E] border border-slate-600 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-black border border-slate-700 flex items-center justify-center shrink-0 shadow-inner">
+                      <div className="w-3.5 h-3.5 rounded-lg bg-[#1C1C1E] border border-slate-600 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      </div>
                     </div>
+                    {(formData.themeMode || 'pure_black') === 'pure_black' && (
+                      <Check className="w-4 h-4 text-cyan-400" />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">Pure Black (OLED)</span>
-                      {(formData.themeMode || 'pure_black') !== 'midnight_slate' && (
-                        <Check className="w-3.5 h-3.5 text-cyan-400" />
-                      )}
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Pure Black</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-normal">Dark</span>
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                      True black background with neutral gray cards for maximum contrast and battery savings.
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      OLED true black canvas with neutral gray cards. Maximum battery savings.
                     </p>
                   </div>
                 </button>
 
-                {/* Midnight Slate option */}
+                {/* Teal Breeze option (Concept 1) */}
                 <button
                   type="button"
-                  onClick={() => handleThemeChange('midnight_slate')}
-                  className={`p-3 rounded-2xl border text-left transition flex items-start space-x-3 ${
-                    formData.themeMode === 'midnight_slate'
-                      ? 'bg-slate-900 border-cyan-500 ring-1 ring-cyan-500/60 shadow-lg'
+                  onClick={() => handleThemeChange('teal_breeze')}
+                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                    formData.themeMode === 'teal_breeze'
+                      ? 'bg-teal-500/10 border-teal-500 ring-1 ring-teal-500/60 shadow-lg'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-[#020617] border border-slate-700 flex items-center justify-center shrink-0 shadow-inner">
-                    <div className="w-4 h-4 rounded-lg bg-[#0f172a] border border-slate-600 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-[#F0FDFA] border border-teal-300 flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-3.5 h-3.5 rounded-lg bg-white border border-teal-400 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                      </div>
                     </div>
+                    {formData.themeMode === 'teal_breeze' && (
+                      <Check className="w-4 h-4 text-teal-400" />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">Midnight Slate</span>
-                      {formData.themeMode === 'midnight_slate' && (
-                        <Check className="w-3.5 h-3.5 text-cyan-400" />
-                      )}
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Teal Breeze</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-950/60 text-teal-300 border border-teal-500/30 font-normal">Light</span>
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                      Classic deep navy-slate background and card surfaces.
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      Soft aqua mist canvas with white cards, frosted ice teal borders & vibrant accents.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Nordic Frost option (Concept 2) */}
+                <button
+                  type="button"
+                  onClick={() => handleThemeChange('nordic_teal')}
+                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                    formData.themeMode === 'nordic_teal'
+                      ? 'bg-cyan-500/10 border-cyan-500 ring-1 ring-cyan-500/60 shadow-lg'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-[#F8FAFC] border border-slate-300 flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-3.5 h-3.5 rounded-lg bg-white border border-slate-400 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#0F766E]" />
+                      </div>
+                    </div>
+                    {formData.themeMode === 'nordic_teal' && (
+                      <Check className="w-4 h-4 text-cyan-400" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Nordic Frost</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-500/30 font-normal">Light</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      Clean paper canvas with floating white cards, crisp slate lines & deep ocean teal.
                     </p>
                   </div>
                 </button>
               </div>
               <p className="text-[11px] text-slate-400">
-                You can toggle between Pure Black and Midnight Slate at any time. Changes preview immediately.
+                You can toggle between Dark and Light modes at any time. Changes preview immediately.
               </p>
             </div>
 

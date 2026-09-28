@@ -228,6 +228,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   };
 
   const isMidnight = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-midnight');
+  const isLightMode = typeof document !== 'undefined' && (
+    document.documentElement.classList.contains('theme-teal-breeze') ||
+    document.documentElement.classList.contains('theme-nordic-teal')
+  );
 
   // Custom Chart.js plugin to add breathing room between top legend and the chart plot area
   const legendMarginPlugin = {
@@ -259,7 +263,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         position: 'top' as const,
         align: 'center' as const,
         labels: {
-          color: isMidnight ? '#94a3b8' : '#8e8e93',
+          color: isLightMode ? '#334155' : isMidnight ? '#94a3b8' : '#8e8e93',
           font: { size: 11, weight: '600' },
           boxWidth: 9,
           boxHeight: 9,
@@ -269,10 +273,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         }
       },
       tooltip: {
-        backgroundColor: isMidnight ? '#0f172a' : '#1c1c1e',
-        titleColor: '#ffffff',
-        bodyColor: isMidnight ? '#cbd5e1' : '#d1d1d6',
-        borderColor: isMidnight ? '#334155' : '#38383a',
+        backgroundColor: isLightMode ? '#ffffff' : isMidnight ? '#0f172a' : '#1c1c1e',
+        titleColor: isLightMode ? '#0f172a' : '#ffffff',
+        bodyColor: isLightMode ? '#334155' : isMidnight ? '#cbd5e1' : '#d1d1d6',
+        borderColor: isLightMode ? '#cbd5e1' : isMidnight ? '#334155' : '#38383a',
         borderWidth: 1,
         padding: 10,
         cornerRadius: 8
@@ -280,12 +284,12 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
     },
     scales: {
       x: {
-        grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
-        ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } }
+        grid: { color: isLightMode ? 'rgba(203, 213, 225, 0.4)' : isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
+        ticks: { color: isLightMode ? '#475569' : isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } }
       },
       y: {
-        grid: { color: isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
-        ticks: { color: isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } },
+        grid: { color: isLightMode ? 'rgba(203, 213, 225, 0.4)' : isMidnight ? 'rgba(51, 65, 85, 0.3)' : 'rgba(56, 56, 58, 0.3)' },
+        ticks: { color: isLightMode ? '#475569' : isMidnight ? '#94a3b8' : '#8e8e93', font: { size: 11 } },
         beginAtZero: metric !== 'weight' && metric !== 'lipids',
         grace: '6%'
       }

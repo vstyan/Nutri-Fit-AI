@@ -40,6 +40,50 @@ html.theme-midnight {
   --color-slate-50: 248 250 252;   /* Tailwind Slate 50 #f8fafc */
 }
 
+/* Concept 1: Teal Breeze (Fresh Light Mode with Soft Aqua & Crisp White) */
+html.theme-teal-breeze {
+  color-scheme: light;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Canvas & Card Surfaces */
+  --color-slate-950: 240 253 250;  /* Tailwind teal-50 #F0FDFA (Airy Aqua Mist Background) */
+  --color-slate-900: 255 255 255;  /* Pure White #FFFFFF (Elevated Cards & Sheets) */
+  --color-slate-800: 236 253 245;  /* Soft Mint Well #ECFDF5 (Inputs, Wells & Secondary Insets) */
+  --color-slate-700: 204 251 241;  /* Frosted Ice Teal #CCFBF1 / teal-100 (Clean Card Borders) */
+  --color-slate-600: 153 246 228;  /* Muted Aqua Border #99F6E4 / teal-200 */
+  --color-slate-500: 100 116 139;  /* Muted Slate #64748B (Subtitles & Units) */
+  --color-slate-400: 71 85 105;    /* Medium Slate #475569 (Secondary Text & Labels) */
+  --color-slate-300: 51 65 85;     /* Dark Slate #334155 (Readable Body Content) */
+  --color-slate-200: 30 41 59;     /* Deep Slate #1E293B (Bold Body & Subheadings) */
+  --color-slate-100: 15 23 42;     /* Obsidian Charcoal #0F172A (Primary Titles & Stat Numbers) */
+  --color-slate-50: 2 6 23;        /* Pitch Charcoal #020617 */
+}
+
+/* Concept 2: Nordic Frost (Minimalist Light Mode with Clean Paper & Slate) */
+html.theme-nordic-teal {
+  color-scheme: light;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Canvas & Card Surfaces */
+  --color-slate-950: 248 250 252;  /* Tailwind slate-50 #F8FAFC (Neutral Paper Canvas) */
+  --color-slate-900: 255 255 255;  /* Pure White #FFFFFF (Minimalist Floating Cards) */
+  --color-slate-800: 241 245 249;  /* Cool Slate Well #F1F5F9 (Inputs & Secondary Insets) */
+  --color-slate-700: 226 232 240;  /* Fine Slate Line #E2E8F0 (Subtle Borders) */
+  --color-slate-600: 203 213 225;  /* Divider Line #CBD5E1 */
+  --color-slate-500: 148 163 184;  /* Muted Slate #94A3B8 */
+  --color-slate-400: 100 116 139;  /* Secondary Text #64748B */
+  --color-slate-300: 51 65 85;     /* Dark Slate #334155 (Body Content) */
+  --color-slate-200: 30 41 59;     /* Deep Slate #1E293B */
+  --color-slate-100: 2 6 23;       /* Obsidian Black #020617 (Headers & High-Contrast Stats) */
+  --color-slate-50: 0 0 0;         /* Pure Black #000000 */
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -94,4 +138,103 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--color-slate-500) / 0.8);
+}
+
+/* ==========================================================================
+   LIGHT MODE CONTRAST & TYPOGRAPHY ADAPTATIONS
+   ========================================================================== */
+html.theme-teal-breeze,
+html.theme-nordic-teal {
+  /* Invert text-white for general headings, stats, and card text */
+  .text-white {
+    color: rgb(15 23 42);
+  }
+
+  /* Keep crisp white text on colored CTA buttons, pills, gradients, and dark chips */
+  button[class*="text-white"],
+  a[class*="text-white"],
+  button span.text-white,
+  a span.text-white,
+  [class*="bg-cyan-"] .text-white,
+  [class*="bg-teal-"] .text-white,
+  [class*="bg-emerald-"] .text-white,
+  [class*="bg-indigo-"] .text-white,
+  [class*="bg-purple-"] .text-white,
+  [class*="bg-rose-"] .text-white,
+  [class*="bg-blue-"] .text-white,
+  [class*="bg-amber-"] .text-white,
+  [class*="bg-gradient-"] .text-white,
+  [class*="bg-black"] .text-white,
+  [class*="bg-slate-900"] button .text-white {
+    color: #ffffff !important;
+  }
+
+  /* Floating Action Button and Logo contrast */
+  button[aria-label="Log meal"],
+  .bg-gradient-to-tr {
+    color: #020617 !important;
+  }
+
+  /* Card elevation & shadows for crisp daylight viewing */
+  .glass-panel {
+    background: rgb(255 255 255 / 0.95);
+    border: 1px solid rgb(var(--color-slate-700));
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  }
+
+  .glass-card {
+    background: rgb(255 255 255);
+    border: 1px solid rgb(var(--color-slate-700));
+    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
+  }
+
+  /* Pastel badges & pill highlights */
+  [class*="bg-purple-950"] {
+    background-color: rgb(243 232 255 / 0.8) !important;
+  }
+  [class*="text-purple-300"] {
+    color: rgb(126 34 206) !important;
+  }
+
+  [class*="bg-amber-950"] {
+    background-color: rgb(254 243 199 / 0.8) !important;
+  }
+  [class*="text-amber-300"] {
+    color: rgb(180 83 9) !important;
+  }
+
+  [class*="bg-emerald-950"] {
+    background-color: rgb(209 250 229 / 0.8) !important;
+  }
+  [class*="text-emerald-300"] {
+    color: rgb(4 120 87) !important;
+  }
+
+  [class*="bg-sky-950"] {
+    background-color: rgb(224 242 254 / 0.8) !important;
+  }
+  [class*="text-sky-300"] {
+    color: rgb(3 105 161) !important;
+  }
+
+  [class*="bg-cyan-950"] {
+    background-color: rgb(207 250 254 / 0.8) !important;
+  }
+  [class*="text-cyan-300"] {
+    color: rgb(14 116 144) !important;
+  }
+
+  [class*="bg-indigo-950"] {
+    background-color: rgb(224 231 255 / 0.8) !important;
+  }
+  [class*="text-indigo-300"] {
+    color: rgb(67 56 202) !important;
+  }
+
+  [class*="bg-rose-950"] {
+    background-color: rgb(255 228 230 / 0.8) !important;
+  }
+  [class*="text-rose-300"] {
+    color: rgb(190 18 60) !important;
+  }
 }
