@@ -67,19 +67,36 @@ export const UpdatePrompt: React.FC = () => {
 
   const handleAcceptUpdate = async () => {
     setIsUpdating(true);
-    try {
-      // Clear deferred flag since user accepted
-      localStorage.removeItem('nutrifit_deferred_version');
+    localStorage.removeItem('nutrifit_deferred_version');
 
+    try {
       if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        await reg.update();
+        // Reload as soon as the new service worker takes control
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        }, { once: true });
+
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+          await reg.update().catch(() => {});
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        }
       }
-      await updateServiceWorker(true);
+
+      await updateServiceWorker(true).catch(() => {});
     } catch (err) {
-      console.warn('Update trigger encountered an issue, reloading page:', err);
-      window.location.reload();
+      console.warn('Update trigger encountered an issue:', err);
     }
+
+    // Safety timeout: ensure page reloads to load the fresh bundle
+    setTimeout(() => {
+      window.location.reload();
+    }, 1200);
   };
 
   // Only show if user has not dismissed this version AND (remote update is detected OR service worker is waiting)

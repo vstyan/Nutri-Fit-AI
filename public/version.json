@@ -1,5 +1,5 @@
 {
-  "version": "1.5.3",
+  "version": "1.5.4",
   "releaseDate": "2026-09-28",
-  "notes": "Streamlined sync status with last sync timestamp directly beside the Sync button, removing top toast clutter."
+  "notes": "Instant PWA update completion, guaranteed reload, and streamlined sync status beside the Sync button."
 }
