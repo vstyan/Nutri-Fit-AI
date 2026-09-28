@@ -12,7 +12,7 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
-import { TrendingUp, Scale, Zap, Wheat } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, Zap, Wheat, Flame } from 'lucide-react';
 import { WeightRecord } from '../types';
 
 ChartJS.register(
@@ -54,6 +54,35 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
     const dt = new Date(d.date + 'T00:00:00');
     return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' });
   });
+
+  // 7-Day Averages & Weekly Balance Calculations
+  const totalBurned = historyData.reduce((sum, d) => sum + (d.caloriesBurned || 0), 0);
+  const avgBurned = historyData.length > 0 ? Math.round(totalBurned / historyData.length) : 0;
+
+  const loggedDays = historyData.filter(d => (d.caloriesIntake || 0) > 0);
+  const loggedDaysCount = loggedDays.length;
+  const totalConsumed = loggedDays.reduce((sum, d) => sum + (d.caloriesIntake || 0), 0);
+  const avgConsumed = loggedDaysCount > 0 ? Math.round(totalConsumed / loggedDaysCount) : 0;
+
+  // Net difference per day (Consumed - Burned)
+  // Negative means Deficit (Burned > Consumed), Positive means Surplus (Consumed > Burned)
+  const netDaily = avgConsumed > 0 ? (avgConsumed - avgBurned) : 0;
+  const isDeficit = netDaily < 0;
+  const isSurplus = netDaily > 0;
+
+  // Projected weekly weight change (approx. 3,500 kcal per lb of fat, 7,700 kcal per kg)
+  const estWeeklyWeight = avgConsumed > 0 && Math.abs(netDaily) >= 25
+    ? isImperial
+      ? (Math.abs(netDaily) * 7 / 3500).toFixed(1)
+      : (Math.abs(netDaily) * 7 / 7700).toFixed(1)
+    : null;
+
+  // Net carbs & macro averages
+  const carbLoggedDays = historyData.filter(d => (d.carbsIntake || 0) > 0);
+  const carbDaysCount = carbLoggedDays.length > 0 ? carbLoggedDays.length : 1;
+  const avgNetCarbs = Math.round(historyData.reduce((sum, d) => sum + (d.netCarbsIntake ?? d.carbsIntake ?? 0), 0) / carbDaysCount * 10) / 10;
+  const avgTotalCarbs = Math.round(historyData.reduce((sum, d) => sum + (d.carbsIntake || 0), 0) / carbDaysCount * 10) / 10;
+  const avgFiber = Math.round(historyData.reduce((sum, d) => sum + (d.fiberIntake || 0), 0) / carbDaysCount * 10) / 10;
 
   // Calorie and Carb datasets
   const barChartData = {
@@ -105,8 +134,20 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         ]
   };
 
-  // Weight Trend Line Dataset
+  // Weight Trend Line Dataset & Statistics
   const sortedWeight = [...weightHistory].sort((a, b) => a.date.localeCompare(b.date));
+  const latestWeight = sortedWeight.length > 0
+    ? (isImperial ? sortedWeight[sortedWeight.length - 1].weightLbs : sortedWeight[sortedWeight.length - 1].weightKg)
+    : 0;
+  const firstWeight = sortedWeight.length > 0
+    ? (isImperial ? sortedWeight[0].weightLbs : sortedWeight[0].weightKg)
+    : 0;
+  const weightChange = sortedWeight.length > 1
+    ? Math.round((latestWeight - firstWeight) * 10) / 10
+    : 0;
+  const avgWeight = sortedWeight.length > 0
+    ? Math.round(sortedWeight.reduce((s, w) => s + (isImperial ? w.weightLbs : w.weightKg), 0) / sortedWeight.length * 10) / 10
+    : 0;
   const weightLabels = sortedWeight.map(w => {
     const dt = new Date(w.date + 'T00:00:00');
     return dt.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
@@ -197,51 +238,251 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-2">
-          <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+          <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400 shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-white">Historical Trends & Charts</h2>
-            <p className="text-xs text-slate-400">Calories, net carbs, and body weight progression</p>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-white truncate">Historical Trends & Charts</h2>
+            <p className="text-xs text-slate-400 truncate">Calories, net carbs, and body weight progression</p>
           </div>
         </div>
 
-        {/* Metric Selector Buttons */}
-        <div className="flex items-center space-x-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700 self-end sm:self-auto">
+        {/* Metric Selector Buttons - Centered, balanced, and responsive */}
+        <div className="w-full sm:w-auto flex items-center justify-center p-1 bg-slate-800/90 rounded-xl border border-slate-700/80 shadow-inner">
           <button
+            type="button"
             onClick={() => setMetric('calories')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
+            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
               metric === 'calories'
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
             Calories
           </button>
           <button
+            type="button"
             onClick={() => setMetric('carbs')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
+            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
               metric === 'carbs'
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
             Net Carbs
           </button>
           <button
+            type="button"
             onClick={() => setMetric('weight')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all ${
+            className={`flex-1 sm:flex-initial text-center px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[76px] sm:min-w-[84px] ${
               metric === 'weight'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
             Weight
           </button>
         </div>
       </div>
+
+      {/* 7-Day Averages Summary Bar */}
+      {metric === 'calories' && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* 1. Avg Consumed */}
+          <div className="bg-slate-950/70 border border-cyan-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
+                <span className="sm:hidden">Avg In</span>
+                <span className="hidden sm:inline">7-Day Avg Consumed</span>
+              </span>
+              {loggedDaysCount > 0 && loggedDaysCount < historyData.length && (
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{loggedDaysCount}/7d</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-cyan-300">
+                {avgConsumed > 0 ? avgConsumed.toLocaleString() : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">kcal/d</span>
+            </div>
+          </div>
+
+          {/* 2. Avg Burned */}
+          <div className="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="sm:hidden">Avg Burn</span>
+                <span className="hidden sm:inline">7-Day Avg Burned</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">TDEE</span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-emerald-300">
+                {avgBurned.toLocaleString()}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">kcal/d</span>
+            </div>
+          </div>
+
+          {/* 3. Weekly Net Balance */}
+          <div className={`bg-slate-950/70 border rounded-xl p-2.5 sm:p-3 flex flex-col justify-between ${
+            isDeficit
+              ? 'border-emerald-500/30'
+              : isSurplus
+                ? 'border-amber-500/30'
+                : 'border-slate-800'
+          }`}>
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  isDeficit ? 'bg-emerald-400' : isSurplus ? 'bg-amber-400' : 'bg-slate-400'
+                }`} />
+                <span className="sm:hidden">{isDeficit ? 'Deficit' : isSurplus ? 'Surplus' : 'Balance'}</span>
+                <span className="hidden sm:inline">Weekly Net Balance</span>
+              </span>
+              {estWeeklyWeight && (
+                <span className={`text-[10px] font-semibold hidden md:inline ${
+                  isDeficit ? 'text-emerald-400' : 'text-amber-400'
+                }`}>
+                  {isDeficit ? `~${estWeeklyWeight} ${isImperial ? 'lbs' : 'kg'}/wk loss` : `~${estWeeklyWeight} ${isImperial ? 'lbs' : 'kg'}/wk gain`}
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                isDeficit ? 'text-emerald-300' : isSurplus ? 'text-amber-300' : 'text-slate-300'
+              }`}>
+                {avgConsumed === 0
+                  ? '—'
+                  : isDeficit
+                    ? `-${Math.abs(netDaily).toLocaleString()}`
+                    : isSurplus
+                      ? `+${netDaily.toLocaleString()}`
+                      : '0'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                {avgConsumed === 0 ? 'no logs' : isDeficit ? 'kcal/d def.' : isSurplus ? 'kcal/d surp.' : 'balanced'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {metric === 'carbs' && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* Net Carbs */}
+          <div className="bg-slate-950/70 border border-purple-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                <span className="sm:hidden">Net Carbs</span>
+                <span className="hidden sm:inline">7-Day Avg Net Carbs</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-purple-300">
+                {avgNetCarbs}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">g / day</span>
+            </div>
+          </div>
+
+          {/* Total Carbs */}
+          <div className="bg-slate-950/70 border border-cyan-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
+                <span className="sm:hidden">Total Carbs</span>
+                <span className="hidden sm:inline">7-Day Avg Total Carbs</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-cyan-300">
+                {avgTotalCarbs}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">g / day</span>
+            </div>
+          </div>
+
+          {/* Fiber */}
+          <div className="bg-slate-950/70 border border-amber-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="sm:hidden">Fiber</span>
+                <span className="hidden sm:inline">7-Day Avg Fiber</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-amber-300">
+                {avgFiber}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">g / day</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {metric === 'weight' && sortedWeight.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* Latest */}
+          <div className="bg-slate-950/70 border border-indigo-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                <span className="sm:hidden">Latest</span>
+                <span className="hidden sm:inline">Latest Logged</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-indigo-300">
+                {latestWeight}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">{isImperial ? 'lbs' : 'kg'}</span>
+            </div>
+          </div>
+
+          {/* Change */}
+          <div className="bg-slate-950/70 border border-indigo-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                <span className="sm:hidden">Change</span>
+                <span className="hidden sm:inline">Period Change</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                weightChange < 0 ? 'text-emerald-400' : weightChange > 0 ? 'text-amber-400' : 'text-slate-300'
+              }`}>
+                {weightChange > 0 ? `+${weightChange}` : weightChange < 0 ? `${weightChange}` : '0.0'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">{isImperial ? 'lbs' : 'kg'}</span>
+            </div>
+          </div>
+
+          {/* Average */}
+          <div className="bg-slate-950/70 border border-indigo-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                <span className="sm:hidden">Average</span>
+                <span className="hidden sm:inline">Period Average</span>
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-indigo-300">
+                {avgWeight}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">{isImperial ? 'lbs' : 'kg'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="h-72 sm:h-80 w-full pt-2">
         {metric === 'weight' ? (

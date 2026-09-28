@@ -1,5 +1,5 @@
 {
-  "version": "1.5.4",
+  "version": "1.5.5",
   "releaseDate": "2026-09-28",
-  "notes": "Instant PWA update completion, guaranteed reload, and streamlined sync status beside the Sync button."
+  "notes": "Added 7-day average metrics and weekly balance summary to Historical Charts, with centered and balanced navigation buttons."
 }
