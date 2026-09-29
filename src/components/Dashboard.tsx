@@ -508,13 +508,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-[9px] text-emerald-400 font-medium">Google Fit + TEF</span>
               </div>
             </div>
-
-            <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/20 rounded-xl text-emerald-300 text-[11px] flex items-center space-x-2">
-              <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>
-                <strong>NEAT Double-Counting Protected:</strong> Google Fit already accounts for daily steps and NEAT. NutriFit dynamically adds TEF from your logged meals without double-counting NEAT.
-              </span>
-            </div>
           </div>
         ) : (
           <div className="bg-slate-950/60 border border-emerald-500/20 rounded-xl p-3.5 flex items-center justify-between">

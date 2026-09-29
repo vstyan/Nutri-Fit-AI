@@ -109,12 +109,16 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
           <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded-xl p-4">
             <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-amber-400" />
-              NEAT Double-Counting Protection
+              NEAT Double-Counting Protection Explained
             </h4>
             <p>
-              Google Fit already tracks Non-Exercise Activity Thermogenesis (NEAT) such as steps, fidgeting, and walking. 
-              NutriFit detects when Google Fit is connected and <strong>automatically zeros out the manual NEAT floor</strong> to prevent double-counting your daily steps. 
-              The app then dynamically adds the <strong>Thermic Effect of Food (TEF)</strong> from your logged meals on top of your Google Fit burn for a 100% accurate TDEE.
+              In <strong>Configuration 2 (Google Fit Tracker)</strong>, Google Fit continuously captures all movement sensors (steps, baseline pacing, walking, and everyday movement), which directly measures your <em>Non-Exercise Activity Thermogenesis (NEAT)</em>.
+            </p>
+            <p>
+              To guarantee scientific accuracy, NutriFit AI detects your active Google Fit tracker connection and <strong>automatically zeros out the static manual NEAT baseline allowance</strong>. This ensures your daily steps and movement are never counted twice (once by Google Fit sensors and once by an estimated static multiplier).
+            </p>
+            <p>
+              The engine then dynamically calculates and layers the <strong>Thermic Effect of Food (TEF)</strong> from each meal you log directly onto your Google Fit burn, producing a comprehensive, 100% accurate Total Daily Energy Expenditure (TDEE).
             </p>
           </div>
         </div>
