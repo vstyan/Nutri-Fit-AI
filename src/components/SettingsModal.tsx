@@ -270,9 +270,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (mode === 'teal_breeze') {
       root.classList.add('theme-teal-breeze');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
-    } else if (mode === 'nordic_teal') {
-      root.classList.add('theme-nordic-teal');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F8FAFC');
     } else if (mode === 'midnight_slate') {
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
@@ -289,12 +286,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const metaThemeColor = document.getElementById('app-theme-color');
     root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
     
-    if (activeTheme === 'teal_breeze') {
+    if (activeTheme === 'teal_breeze' || (activeTheme as string) === 'nordic_teal') {
       root.classList.add('theme-teal-breeze');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
-    } else if (activeTheme === 'nordic_teal') {
-      root.classList.add('theme-nordic-teal');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F8FAFC');
     } else if (activeTheme === 'midnight_slate') {
       root.classList.add('theme-midnight');
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
@@ -916,7 +910,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="text-[10px] text-slate-400 font-medium">Dark & Light Modes</span>
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Pure Black option */}
                 <button
                   type="button"
@@ -948,7 +942,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </button>
 
-                {/* Teal Breeze option (Concept 1) */}
+                {/* Teal Breeze option */}
                 <button
                   type="button"
                   onClick={() => handleThemeChange('teal_breeze')}
@@ -975,37 +969,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
                       Soft aqua mist canvas with white cards, frosted ice teal borders & vibrant accents.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Nordic Frost option (Concept 2) */}
-                <button
-                  type="button"
-                  onClick={() => handleThemeChange('nordic_teal')}
-                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
-                    formData.themeMode === 'nordic_teal'
-                      ? 'bg-cyan-500/10 border-cyan-500 ring-1 ring-cyan-500/60 shadow-lg'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-[#F8FAFC] border border-slate-300 flex items-center justify-center shrink-0 shadow-sm">
-                      <div className="w-3.5 h-3.5 rounded-lg bg-white border border-slate-400 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#0F766E]" />
-                      </div>
-                    </div>
-                    {formData.themeMode === 'nordic_teal' && (
-                      <Check className="w-4 h-4 text-cyan-400" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Nordic Frost</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-500/30 font-normal">Light</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                      Clean paper canvas with floating white cards, crisp slate lines & deep ocean teal.
                     </p>
                   </div>
                 </button>

@@ -1,5 +1,5 @@
 {
-  "version": "1.7.2",
+  "version": "1.7.3",
   "releaseDate": "2026-09-28",
-  "notes": "Fixed heading and section title visibility across light themes (Teal Breeze & Nordic Frost), ensuring crisp high-contrast obsidian typography on all cards and dashboards."
+  "notes": "Streamlined theme options to Pure Black (OLED) and Teal Breeze (Light Mode), with crisp card borders, frosted teal accents, and high-contrast typography."
 }

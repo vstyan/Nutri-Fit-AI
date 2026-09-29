@@ -62,27 +62,6 @@ html.theme-teal-breeze {
   --color-slate-50: 2 6 23;        /* Pitch Charcoal #020617 */
 }
 
-/* Concept 2: Nordic Frost (Minimalist Light Mode with Clean Paper & Slate) */
-html.theme-nordic-teal {
-  color-scheme: light;
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
-
-  /* Canvas & Card Surfaces */
-  --color-slate-950: 248 250 252;  /* Tailwind slate-50 #F8FAFC (Neutral Paper Canvas) */
-  --color-slate-900: 255 255 255;  /* Pure White #FFFFFF (Minimalist Floating Cards) */
-  --color-slate-800: 241 245 249;  /* Cool Slate Well #F1F5F9 (Inputs & Secondary Insets) */
-  --color-slate-700: 226 232 240;  /* Fine Slate Line #E2E8F0 (Subtle Borders) */
-  --color-slate-600: 203 213 225;  /* Divider Line #CBD5E1 */
-  --color-slate-500: 148 163 184;  /* Muted Slate #94A3B8 */
-  --color-slate-400: 100 116 139;  /* Secondary Text #64748B */
-  --color-slate-300: 51 65 85;     /* Dark Slate #334155 (Body Content) */
-  --color-slate-200: 30 41 59;     /* Deep Slate #1E293B */
-  --color-slate-100: 2 6 23;       /* Obsidian Black #020617 (Headers & High-Contrast Stats) */
-  --color-slate-50: 0 0 0;         /* Pure Black #000000 */
-}
 
 html, body {
   margin: 0;
@@ -143,8 +122,7 @@ html, body {
 /* ==========================================================================
    LIGHT MODE CONTRAST & TYPOGRAPHY ADAPTATIONS
    ========================================================================== */
-html.theme-teal-breeze,
-html.theme-nordic-teal {
+html.theme-teal-breeze {
   /* 1. All headings & section titles are ALWAYS dark high-contrast slate in light mode */
   h1, h2, h3, h4, h5, h6 {
     color: rgb(var(--color-slate-100)) !important;

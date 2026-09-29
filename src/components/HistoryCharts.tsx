@@ -228,10 +228,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   };
 
   const isMidnight = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-midnight');
-  const isLightMode = typeof document !== 'undefined' && (
-    document.documentElement.classList.contains('theme-teal-breeze') ||
-    document.documentElement.classList.contains('theme-nordic-teal')
-  );
+  const isLightMode = typeof document !== 'undefined' && document.documentElement.classList.contains('theme-teal-breeze');
 
   // Custom Chart.js plugin to add breathing room between top legend and the chart plot area
   const legendMarginPlugin = {
