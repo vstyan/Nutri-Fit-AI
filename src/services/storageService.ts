@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dailyProteinTarget: 140,
     dailyFatTarget: 65,
     dailyCholesterolTarget: 300,
+    primaryGoals: [],
   }
 };
 

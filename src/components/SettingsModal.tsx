@@ -19,8 +19,20 @@ import {
   Sparkles, 
   Activity,
   Palette,
-  BookOpen
+  BookOpen,
+  Plus
 } from 'lucide-react';
+
+const POPULAR_GOAL_PRESETS = [
+  'Lose body fat & lean down',
+  'Build muscle & strength',
+  'Lower LDL cholesterol & heart health',
+  'Improve endurance & stamina',
+  'Body recomposition (tone & strength)',
+  'Manage blood sugar & insulin sensitivity',
+  'Optimize gut health & digestion',
+  'Boost daily energy & vitality'
+];
 import { AppSettings, Gender, UnitSystem, ThemeMode, APP_VERSION } from '../types';
 import { 
   calculateBMR, 
@@ -76,10 +88,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
   const [availableVersionInfo, setAvailableVersionInfo] = useState<{ version: string; notes?: string } | null>(null);
 
+  // Goal customization state
+  const [customGoalInput, setCustomGoalInput] = useState('');
+
   // Sync formData whenever settings changes or modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData(settings);
+      setCustomGoalInput('');
       setWeightLbs(kgToLbs(settings.profile.weightKg || 75));
       const { feet, inches } = cmToFeetInches(settings.profile.heightCm || 175);
       setHeightFt(feet);
@@ -190,6 +206,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         [field]: value
       }
     }));
+  };
+
+  const selectedPrimaryGoals = formData.goals.primaryGoals || [];
+
+  const handleToggleGoal = (goalText: string) => {
+    if (selectedPrimaryGoals.includes(goalText)) {
+      setFormData(prev => ({
+        ...prev,
+        goals: {
+          ...prev.goals,
+          primaryGoals: (prev.goals.primaryGoals || []).filter(g => g !== goalText)
+        }
+      }));
+    } else {
+      if (selectedPrimaryGoals.length >= 3) return;
+      setFormData(prev => ({
+        ...prev,
+        goals: {
+          ...prev.goals,
+          primaryGoals: [...(prev.goals.primaryGoals || []), goalText]
+        }
+      }));
+    }
+  };
+
+  const handleAddCustomGoal = () => {
+    const trimmed = customGoalInput.trim();
+    if (!trimmed) return;
+    if (selectedPrimaryGoals.length >= 3) return;
+    if (selectedPrimaryGoals.includes(trimmed)) {
+      setCustomGoalInput('');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      goals: {
+        ...prev.goals,
+        primaryGoals: [...(prev.goals.primaryGoals || []), trimmed]
+      }
+    }));
+    setCustomGoalInput('');
   };
 
   // Imperial weight handler (converts lbs -> kg for storage)
@@ -757,6 +814,115 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={e => handleGoalChange('dailyCholesterolTarget', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-bold text-center"
                 />
+              </div>
+            </div>
+
+            {/* 3b. Primary Diet & Exercise Goals (Top 3) */}
+            <div className="pt-3 border-t border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Primary Diet &amp; Exercise Goals (Top 3)</span>
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  selectedPrimaryGoals.length === 3
+                    ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+                    : selectedPrimaryGoals.length > 0
+                      ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {selectedPrimaryGoals.length}/3 Selected
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Choose or enter up to 3 primary goals so NutriFit AI Coach can factor your exact mission (e.g. fat loss, muscle gain, cholesterol, endurance) into every metabolic diagnosis, nutrient timing, and food recommendation.
+              </p>
+
+              {/* Selected Goals Badges */}
+              {selectedPrimaryGoals.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {selectedPrimaryGoals.map((goal, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-indigo-200 shadow-sm"
+                    >
+                      <span>🎯 {goal}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleGoal(goal)}
+                        className="text-indigo-400 hover:text-white p-0.5 rounded hover:bg-indigo-800/40 transition"
+                        title="Remove goal"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Popular Presets */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
+                  Quick Presets:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {POPULAR_GOAL_PRESETS.map((preset, idx) => {
+                    const isSelected = selectedPrimaryGoals.includes(preset);
+                    const isMaxReached = selectedPrimaryGoals.length >= 3 && !isSelected;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleToggleGoal(preset)}
+                        disabled={isMaxReached}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg font-medium transition border flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-cyan-600/30 border-cyan-500/60 text-cyan-200 shadow-sm'
+                            : isMaxReached
+                              ? 'bg-slate-900/40 border-slate-800 text-slate-600 cursor-not-allowed'
+                              : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:border-slate-600 active:scale-95'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-cyan-300" />}
+                        <span>{preset}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Write-in Goal Input */}
+              <div className="pt-1.5 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={customGoalInput}
+                    onChange={e => setCustomGoalInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomGoal();
+                      }
+                    }}
+                    disabled={selectedPrimaryGoals.length >= 3}
+                    placeholder={
+                      selectedPrimaryGoals.length >= 3
+                        ? 'Maximum 3 goals selected (remove one to add another)'
+                        : 'Or type custom goal (e.g. Marathon prep, Lower blood pressure)...'
+                    }
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddCustomGoal}
+                  disabled={!customGoalInput.trim() || selectedPrimaryGoals.length >= 3}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add</span>
+                </button>
               </div>
             </div>
           </div>

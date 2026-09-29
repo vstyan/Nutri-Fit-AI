@@ -546,6 +546,28 @@ const DAILY_COACH_SCHEMA = {
       },
       required: ['timingDiagnosis', 'actionableAdjustment']
     },
+    workoutAnalysis: {
+      type: 'OBJECT',
+      properties: {
+        workoutDetected: {
+          type: 'BOOLEAN',
+          description: 'True if active exercise, logged workout(s), or significant active calorie expenditure (>=150 kcal) was recorded today.'
+        },
+        activitySummary: {
+          type: 'STRING',
+          description: 'Short 1-sentence recap of the workouts or active calories detected (e.g. "600 kcal burned from morning workout" or "Rest day with 50 kcal active movement").'
+        },
+        encouragement: {
+          type: 'STRING',
+          description: 'Enthusiastic, genuine athletic encouragement celebrating the user\'s workout and dedication, or positive reinforcement for recovery on rest days.'
+        },
+        fuelingAdvice: {
+          type: 'STRING',
+          description: 'Direct, practical plain-English instructions on how the user should adjust their food intake to fuel recovery (e.g. post-workout protein for muscle repair, complex carbs for glycogen replenishment, hydration), aligned with their primary goals.'
+        }
+      },
+      required: ['workoutDetected', 'activitySummary', 'encouragement', 'fuelingAdvice']
+    },
     patternDiscovery: {
       type: 'OBJECT',
       properties: {
@@ -585,7 +607,7 @@ const DAILY_COACH_SCHEMA = {
       }
     }
   },
-  required: ['headline', 'adherenceScore', 'chronoNutrition', 'patternDiscovery', 'rebalancePlan', 'recommendedFoods']
+  required: ['headline', 'adherenceScore', 'chronoNutrition', 'workoutAnalysis', 'patternDiscovery', 'rebalancePlan', 'recommendedFoods']
 };
 
 const WEEKLY_COACH_SCHEMA = {
@@ -691,12 +713,38 @@ CRITICAL COACHING INSTRUCTIONS:
    - Inspect 'dayPacingContext.proteinRemainingToday' to realistically pace upcoming afternoon and evening protein portions.
    - NEVER confuse multi-day historical deficit calculations in 'rollingMultiDayContext' with today's immediate progress when today is already well on track!
 
-3. RELY ON TIMESTAMPS, NOT MEAL LABELS:
+3. FACTOR IN USER'S PRIMARY GOALS (CRITICAL):
+   - Check 'targets.primaryGoals' (e.g. ${(payload.targets.primaryGoals || []).length > 0 ? (payload.targets.primaryGoals || []).join(', ') : 'General fitness & vitality'}).
+   - Every individual has specific objectives (fat loss, muscle hypertrophy, LDL cholesterol reduction, endurance, glycemic control, gut health).
+   - Anchor your entire diagnosis, macronutrient pacing, and food recommendations to directly help them achieve these exact top goals!
+   - If their goal includes "Lose body fat": prioritize satiety per calorie, high protein, fiber volume, and preserving a sustainable calorie deficit without crash under-fueling.
+   - If their goal includes "Build muscle & strength": emphasize adequate per-meal protein boluses (25-40g), post-workout amino acid availability, and avoiding deep deficits.
+   - If their goal includes "Lower LDL cholesterol & heart health": champion viscous/soluble fiber staples (oats, chia, lentils) and heart-healthy unsaturated fats while minimizing saturated fat.
+   - If their goal includes "Improve endurance": emphasize complex carbohydrate refueling and hydration.
+
+4. FACTOR IN WORKOUTS, CALORIES BURNED & ATHLETIC FUELING (CRITICAL):
+   - Inspect 'todayExpenditure.activeCalories', 'todayExpenditure.workoutsLogged', and 'todayExpenditure.workoutSummary'.
+   - NEVER evaluate nutrition in isolation from physical activity! Calories burned from workouts dramatically alter metabolic recovery demands.
+   - If a workout or substantial active burn (>= 150 active kcal) is detected:
+     * Set 'workoutAnalysis.workoutDetected' to true.
+     * In 'workoutAnalysis.activitySummary', provide a concise 1-sentence recap (e.g., "${payload.todayExpenditure.activeCalories} kcal active workout burn recorded today").
+     * In 'workoutAnalysis.encouragement', provide genuine, enthusiastic athletic encouragement celebrating their dedication and sweat equity.
+     * In 'workoutAnalysis.fuelingAdvice', explain clearly how their nutrition should adjust to recover from this workout:
+       - Post-workout protein synthesis: replenish amino acids for muscle tissue repair.
+       - Glycogen restoration: smart complex carbohydrates to restock depleted muscle and liver glycogen.
+       - Hydration and electrolyte balance.
+       - If the workout occurred earlier in the day (e.g. morning/midday), assess whether subsequent meals provided adequate recovery or if upcoming meals today should supply extra recovery nutrients.
+   - If active burn is low (< 150 active kcal and no workouts logged):
+     * Set 'workoutAnalysis.workoutDetected' to false.
+     * In 'workoutAnalysis.encouragement', provide positive reinforcement for rest, bodily recovery, and preparing for the next training session.
+     * In 'workoutAnalysis.fuelingAdvice', explain baseline rest-day nutrition (e.g. keeping protein steady for muscle preservation while moderating dense carbohydrate loads).
+
+5. RELY ON TIMESTAMPS, NOT MEAL LABELS:
    - Examine actual 24h meal timestamps (e.g., 08:15, 10:05, 13:20). Do NOT deduce behavior from meal labels like 'breakfast' or 'dinner'—users frequently eat multiple morning fuelings or log items under default tags. Evaluate the spacing and nutritional composition of meals chronologically.
 
-4. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
+6. DO NOT merely restate dashboard numbers (e.g. avoid "You ate 1800 kcal and burned 2200 kcal"). The user already sees those raw totals. Instead, diagnose cause-and-effect relationships and non-obvious patterns.
 
-5. CHRONO-NUTRITION & MEAL TIMING:
+7. CHRONO-NUTRITION & MEAL TIMING:
    - Examine firstMealTime, lastMealTime (the most recent meal logged), eatingWindowHours, and caloriesAfter8PM.
    - If day is in progress (isDayInProgress is true):
      * The eating window is STILL OPEN! lastMealTime (${payload.timingMetrics.lastMealTime}) is merely the most recent meal logged so far today, NOT the end of their eating window. Dinner and evening fuel are still ahead.
@@ -705,18 +753,18 @@ CRITICAL COACHING INSTRUCTIONS:
    - If day is completed (isDayInProgress is false):
      * Assess the full day eating window and give timing tweaks for TOMORROW.
 
-6. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
+8. BEHAVIORAL & DAY-OF-WEEK PATTERNS:
    - Identify whether today (${payload.dayOfWeek}) or recent days reflect weekend drift, weekday slumps, or meal prep gaps.
 
-7. COMPENSATORY REBALANCING:
+9. COMPENSATORY REBALANCING:
    - If day is in progress, rebalance the REMAINING meals of today. If day is finished, check rolling multi-day deficit and protein/fiber gaps to calculate practical micro-adjustments for tomorrow without crash dieting.
 
-8. WHOLE FOOD PRESCRIPTIONS:
+10. WHOLE FOOD PRESCRIPTIONS:
    - Name 2 to 3 specific healthy whole foods (e.g. Wild Salmon, Greek Yogurt, Edamame, Steel-Cut Oats with Chia, Lentil Soup).
    - If the user has elevated LDL or cholesterol context (isLdlElevated is true), prioritize cardio-protective foods rich in soluble fiber and omega-3s, and avoid high-saturated-fat choices.
    - Include realistic serving suggestions and the optimal time of day to eat them.
 
-9. TONE & PLAIN ENGLISH (CRITICAL):
+11. TONE & PLAIN ENGLISH (CRITICAL):
    - Speak in clear, down-to-earth, direct English like an elite athletic coach speaking to a real person—NEVER use academic jargon, flowery expressions, or cryptic pseudo-intellectual phrases.
    - FORBIDDEN JARGON & PHRASING:
      * NEVER use "mindful closure" (instead say: "Close your kitchen for tonight", "Finish eating for the day", or "Stop eating for tonight").
@@ -758,6 +806,12 @@ Respond strictly in valid JSON matching the requested schema.`;
       timingDiagnosis: raw.chronoNutrition?.timingDiagnosis || 'Meals were distributed across your eating window.',
       actionableAdjustment: raw.chronoNutrition?.actionableAdjustment || 'Maintain a regular eating cadence.'
     },
+    workoutAnalysis: {
+      workoutDetected: Boolean(raw.workoutAnalysis?.workoutDetected ?? payload.todayExpenditure.hasSignificantWorkout),
+      activitySummary: raw.workoutAnalysis?.activitySummary || payload.todayExpenditure.workoutSummary || 'Activity and expenditure tracked.',
+      encouragement: raw.workoutAnalysis?.encouragement || (payload.todayExpenditure.hasSignificantWorkout ? 'Great workout effort today! Keep up the tremendous dedication!' : 'Good recovery pacing today.'),
+      fuelingAdvice: raw.workoutAnalysis?.fuelingAdvice || 'Ensure adequate protein and hydration to support your metabolic activity.'
+    },
     patternDiscovery: {
       patternTitle: raw.patternDiscovery?.patternTitle || 'Behavioral Trend',
       observation: raw.patternDiscovery?.observation || 'Consistency is the primary driver of body composition progress.',
@@ -798,7 +852,10 @@ CRITICAL COACHING INSTRUCTIONS:
 2. Compare the weekly cumulative energy balance (deficit or surplus) to actual scale weight shifts.
 3. Formulate a 2-3 step strategic game plan for the upcoming week.
 4. Recommend 2 to 3 whole food staples to prioritize next week to fix the week's biggest nutritional deficiencies.
-5. TONE:
+5. ALIGN WITH USER'S PRIMARY GOALS:
+   - Check 'targets.primaryGoals' (e.g. ${(payload.targets.primaryGoals || []).join(', ') || 'General fitness & vitality'}).
+   - Anchor your entire executive diagnosis, weekly strategy, and recommended foods around these core goals.
+6. TONE:
    - Analytical, inspiring, objective, and strategic.
 
 Respond strictly in valid JSON matching the requested schema.`;

@@ -47,6 +47,7 @@ export interface DailyCoachPayload {
     fiberGrams: number;
     fatGrams: number;
     cholesterolMg: number;
+    primaryGoals?: string[];
   };
   todayIntake: {
     calories: number;
@@ -66,6 +67,17 @@ export interface DailyCoachPayload {
     tefCalories: number;
     totalBurned: number;
     netEnergyBalance: number; // Consumed - Burned (negative = deficit)
+    activeBurnSource?: string;
+    workoutsLogged: Array<{
+      title: string;
+      caloriesBurned: number;
+      time?: string;
+      durationMinutes?: number;
+      intensity?: string;
+      description?: string;
+    }>;
+    workoutSummary: string;
+    hasSignificantWorkout: boolean;
   };
   timingMetrics: {
     mealCount: number;
@@ -123,6 +135,7 @@ export interface WeeklyCoachPayload {
     dailyProtein: number;
     dailyFiber: number;
     dailyCholesterol: number;
+    primaryGoals?: string[];
   };
   days: Array<{
     date: string;
@@ -353,6 +366,48 @@ export function buildDailyCoachPayload(
     ? Math.round((proteinConsumed / targetProtein) * 100)
     : 0;
 
+  // Workout detection & detailed expenditure analysis
+  const activeCalories = summary.activity.activeCaloriesBurned || 0;
+  const rawWorkouts = summary.activity.workouts || [];
+  const workoutsLogged = rawWorkouts.map(w => ({
+    title: w.title,
+    caloriesBurned: w.caloriesBurned,
+    time: extractTimeFromTimestamp(w.timestamp),
+    durationMinutes: w.durationMinutes,
+    intensity: w.intensity,
+    description: w.description
+  }));
+
+  const hasSignificantWorkout = activeCalories >= 150 || workoutsLogged.length > 0;
+  const activeBurnSource = summary.activity.source || (settings.googleFitConnected ? 'google_fit' : 'manual');
+
+  let workoutSummary = '';
+  if (workoutsLogged.length > 0) {
+    const workoutParts = workoutsLogged.map(w => 
+      `${w.title}${w.time ? ` at ${w.time}` : ''} (${w.caloriesBurned} kcal${w.durationMinutes ? `, ${w.durationMinutes} min` : ''}${w.intensity ? `, ${w.intensity} intensity` : ''})`
+    );
+    workoutSummary = `Workouts logged: ${workoutParts.join('; ')}. Total active exercise burn: ${activeCalories} kcal.`;
+  } else if (activeCalories >= 150) {
+    const sourceLabel = activeBurnSource === 'google_fit' ? 'Google Fit tracker sync' : 'manual active entry';
+    workoutSummary = `Substantial workout expenditure detected: ~${activeCalories} active calories recorded (${sourceLabel}), representing a strenuous workout session.`;
+  } else if (activeCalories > 0) {
+    workoutSummary = `Light physical activity recorded: ${activeCalories} active calories.`;
+  } else {
+    workoutSummary = 'No heavy workouts or active exercise logged today. Baseline resting / recovery day.';
+  }
+
+  const primaryGoals = settings.goals.primaryGoals || [];
+  const goalsGuidance = primaryGoals.length > 0
+    ? `USER'S PRIMARY GOALS: The user has selected the following top goals: [${primaryGoals.join(', ')}]. Tailor your diagnosis, nutrient timing, and food recommendations to directly advance these goals.`
+    : `USER GOALS: General metabolic health, sustainable body composition, and balanced energy.`;
+
+  let workoutGuidance = '';
+  if (hasSignificantWorkout) {
+    workoutGuidance = `WORKOUT & EXERCISE DETECTED: The user burned ${activeCalories} active calories today! (${workoutSummary}). You MUST acknowledge and celebrate this workout in 'workoutAnalysis.encouragement' with genuine, high-energy praise. In 'workoutAnalysis.fuelingAdvice', explain how their diet should adjust to properly recover from this workout (protein for muscle synthesis, carbs for glycogen repletion, fluid/electrolytes), keeping their primary goals (${primaryGoals.join(', ') || 'fitness & health'}) in mind.`;
+  } else {
+    workoutGuidance = `REST / RECOVERY DAY: Active burn is low (${activeCalories} kcal). In 'workoutAnalysis', provide positive reinforcement for rest/recovery and explain baseline fueling for rest days.`;
+  }
+
   let fiberPacingGuidance = '';
   if (percentFiberConsumedSoFar >= 70) {
     fiberPacingGuidance = `FIBER PACING ALERT: The user has ALREADY consumed ${fiberConsumed}g of their ${targetFiber}g fiber target (~${percentFiberConsumedSoFar}% of daily goal)! This is an exceptional fiber start. You MUST NOT claim or imply the user has a 'fiber gap' or 'fiber deficiency' today. If addressing elevated LDL, praise their high total fiber intake and suggest only modest soluble-fiber sources (oats, chia, lentils) specifically for lipid clearance without calling it a deficit.`;
@@ -361,8 +416,8 @@ export function buildDailyCoachPayload(
   }
 
   const guidanceForAI = isDayInProgress
-    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning/afternoon expenditure recorded so far (${totalBurned} kcal), NOT 24-hour total burn. This is NOT a severe deficit or low intake. The user's eating window is STILL ACTIVELY OPEN: their latest meal was at ${lastMealTime || 'N/A'}, but upcoming meals (afternoon fuel, dinner, evening snacks) are still ahead. DO NOT state or imply that 'the eating window closed at ${lastMealTime || 'N/A'}'. You MUST advise on upcoming meals for TODAY to budget the remaining ${caloriesRemainingToday} kcal and remaining ${proteinRemainingToday}g protein. ${fiberPacingGuidance} 'actionableAdjustment' must give timing advice for remaining meals TODAY (not tomorrow)!`
-    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal. ${fiberPacingGuidance} 'actionableAdjustment' should suggest a timing tweak for tomorrow.`;
+    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning/afternoon expenditure recorded so far (${totalBurned} kcal), NOT 24-hour total burn. This is NOT a severe deficit or low intake. The user's eating window is STILL ACTIVELY OPEN: their latest meal was at ${lastMealTime || 'N/A'}, but upcoming meals (afternoon fuel, dinner, evening snacks) are still ahead. DO NOT state or imply that 'the eating window closed at ${lastMealTime || 'N/A'}'. You MUST advise on upcoming meals for TODAY to budget the remaining ${caloriesRemainingToday} kcal and remaining ${proteinRemainingToday}g protein. ${fiberPacingGuidance} ${goalsGuidance} ${workoutGuidance} 'actionableAdjustment' must give timing advice for remaining meals TODAY (not tomorrow)!`
+    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal. ${fiberPacingGuidance} ${goalsGuidance} ${workoutGuidance} 'actionableAdjustment' should suggest a timing tweak for tomorrow.`;
 
   const dayPacingContext = {
     isToday,
@@ -404,7 +459,8 @@ export function buildDailyCoachPayload(
       carbsGrams: settings.goals.dailyCarbsTarget,
       fiberGrams: settings.goals.dailyFiberTarget,
       fatGrams: settings.goals.dailyFatTarget,
-      cholesterolMg: settings.goals.dailyCholesterolTarget || 300
+      cholesterolMg: settings.goals.dailyCholesterolTarget || 300,
+      primaryGoals
     },
     todayIntake: {
       calories: totalCalories,
@@ -420,10 +476,14 @@ export function buildDailyCoachPayload(
     todayExpenditure: {
       bmrCalories: summary.activity.baseBmrCalories || 0,
       neatCalories: summary.activity.neatCalories || 0,
-      activeCalories: summary.activity.activeCaloriesBurned || 0,
+      activeCalories,
       tefCalories: summary.activity.tefCalories || 0,
       totalBurned,
-      netEnergyBalance
+      netEnergyBalance,
+      activeBurnSource,
+      workoutsLogged,
+      workoutSummary,
+      hasSignificantWorkout
     },
     timingMetrics: {
       mealCount: summary.meals.length,
@@ -561,7 +621,8 @@ export function buildWeeklyCoachPayload(
       dailyCalories: settings.goals.dailyCaloriesTarget,
       dailyProtein: settings.goals.dailyProteinTarget,
       dailyFiber: settings.goals.dailyFiberTarget,
-      dailyCholesterol: settings.goals.dailyCholesterolTarget || 300
+      dailyCholesterol: settings.goals.dailyCholesterolTarget || 300,
+      primaryGoals: settings.goals.primaryGoals || []
     },
     days: daySummaries,
     weeklyAverages: {

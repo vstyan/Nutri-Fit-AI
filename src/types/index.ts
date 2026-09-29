@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.8.5';
+export const APP_VERSION = '1.8.6';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -125,6 +125,7 @@ export interface UserGoals {
   dailyProteinTarget: number; // g
   dailyFatTarget: number; // g
   dailyCholesterolTarget?: number; // mg (e.g. 300)
+  primaryGoals?: string[]; // Top 1 to 3 primary diet/exercise goals
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
@@ -235,12 +236,20 @@ export interface RecommendedFood {
   bestTiming: string; // e.g. "Lunch (12:30 PM)"
 }
 
+export interface WorkoutFuelingInsight {
+  workoutDetected: boolean;
+  activitySummary: string; // e.g. "600 kcal burned from morning workout"
+  encouragement: string; // Enthusiastic, genuine encouragement celebrating the effort
+  fuelingAdvice: string; // Plain-English advice on how diet should adjust to account for this workout (protein synthesis, glycogen, timing) aligned with primary goals
+}
+
 export interface DailyCoachInsight {
   date: string; // YYYY-MM-DD
   generatedAt: string; // ISO string
   headline: string; // 1-2 sentence sharp behavioral diagnosis
   adherenceScore: number; // 0-100
   chronoNutrition: ChronoNutritionInsight;
+  workoutAnalysis?: WorkoutFuelingInsight; // Workout acknowledgment, celebration & fueling adjustments
   patternDiscovery: BehavioralPatternDiscovery;
   rebalancePlan: CompensatoryRebalancePlan;
   recommendedFoods: RecommendedFood[];

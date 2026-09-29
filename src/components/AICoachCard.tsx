@@ -12,7 +12,11 @@ import {
   AlertCircle,
   ShieldCheck,
   ChevronRight,
-  Info
+  Info,
+  Flame,
+  Zap,
+  Target,
+  Dumbbell
 } from 'lucide-react';
 import { 
   DailyCoachInsight, 
@@ -112,8 +116,8 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
     if (!isLoading) return;
     const steps = [
       'Analyzing chrono-nutrition & meal timing windows...',
-      'Detecting non-obvious day-of-week behavioral patterns...',
-      'Calculating multi-day compensatory rebalancing...',
+      'Evaluating workouts, active burn & athletic recovery...',
+      'Aligning recommendations with your top diet & fitness goals...',
       'Formulating tailored whole food prescriptions...'
     ];
     const interval = setInterval(() => {
@@ -224,8 +228,8 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
 
   const loadingMessages = [
     'Analyzing chrono-nutrition & meal timing windows...',
-    'Detecting non-obvious day-of-week behavioral patterns...',
-    'Calculating multi-day compensatory rebalancing...',
+    'Evaluating workouts, active burn & athletic recovery...',
+    'Aligning recommendations with your top diet & fitness goals...',
     'Formulating tailored whole food prescriptions...'
   ];
 
@@ -296,6 +300,49 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Active User Goals Bar */}
+      {settings.goals.primaryGoals && settings.goals.primaryGoals.length > 0 ? (
+        <div className="flex items-center gap-1.5 flex-wrap pt-0.5 pb-1">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <Target className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Target Goals:</span>
+          </span>
+          {settings.goals.primaryGoals.map((goal, idx) => (
+            <span
+              key={idx}
+              className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 flex items-center gap-1 shadow-sm"
+            >
+              <span>🎯 {goal}</span>
+            </span>
+          ))}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="text-[10px] text-slate-400 hover:text-cyan-300 underline font-medium ml-1 transition"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/50 border border-slate-800 text-[11px] text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>Set your top 3 diet &amp; fitness goals in Settings so AI Coach can personalize all insights.</span>
+          </div>
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="text-cyan-400 hover:text-cyan-300 font-semibold underline shrink-0 ml-2"
+            >
+              Set Goals &rarr;
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -439,7 +486,47 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 </div>
               </div>
 
-              {/* 2. Hidden Behavioral Pattern Detected */}
+              {/* 2. Workout Fueling & Athletic Recovery */}
+              {dailyInsight.workoutAnalysis && (
+                <div className={`p-3.5 rounded-xl space-y-2.5 border transition ${
+                  dailyInsight.workoutAnalysis.workoutDetected
+                    ? 'bg-gradient-to-r from-orange-950/40 via-amber-950/30 to-slate-950/80 border-orange-500/40 shadow-sm'
+                    : 'bg-slate-950/70 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center space-x-2 text-xs font-bold text-orange-300">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      <span>Workout Fueling &amp; Athletic Recovery</span>
+                    </div>
+                    {dailyInsight.workoutAnalysis.activitySummary && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        dailyInsight.workoutAnalysis.workoutDetected
+                          ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {dailyInsight.workoutAnalysis.workoutDetected ? '🔥 ' : '🛌 '}
+                        {dailyInsight.workoutAnalysis.activitySummary}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Encouragement / Workout Praise */}
+                  <p className="text-xs text-slate-200 font-medium leading-relaxed">
+                    {dailyInsight.workoutAnalysis.encouragement}
+                  </p>
+
+                  {/* Dietary Adjustment & Fueling Advice */}
+                  <div className="pt-2 border-t border-slate-800/80 flex items-start space-x-2 text-xs text-slate-300 leading-relaxed">
+                    <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white font-semibold">Dietary Fueling Adjustment:</strong>{' '}
+                      <span>{dailyInsight.workoutAnalysis.fuelingAdvice}</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Hidden Behavioral Pattern Detected */}
               <div className="p-3.5 bg-slate-950/70 border border-amber-500/25 rounded-xl space-y-2">
                 <div className="flex items-center space-x-2 text-amber-300 text-xs font-bold">
                   <TrendingUp className="w-4 h-4 text-amber-400" />
@@ -455,7 +542,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 )}
               </div>
 
-              {/* 3. Compensatory Rebalance Plan */}
+              {/* 4. Compensatory Rebalance Plan */}
               <div className="p-3.5 bg-slate-950/70 border border-emerald-500/25 rounded-xl space-y-2">
                 <div className="flex items-center space-x-2 text-emerald-300 text-xs font-bold">
                   <Scale className="w-4 h-4 text-emerald-400" />
@@ -469,7 +556,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 </p>
               </div>
 
-              {/* 4. Prescriptive Whole Food Solutions */}
+              {/* 5. Prescriptive Whole Food Solutions */}
               {dailyInsight.recommendedFoods.length > 0 && (
                 <div className="p-3.5 bg-slate-950/70 border border-sky-500/25 rounded-xl space-y-2.5">
                   <div className="flex items-center space-x-2 text-sky-300 text-xs font-bold">
