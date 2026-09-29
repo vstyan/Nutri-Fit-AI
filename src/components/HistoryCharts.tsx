@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import { TrendingUp, TrendingDown, Scale, Zap, Wheat, Flame, Heart } from 'lucide-react';
-import { WeightRecord, BloodLipidRecord } from '../types';
+import { WeightRecord, BloodLipidRecord, HistoryDayRecord } from '../types';
 
 ChartJS.register(
   CategoryScale,
@@ -28,19 +28,13 @@ ChartJS.register(
 );
 
 interface HistoryChartsProps {
-  historyData: Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }>;
+  historyData: HistoryDayRecord[];
   weightHistory?: WeightRecord[];
   lipidHistory?: BloodLipidRecord[];
   isImperial?: boolean;
   includeResting?: boolean;
+  calorieTarget?: number;
+  proteinTarget?: number;
 }
 
 export const HistoryCharts: React.FC<HistoryChartsProps> = ({
@@ -48,9 +42,11 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   weightHistory = [],
   lipidHistory = [],
   isImperial = true,
-  includeResting = true
+  includeResting = true,
+  calorieTarget,
+  proteinTarget
 }) => {
-  const [metric, setMetric] = useState<'calories' | 'carbs' | 'weight' | 'lipids'>('calories');
+  const [metric, setMetric] = useState<'calories' | 'protein' | 'carbs' | 'weight' | 'lipids'>('calories');
 
   const labels = historyData.map(d => {
     const dt = new Date(d.date + 'T00:00:00');
@@ -86,52 +82,128 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   const avgTotalCarbs = Math.round(historyData.reduce((sum, d) => sum + (d.carbsIntake || 0), 0) / carbDaysCount * 10) / 10;
   const avgFiber = Math.round(historyData.reduce((sum, d) => sum + (d.fiberIntake || 0), 0) / carbDaysCount * 10) / 10;
 
-  // Calorie and Carb datasets
-  const barChartData = {
+  // Protein averages & target adherence calculations
+  const proteinLoggedDays = historyData.filter(d => (d.proteinIntake || 0) > 0);
+  const proteinDaysCount = proteinLoggedDays.length > 0 ? proteinLoggedDays.length : 1;
+  const avgProtein = Math.round((historyData.reduce((sum, d) => sum + (d.proteinIntake || 0), 0) / proteinDaysCount) * 10) / 10;
+  const proteinAdherencePct = proteinTarget && proteinTarget > 0 ? Math.round((avgProtein / proteinTarget) * 100) : null;
+  const proteinCalories = Math.round(avgProtein * 4);
+  const proteinCaloriesPct = avgConsumed > 0 ? Math.round((proteinCalories / avgConsumed) * 100) : null;
+
+  // Calorie, Protein, and Carb datasets
+  const barChartData: any = {
     labels,
     datasets: metric === 'calories'
       ? [
           {
+            type: 'bar',
             label: 'Calories Consumed (kcal)',
             data: historyData.map(d => d.caloriesIntake),
             backgroundColor: 'rgba(56, 189, 248, 0.75)',
             borderColor: '#38bdf8',
             borderWidth: 1.5,
             borderRadius: 6,
+            pointStyle: 'circle',
+            order: 2,
           },
           {
+            type: 'bar',
             label: 'Total Calories Burned (kcal)',
             data: historyData.map(d => d.caloriesBurned),
             backgroundColor: 'rgba(52, 211, 153, 0.75)',
             borderColor: '#34d399',
             borderWidth: 1.5,
             borderRadius: 6,
-          }
+            pointStyle: 'circle',
+            order: 2,
+          },
+          ...(calorieTarget && calorieTarget > 0
+            ? [
+                {
+                  type: 'line',
+                  label: `Target (${calorieTarget.toLocaleString()} kcal)`,
+                  data: historyData.map(() => calorieTarget),
+                  borderColor: '#f59e0b',
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderDash: [6, 4],
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  pointBackgroundColor: '#f59e0b',
+                  pointBorderColor: '#ffffff',
+                  pointStyle: 'line',
+                  fill: false,
+                  tension: 0,
+                  order: 1,
+                }
+              ]
+            : [])
+        ]
+      : metric === 'protein'
+      ? [
+          {
+            type: 'bar',
+            label: 'Protein Intake (g)',
+            data: historyData.map(d => d.proteinIntake || 0),
+            backgroundColor: 'rgba(251, 113, 133, 0.75)',
+            borderColor: '#fb7185',
+            borderWidth: 1.5,
+            borderRadius: 6,
+            pointStyle: 'circle',
+            order: 2,
+          },
+          ...(proteinTarget && proteinTarget > 0
+            ? [
+                {
+                  type: 'line',
+                  label: `Target (${proteinTarget}g)`,
+                  data: historyData.map(() => proteinTarget),
+                  borderColor: '#f43f5e',
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderDash: [6, 4],
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  pointBackgroundColor: '#f43f5e',
+                  pointBorderColor: '#ffffff',
+                  pointStyle: 'line',
+                  fill: false,
+                  tension: 0,
+                  order: 1,
+                }
+              ]
+            : [])
         ]
       : [
           {
+            type: 'bar',
             label: 'Total Carbs (g)',
             data: historyData.map(d => d.carbsIntake),
             backgroundColor: 'rgba(56, 189, 248, 0.75)',
             borderColor: '#38bdf8',
             borderWidth: 1.5,
             borderRadius: 6,
+            pointStyle: 'circle',
           },
           {
+            type: 'bar',
             label: 'Net Carbs (g)',
             data: historyData.map(d => d.netCarbsIntake ?? d.carbsIntake),
             backgroundColor: 'rgba(167, 139, 250, 0.75)',
             borderColor: '#a78bfa',
             borderWidth: 1.5,
             borderRadius: 6,
+            pointStyle: 'circle',
           },
           {
+            type: 'bar',
             label: 'Fiber (g)',
             data: historyData.map(d => d.fiberIntake || 0),
             backgroundColor: 'rgba(251, 191, 36, 0.75)',
             borderColor: '#fbbf24',
             borderWidth: 1.5,
             borderRadius: 6,
+            pointStyle: 'circle',
           }
         ]
   };
@@ -255,6 +327,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         right: 4
       }
     },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false
+    },
     plugins: {
       legend: {
         position: 'top' as const,
@@ -262,11 +338,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
         labels: {
           color: isLightMode ? '#334155' : isMidnight ? '#94a3b8' : '#8e8e93',
           font: { size: 11, weight: '600' },
-          boxWidth: 9,
+          boxWidth: 14,
           boxHeight: 9,
-          padding: 18,
-          usePointStyle: true,
-          pointStyle: 'circle'
+          padding: 14,
+          usePointStyle: true
         }
       },
       tooltip: {
@@ -302,16 +377,16 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-bold text-white truncate">Historical Trends & Charts</h2>
-            <p className="text-xs text-slate-400 truncate">Calories, net carbs, weight, and blood lipids progression</p>
+            <p className="text-xs text-slate-400 truncate">Calories, protein, net carbs, weight, and blood lipids progression</p>
           </div>
         </div>
 
         {/* Metric Selector Buttons - Centered, balanced, and responsive */}
-        <div className="w-full sm:w-auto flex items-center justify-center p-1 bg-slate-800/90 rounded-xl border border-slate-700/80 shadow-inner">
+        <div className="w-full sm:w-auto flex items-center justify-start sm:justify-center p-1 bg-slate-800/90 rounded-xl border border-slate-700/80 shadow-inner overflow-x-auto no-scrollbar gap-0.5 sm:gap-1">
           <button
             type="button"
             onClick={() => setMetric('calories')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
               metric === 'calories'
                 ? 'bg-cyan-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -321,8 +396,19 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setMetric('protein')}
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
+              metric === 'protein'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+            }`}
+          >
+            Protein
+          </button>
+          <button
+            type="button"
             onClick={() => setMetric('carbs')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
               metric === 'carbs'
                 ? 'bg-cyan-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -333,7 +419,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           <button
             type="button"
             onClick={() => setMetric('weight')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
               metric === 'weight'
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -344,7 +430,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           <button
             type="button"
             onClick={() => setMetric('lipids')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[64px] sm:min-w-[76px] ${
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
               metric === 'lipids'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
@@ -366,9 +452,13 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
                 <span className="sm:hidden">Avg In</span>
                 <span className="hidden sm:inline">7-Day Avg Consumed</span>
               </span>
-              {loggedDaysCount > 0 && loggedDaysCount < historyData.length && (
+              {calorieTarget && calorieTarget > 0 ? (
+                <span className="text-[10px] text-amber-400 font-semibold hidden sm:inline">
+                  {calorieTarget.toLocaleString()} target
+                </span>
+              ) : loggedDaysCount > 0 && loggedDaysCount < historyData.length ? (
                 <span className="text-[10px] text-slate-500 hidden sm:inline">{loggedDaysCount}/7d</span>
-              )}
+              ) : null}
             </div>
             <div className="mt-1.5 flex items-baseline gap-1">
               <span className="text-base sm:text-xl font-bold text-cyan-300">
@@ -434,6 +524,85 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
               </span>
               <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
                 {avgConsumed === 0 ? 'no logs' : isDeficit ? 'kcal/d def.' : isSurplus ? 'kcal/d surp.' : 'balanced'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Protein 7-Day Averages & Adherence Bar */}
+      {metric === 'protein' && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* 1. Avg Protein */}
+          <div className="bg-slate-950/70 border border-rose-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                <span className="sm:hidden">Avg Protein</span>
+                <span className="hidden sm:inline">7-Day Avg Protein</span>
+              </span>
+              {proteinLoggedDays.length > 0 && proteinLoggedDays.length < historyData.length && (
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{proteinLoggedDays.length}/7d</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-rose-300">
+                {avgProtein > 0 ? avgProtein : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">g / day</span>
+            </div>
+          </div>
+
+          {/* 2. Target Adherence */}
+          <div className="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="sm:hidden">Adherence</span>
+                <span className="hidden sm:inline">Target Adherence</span>
+              </span>
+              {proteinTarget && proteinTarget > 0 && (
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{proteinTarget}g target</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                proteinAdherencePct !== null
+                  ? proteinAdherencePct >= 90 && proteinAdherencePct <= 115
+                    ? 'text-emerald-300'
+                    : proteinAdherencePct < 90
+                      ? 'text-amber-300'
+                      : 'text-cyan-300'
+                  : 'text-slate-300'
+              }`}>
+                {proteinAdherencePct !== null ? `${proteinAdherencePct}%` : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                {proteinAdherencePct !== null && proteinTarget
+                  ? avgProtein >= proteinTarget
+                    ? `+${Math.round((avgProtein - proteinTarget) * 10) / 10}g/d`
+                    : `${Math.round((avgProtein - proteinTarget) * 10) / 10}g/d`
+                  : 'no target'}
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Energy from Protein */}
+          <div className="bg-slate-950/70 border border-amber-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="sm:hidden">Energy %</span>
+                <span className="hidden sm:inline">Energy From Protein</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">4 kcal/g</span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className="text-base sm:text-xl font-bold text-amber-300">
+                {proteinCaloriesPct !== null ? `${proteinCaloriesPct}%` : avgProtein > 0 ? `${proteinCalories}` : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                {proteinCaloriesPct !== null ? `${proteinCalories} kcal/d` : 'kcal / day'}
               </span>
             </div>
           </div>

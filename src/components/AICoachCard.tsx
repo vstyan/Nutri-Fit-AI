@@ -20,7 +20,8 @@ import {
   AppSettings, 
   MealRecord, 
   WeightRecord, 
-  BloodLipidRecord 
+  BloodLipidRecord,
+  HistoryDayRecord
 } from '../types';
 import { 
   buildDailyCoachPayload, 
@@ -45,15 +46,7 @@ interface AICoachCardProps {
   selectedDate: string;
   summary: DailySummary;
   settings: AppSettings;
-  historyData: Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }>;
+  historyData: HistoryDayRecord[];
   weightHistory?: WeightRecord[];
   lipidHistory?: BloodLipidRecord[];
   onOpenSettings?: () => void;

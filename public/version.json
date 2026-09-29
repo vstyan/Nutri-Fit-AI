@@ -1,5 +1,5 @@
 {
-  "version": "1.7.9",
+  "version": "1.8.0",
   "releaseDate": "2026-09-28",
-  "notes": "Reordered Daily Nutrition section to position Dietary Cholesterol Intake directly beneath Total Fat, keeping all nutritional progress bars grouped together."
+  "notes": "Added dedicated Protein tab to Historical Trends & Charts and added horizontal dotted target benchmark lines for both Calories and Protein based on user settings."
 }

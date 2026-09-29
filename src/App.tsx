@@ -17,7 +17,8 @@ import {
   StorageLocation,
   WeightRecord,
   WorkoutEntry,
-  BloodLipidRecord
+  BloodLipidRecord,
+  HistoryDayRecord
 } from './types';
 import { 
   getAppSettings, 
@@ -107,15 +108,7 @@ export function App() {
     };
   });
 
-  const [historyData, setHistoryData] = useState<Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }>>([]);
+  const [historyData, setHistoryData] = useState<HistoryDayRecord[]>([]);
 
   // Modals state
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -455,15 +448,7 @@ export function App() {
     setYesterdayMeals(yMeals);
 
     // Load past 7 days for trend charts
-    const past7: Array<{
-      date: string;
-      carbsIntake: number;
-      fiberIntake?: number;
-      netCarbsIntake?: number;
-      carbsBurned: number;
-      caloriesIntake: number;
-      caloriesBurned: number;
-    }> = [];
+    const past7: HistoryDayRecord[] = [];
 
     const past7Dates = getPastNDaysDateStrings(7, date);
     for (const dStr of past7Dates) {
@@ -473,6 +458,8 @@ export function App() {
       const cIn = Math.round(mList.reduce((s, m) => s + (m.totalCarbs || 0), 0) * 10) / 10;
       const fibIn = Math.round(mList.reduce((s, m) => s + (m.totalFiber || 0), 0) * 10) / 10;
       const netCIn = Math.max(0, Math.round((cIn - fibIn) * 10) / 10);
+      const protIn = Math.round(mList.reduce((s, m) => s + (m.totalProtein || 0), 0) * 10) / 10;
+      const fatIn = Math.round(mList.reduce((s, m) => s + (m.totalFat || 0), 0) * 10) / 10;
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
 
       const pastBmr = includeResting ? calculateBMR(currentSettings.profile) : 0;
@@ -490,6 +477,8 @@ export function App() {
         carbsIntake: cIn,
         fiberIntake: fibIn,
         netCarbsIntake: netCIn,
+        proteinIntake: protIn,
+        fatIntake: fatIn,
         carbsBurned: 0,
         caloriesIntake: calIn,
         caloriesBurned: pastBreakdown.totalBurned

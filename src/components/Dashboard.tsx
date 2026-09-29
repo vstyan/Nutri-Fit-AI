@@ -26,7 +26,8 @@ import {
   MealRecord, 
   WeightRecord,
   WorkoutEntry,
-  BloodLipidRecord
+  BloodLipidRecord,
+  HistoryDayRecord
 } from '../types';
 import { calculateBMR, calculateTDEE, calculateTEFBreakdown } from '../utils/calorieEngine';
 import { MealHistory } from './MealHistory';
@@ -40,15 +41,7 @@ import { AICoachCard } from './AICoachCard';
 interface DashboardProps {
   summary: DailySummary;
   settings: AppSettings;
-  historyData: Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }>;
+  historyData: HistoryDayRecord[];
   weightHistory: WeightRecord[];
   lipidHistory?: BloodLipidRecord[];
   favoriteMeals: MealRecord[];
@@ -906,6 +899,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             lipidHistory={lipidHistory}
             isImperial={settings.profile.unitSystem === 'imperial'}
             includeResting={includeResting}
+            calorieTarget={goals.dailyCaloriesTarget}
+            proteinTarget={goals.dailyProteinTarget}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.7.9';
+export const APP_VERSION = '1.8.0';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -96,6 +96,18 @@ export interface DailyActivity {
   source?: 'manual' | 'google_fit';
   lastSyncedAt?: string;
   lastUpdated: string;
+}
+
+export interface HistoryDayRecord {
+  date: string; // YYYY-MM-DD
+  carbsIntake: number;
+  fiberIntake?: number;
+  netCarbsIntake?: number;
+  proteinIntake?: number;
+  fatIntake?: number;
+  carbsBurned: number;
+  caloriesIntake: number;
+  caloriesBurned: number;
 }
 
 export interface BurnBreakdown {

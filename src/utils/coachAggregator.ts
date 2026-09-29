@@ -3,7 +3,8 @@ import {
   AppSettings, 
   MealRecord, 
   WeightRecord, 
-  BloodLipidRecord 
+  BloodLipidRecord,
+  HistoryDayRecord
 } from '../types';
 import { getLocalDateString } from './dateUtils';
 
@@ -187,15 +188,7 @@ export function buildDailyCoachPayload(
   date: string,
   summary: DailySummary,
   settings: AppSettings,
-  historyData: Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }> = [],
+  historyData: HistoryDayRecord[] = [],
   weightHistory: WeightRecord[] = [],
   lipidHistory: BloodLipidRecord[] = []
 ): DailyCoachPayload {
@@ -427,15 +420,7 @@ export function buildDailyCoachPayload(
 export function buildWeeklyCoachPayload(
   weekKey: string,
   dateRange: string,
-  historyData: Array<{
-    date: string;
-    carbsIntake: number;
-    fiberIntake?: number;
-    netCarbsIntake?: number;
-    carbsBurned: number;
-    caloriesIntake: number;
-    caloriesBurned: number;
-  }>,
+  historyData: HistoryDayRecord[],
   recentMealsByDate: Record<string, MealRecord[]>,
   settings: AppSettings,
   weightHistory: WeightRecord[] = [],
