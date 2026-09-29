@@ -11,7 +11,8 @@ import {
   Calendar,
   AlertCircle,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import { 
   DailyCoachInsight, 
@@ -656,6 +657,14 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
           )}
         </>
       )}
+
+      {/* Google Gemini AI Accuracy Disclaimer */}
+      <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-center text-center px-2">
+        <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 flex-wrap leading-tight">
+          <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span>Gemini can make mistakes, so always double-check data and recommendations.</span>
+        </p>
+      </div>
     </div>
   );
 };

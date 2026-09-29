@@ -1,5 +1,5 @@
 {
-  "version": "1.8.3",
+  "version": "1.8.4",
   "releaseDate": "2026-09-29",
-  "notes": "Added real-time dietary fiber and protein pacing metrics to AI Coach telemetry with explicit anti-hallucination guardrails to prevent falsely flagging fiber gaps when intake is already high, and excluded in-progress days from multi-day rolling deficit calculations."
+  "notes": "Added clean Google Gemini AI accuracy disclaimer to the AI Coach tab to remind users to double-check data and recommendations."
 }
