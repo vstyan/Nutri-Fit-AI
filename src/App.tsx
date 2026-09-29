@@ -68,9 +68,9 @@ export function App() {
 
   // Documentation modal state
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false);
-  const [documentationSection, setDocumentationSection] = useState('google-fit');
+  const [documentationSection, setDocumentationSection] = useState('gemini-key');
 
-  const handleOpenDocumentation = useCallback((section: string = 'google-fit') => {
+  const handleOpenDocumentation = useCallback((section: string = 'gemini-key') => {
     setDocumentationSection(section);
     setIsDocumentationOpen(true);
   }, []);
@@ -819,7 +819,7 @@ export function App() {
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenStorageModal={() => setIsStoragePromptOpen(true)}
-        onOpenDocumentation={() => handleOpenDocumentation('google-fit')}
+        onOpenDocumentation={() => handleOpenDocumentation('gemini-key')}
       />
 
       {/* Main Dashboard */}

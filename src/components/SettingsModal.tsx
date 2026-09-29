@@ -768,15 +768,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Key className="w-4 h-4" />
                 <span>Gemini API Key</span>
               </label>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
-              >
-                <span>Get API key for free</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center gap-3">
+                {onOpenDocumentation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenDocumentation('gemini-key');
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-cyan-300 flex items-center gap-1 transition"
+                    title="Read the step-by-step API key setup guide"
+                  >
+                    <BookOpen className="w-3 h-3 text-cyan-400" />
+                    <span>Setup Guide</span>
+                  </button>
+                )}
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1 font-medium"
+                >
+                  <span>Get API key for free</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
             <input
               type="password"

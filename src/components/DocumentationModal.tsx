@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Smartphone,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Key
 } from 'lucide-react';
 import { APP_VERSION } from '../types';
 
@@ -36,7 +37,7 @@ interface DocSection {
 export const DocumentationModal: React.FC<DocumentationModalProps> = ({
   isOpen,
   onClose,
-  initialSection = 'google-fit'
+  initialSection = 'gemini-key'
 }) => {
   const [activeSection, setActiveSection] = useState<string>(initialSection);
 
@@ -59,6 +60,159 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
   if (!isOpen) return null;
 
   const sections: DocSection[] = [
+    {
+      id: 'gemini-key',
+      title: 'Gemini API Key Setup',
+      icon: Sparkles,
+      badge: 'Essential & Free',
+      badgeColor: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
+      content: (
+        <div className="space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
+          {/* Overview Hero */}
+          <div className="bg-gradient-to-br from-cyan-950/40 via-slate-900 to-indigo-950/30 border border-cyan-500/40 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-cyan-300 font-bold text-sm sm:text-base">
+                <Sparkles className="w-5 h-5 text-cyan-400 shrink-0" />
+                <span>Why You Need a Gemini API Key</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                100% Free
+              </span>
+            </div>
+            <p className="text-slate-200 leading-relaxed">
+              NutriFit AI is powered by Google&apos;s multimodal <strong>Gemini 2.5 Flash</strong> model to perform real-time photo meal recognition, natural language voice workout estimation, and the behavioral AI Coach.
+            </p>
+            <p className="text-slate-300 leading-relaxed">
+              Because NutriFit AI is designed as a <strong>private, client-side app with no monthly subscriptions or centralized server fees</strong>, each user connects directly to Google using their own free API key from Google AI Studio.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+                <span className="font-bold text-white block">📸 Meal Photos</span>
+                <span className="text-[11px] text-slate-400">Identifies dishes, portions, carbs, fiber, protein &amp; lipids from plate photos.</span>
+              </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+                <span className="font-bold text-white block">🎙️ Voice Workouts</span>
+                <span className="text-[11px] text-slate-400">Translates spoken or written exercise descriptions into accurate calories burned.</span>
+              </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+                <span className="font-bold text-white block">🧠 AI Coach</span>
+                <span className="text-[11px] text-slate-400">Analyzes chrono-nutrition eating windows, habit trends &amp; weekly trajectories.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Step-by-Step Instructions */}
+          <div className="space-y-3 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-white text-xs sm:text-sm uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+                Step-by-Step: How to Obtain Your Free Key in 60 Seconds
+              </h4>
+            </div>
+
+            <div className="space-y-2.5 text-xs sm:text-sm text-slate-300">
+              {/* Step 1 */}
+              <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  1
+                </span>
+                <div className="space-y-1.5 flex-1">
+                  <p className="font-semibold text-white">Open Google AI Studio</p>
+                  <p className="text-slate-400 text-xs">
+                    Navigate to Google&apos;s official developer portal for API keys:
+                  </p>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-semibold rounded-lg text-xs transition active:scale-95 shadow-sm"
+                  >
+                    <span>Open aistudio.google.com/app/apikey</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  2
+                </span>
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-white">Sign In with Your Google Account</p>
+                  <p className="text-slate-400 text-xs">
+                    Log in with any personal Google account (e.g., your regular Gmail address). No credit card, payment details, or paid subscription is needed.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  3
+                </span>
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-white">Click &quot;Create API Key&quot;</p>
+                  <p className="text-slate-400 text-xs">
+                    Tap the blue button labeled <strong>&quot;Create API key&quot;</strong>. If prompted, select <strong>&quot;Create key in new project&quot;</strong> (this provisions an automatic, free sandbox project instantly).
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  4
+                </span>
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-white">Copy Your Key</p>
+                  <p className="text-slate-400 text-xs">
+                    A pop-up modal will appear displaying your API key (a string of characters starting with <code>AIzaSy...</code>). Click the <strong>Copy</strong> icon.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 5 */}
+              <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  5
+                </span>
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-white">Paste into NutriFit AI Settings</p>
+                  <p className="text-slate-400 text-xs">
+                    In NutriFit AI, open <strong>Settings</strong> (tap the ⚙️ gear icon in the top header), scroll down to <strong>&quot;Google Gemini API Key&quot;</strong>, paste your copied key, and tap <strong>&quot;Save Settings&quot;</strong>. That&apos;s it!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Privacy & Free Quota Notice */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 space-y-1">
+              <h5 className="font-bold text-white text-xs uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                100% Private &amp; Secure
+              </h5>
+              <p className="text-[11px] text-slate-400">
+                Your API key is saved exclusively in your browser&apos;s local IndexedDB or your private Google Drive backup. It is never transmitted to any third-party developer server.
+              </p>
+            </div>
+
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 space-y-1">
+              <h5 className="font-bold text-white text-xs uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                <Lightbulb className="w-4 h-4 text-cyan-400" />
+                Generous Free Usage
+              </h5>
+              <p className="text-[11px] text-slate-400">
+                Google provides up to 15 requests per minute and 1,500 free requests per day on AI Studio — plenty for multiple meals, workouts, and coach updates daily.
+              </p>
+            </div>
+          </div>
+        </div>
+      )
+    },
     {
       id: 'google-fit',
       title: 'Google Fit & Wearable Sync',
@@ -179,6 +333,36 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
               <span className="text-xs font-bold text-emerald-400 block">Deficit = Weight Loss</span>
               <span className="text-[10px] text-amber-400 font-semibold">Surplus = Weight Gain</span>
             </div>
+          </div>
+
+          <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded-xl p-4">
+            <h4 className="font-bold text-white text-xs uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-rose-400" />
+              What Does &quot;Energy %&quot; Mean?
+            </h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              In nutritional science and metabolic tracking, <strong>Energy %</strong> represents the proportion of your total daily calories that comes from a specific macronutrient, based on the established <strong>Atwater energy factors</strong>:
+            </p>
+            <div className="grid grid-cols-3 gap-2 pt-1 text-center font-medium">
+              <div className="bg-slate-950/80 border border-rose-500/30 rounded-lg p-2.5">
+                <span className="text-rose-300 font-bold block text-xs">Protein</span>
+                <span className="text-[11px] text-slate-400 font-mono">4 kcal / g</span>
+              </div>
+              <div className="bg-slate-950/80 border border-purple-500/30 rounded-lg p-2.5">
+                <span className="text-purple-300 font-bold block text-xs">Carbohydrates</span>
+                <span className="text-[11px] text-slate-400 font-mono">4 kcal / g</span>
+              </div>
+              <div className="bg-slate-950/80 border border-amber-500/30 rounded-lg p-2.5">
+                <span className="text-amber-300 font-bold block text-xs">Fats</span>
+                <span className="text-[11px] text-slate-400 font-mono">9 kcal / g</span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 pt-1 leading-relaxed">
+              <strong>Formula:</strong> <code>Energy % = (Daily Grams × 4 kcal/g) ÷ Total Daily Calories × 100%</code>.
+            </p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              <em>Example:</em> If you consume <strong>140g of protein</strong> on a <strong>2,240 kcal diet</strong>: 140g × 4 kcal/g = 560 kcal from protein, which equals <strong>25% Energy %</strong>. This metric tells you how protein-dense your nutrition is, remaining consistent even if your total intake fluctuates from day to day.
+            </p>
           </div>
         </div>
       )
