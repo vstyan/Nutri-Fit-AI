@@ -1,5 +1,5 @@
 {
-  "version": "1.7.3",
+  "version": "1.7.4",
   "releaseDate": "2026-09-28",
-  "notes": "Streamlined theme options to Pure Black (OLED) and Teal Breeze (Light Mode), with crisp card borders, frosted teal accents, and high-contrast typography."
+  "notes": "Redesigned main dashboard into a structured 3-tab workspace (Daily Log, AI Coach, Trends & Health) beneath the always-visible Hero Caloric Balance card."
 }

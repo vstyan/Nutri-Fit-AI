@@ -17,7 +17,8 @@ import {
   Sparkles,
   Clock,
   HelpCircle,
-  Heart
+  Heart,
+  Utensils
 } from 'lucide-react';
 import { 
   DailySummary, 
@@ -110,6 +111,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
   const [isSavedRecently, setIsSavedRecently] = useState(false);
   const [isVoiceWorkoutOpen, setIsVoiceWorkoutOpen] = useState(false);
+
+  // Segmented Workspace Tab: 'log' | 'coach' | 'trends'
+  const [activeTab, setActiveTab] = useState<'log' | 'coach' | 'trends'>(() => {
+    try {
+      const saved = localStorage.getItem('nutrifit_dashboard_tab');
+      if (saved === 'log' || saved === 'coach' || saved === 'trends') return saved;
+    } catch {
+      // fallback
+    }
+    return 'log';
+  });
+
+  const handleTabChange = (tab: 'log' | 'coach' | 'trends') => {
+    setActiveTab(tab);
+    try {
+      localStorage.setItem('nutrifit_dashboard_tab', tab);
+    } catch {
+      // fallback
+    }
+  };
 
   useEffect(() => {
     setInputActiveKcal(activity.activeCaloriesBurned > 0 ? String(activity.activeCaloriesBurned) : '');
@@ -259,21 +280,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. Weight Scale & Lipid Panel Biometrics Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <WeightTrackerCard
-          currentDate={summary.date}
-          weightRecord={summary.weightRecord}
-          settings={settings}
-          weightHistory={weightHistory}
-          onSaveWeight={onSaveWeight}
-        />
-        <LipidTrackerCard
-          lipidHistory={lipidHistory || []}
-          onOpenModal={handleOpenLipidModal}
-          userGender={settings.profile?.gender || 'male'}
-        />
+      {/* 2. Segmented Workspace Navigation Bar (Daily Log | AI Coach | Trends & Health) */}
+      <div className="flex items-center justify-center p-1 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg">
+        <div className="grid grid-cols-3 w-full gap-1">
+          <button
+            type="button"
+            onClick={() => handleTabChange('log')}
+            className={`py-2 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition-all active:scale-95 ${
+              activeTab === 'log'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Utensils className="w-4 h-4 shrink-0" />
+            <span className="truncate">Daily Log</span>
+            {summary.meals.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold shrink-0 ${
+                activeTab === 'log' ? 'bg-cyan-700/80 text-white' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {summary.meals.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('coach')}
+            className={`py-2 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition-all active:scale-95 ${
+              activeTab === 'coach'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span className="truncate">AI Coach</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('trends')}
+            className={`py-2 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition-all active:scale-95 ${
+              activeTab === 'trends'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 shrink-0" />
+            <span className="truncate">Trends & Health</span>
+          </button>
+        </div>
       </div>
+
+      {/* TAB 1: DAILY LOG (Nutrition & Macros, Meals Timeline, Exercise Burn) */}
+      {activeTab === 'log' && (
+        <div className="space-y-5 animate-in fade-in duration-150">
 
       {/* 3. Daily Exercise & Energy Burn Breakdown Card */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
@@ -815,37 +875,62 @@ export const Dashboard: React.FC<DashboardProps> = ({
         })()}
       </div>
 
-      {/* 5. AI Nutrition Coach: Deep Behavioral Insights, Chrono-Nutrition & Recommendations */}
-      <AICoachCard
-        selectedDate={summary.date}
-        summary={summary}
-        settings={settings}
-        historyData={historyData}
-        weightHistory={weightHistory}
-        lipidHistory={lipidHistory}
-        onOpenSettings={onOpenSettings}
-      />
+          {/* Meals Timeline with Quick Favorites */}
+          <MealHistory
+            meals={summary.meals}
+            favoriteMeals={favoriteMeals}
+            yesterdayMeals={yesterdayMeals}
+            onDeleteMeal={onDeleteMeal}
+            onEditMeal={onEditMeal}
+            onToggleFavorite={onToggleFavorite}
+            onCopyMealToToday={onCopyMealToToday}
+            onOpenCapture={onOpenCapture}
+          />
+        </div>
+      )}
 
-      {/* 6. Meals Timeline with Quick Favorites */}
-      <MealHistory
-        meals={summary.meals}
-        favoriteMeals={favoriteMeals}
-        yesterdayMeals={yesterdayMeals}
-        onDeleteMeal={onDeleteMeal}
-        onEditMeal={onEditMeal}
-        onToggleFavorite={onToggleFavorite}
-        onCopyMealToToday={onCopyMealToToday}
-        onOpenCapture={onOpenCapture}
-      />
+      {/* TAB 2: AI NUTRITION COACH */}
+      {activeTab === 'coach' && (
+        <div className="space-y-5 animate-in fade-in duration-150">
+          <AICoachCard
+            selectedDate={summary.date}
+            summary={summary}
+            settings={settings}
+            historyData={historyData}
+            weightHistory={weightHistory}
+            lipidHistory={lipidHistory}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+      )}
 
-      {/* 6. Historical Comparison Charts (Calories, Net Carbs, Weight, Lipids) */}
-      <HistoryCharts
-        historyData={historyData}
-        weightHistory={weightHistory}
-        lipidHistory={lipidHistory}
-        isImperial={settings.profile.unitSystem === 'imperial'}
-        includeResting={includeResting}
-      />
+      {/* TAB 3: TRENDS & HEALTH BIOMETRICS */}
+      {activeTab === 'trends' && (
+        <div className="space-y-5 animate-in fade-in duration-150">
+          <HistoryCharts
+            historyData={historyData}
+            weightHistory={weightHistory}
+            lipidHistory={lipidHistory}
+            isImperial={settings.profile.unitSystem === 'imperial'}
+            includeResting={includeResting}
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <WeightTrackerCard
+              currentDate={summary.date}
+              weightRecord={summary.weightRecord}
+              settings={settings}
+              weightHistory={weightHistory}
+              onSaveWeight={onSaveWeight}
+            />
+            <LipidTrackerCard
+              lipidHistory={lipidHistory || []}
+              onOpenModal={handleOpenLipidModal}
+              userGender={settings.profile?.gender || 'male'}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 7. Floating Action Button on Mobile with iOS Home Bar Safe Inset */}
       <div 
