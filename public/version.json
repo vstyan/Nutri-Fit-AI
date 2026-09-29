@@ -1,5 +1,5 @@
 {
-  "version": "1.8.2",
+  "version": "1.8.3",
   "releaseDate": "2026-09-29",
-  "notes": "Optimized Gemini food analysis for peak speed and USDA clinical accuracy: top-level systemInstruction with server-side prompt prefix caching, zero-thinking budget for ultra-low latency, strict schema enforcement for fat subtypes and dietary cholesterol, and Atwater caloric balance."
+  "notes": "Added real-time dietary fiber and protein pacing metrics to AI Coach telemetry with explicit anti-hallucination guardrails to prevent falsely flagging fiber gaps when intake is already high, and excluded in-progress days from multi-day rolling deficit calculations."
 }

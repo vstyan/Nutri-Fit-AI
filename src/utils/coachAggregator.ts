@@ -21,6 +21,14 @@ export interface DailyCoachPayload {
     dailyCalorieTarget: number;
     caloriesRemainingToday: number;
     percentTargetConsumedSoFar: number;
+    fiberConsumedSoFar: number;
+    dailyFiberTarget: number;
+    fiberRemainingToday: number;
+    percentFiberConsumedSoFar: number;
+    proteinConsumedSoFar: number;
+    dailyProteinTarget: number;
+    proteinRemainingToday: number;
+    percentProteinConsumedSoFar: number;
     burnRecordedSoFar: number;
     interimNetBalance: number;
     guidanceForAI: string;
@@ -255,6 +263,24 @@ export function buildDailyCoachPayload(
     ? Math.round((caloriesAfter8PM / totalCalories) * 100)
     : 0;
 
+  // Real-time day pacing calculation (ensures AI Coach does not treat in-progress days as complete)
+  const now = new Date();
+  const todayStr = getLocalDateString(now);
+  const isToday = date === todayStr;
+  const currentHour = now.getHours();
+  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+  const currentLocalTime = `${String(currentHour).padStart(2, '0')}:${currentMinutes}`;
+
+  const isDayInProgress = isToday && (currentHour < 21 || (currentHour === 21 && now.getMinutes() < 30));
+
+  let dayPhase: 'early_morning' | 'morning' | 'midday_lunch' | 'afternoon' | 'evening_dinner' | 'night_wrapup' = 'night_wrapup';
+  if (currentHour >= 4 && currentHour < 9) dayPhase = 'early_morning';
+  else if (currentHour >= 9 && currentHour < 12) dayPhase = 'morning';
+  else if (currentHour >= 12 && currentHour < 15) dayPhase = 'midday_lunch';
+  else if (currentHour >= 15 && currentHour < 18) dayPhase = 'afternoon';
+  else if (currentHour >= 18 && currentHour < 22) dayPhase = 'evening_dinner';
+  else dayPhase = 'night_wrapup';
+
   // Past 7 days rolling stats
   const validLoggedDays = historyData.filter(d => (d.caloriesIntake || 0) > 0);
   const daysLoggedPastWeek = validLoggedDays.length;
@@ -268,16 +294,19 @@ export function buildDailyCoachPayload(
     : 0;
   const cumulativeDeficitPast7Days = total7DayBurned - total7DayConsumed;
 
-  // Recent 3 days protein/fiber gap calculation
-  const past3Days = historyData.slice(-3);
+  // Recent 3 completed days protein/fiber gap calculation (exclude today if day is still in progress)
+  const completedHistoryDays = isDayInProgress
+    ? historyData.filter(d => d.date !== date && (d.caloriesIntake || 0) > 0).slice(-3)
+    : historyData.filter(d => (d.caloriesIntake || 0) > 0).slice(-3);
+
   let recentProteinGap = 0;
   let recentFiberGap = 0;
   const targetFiber = settings.goals.dailyFiberTarget || 30;
+  const targetProtein = settings.goals.dailyProteinTarget || 140;
 
-  for (const d of past3Days) {
-    if ((d.caloriesIntake || 0) > 0) {
-      recentFiberGap += ((d.fiberIntake || 0) - targetFiber);
-    }
+  for (const d of completedHistoryDays) {
+    recentFiberGap += ((d.fiberIntake || 0) - targetFiber);
+    recentProteinGap += ((d.proteinIntake || 0) - targetProtein);
   }
 
   // Biometrics context
@@ -306,33 +335,34 @@ export function buildDailyCoachPayload(
   const totalBurned = summary.activity.totalCaloriesBurned || 2000;
   const netEnergyBalance = totalCalories - totalBurned;
 
-  // Real-time day pacing calculation (ensures AI Coach does not treat in-progress days as complete)
-  const now = new Date();
-  const todayStr = getLocalDateString(now);
-  const isToday = date === todayStr;
-  const currentHour = now.getHours();
-  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-  const currentLocalTime = `${String(currentHour).padStart(2, '0')}:${currentMinutes}`;
-
-  const isDayInProgress = isToday && (currentHour < 21 || (currentHour === 21 && now.getMinutes() < 30));
-
-  let dayPhase: 'early_morning' | 'morning' | 'midday_lunch' | 'afternoon' | 'evening_dinner' | 'night_wrapup' = 'night_wrapup';
-  if (currentHour >= 4 && currentHour < 9) dayPhase = 'early_morning';
-  else if (currentHour >= 9 && currentHour < 12) dayPhase = 'morning';
-  else if (currentHour >= 12 && currentHour < 15) dayPhase = 'midday_lunch';
-  else if (currentHour >= 15 && currentHour < 18) dayPhase = 'afternoon';
-  else if (currentHour >= 18 && currentHour < 22) dayPhase = 'evening_dinner';
-  else dayPhase = 'night_wrapup';
-
   const caloriesTarget = settings.goals.dailyCaloriesTarget || 2000;
   const caloriesRemainingToday = Math.max(0, caloriesTarget - totalCalories);
   const percentTargetConsumedSoFar = caloriesTarget > 0
     ? Math.round((totalCalories / caloriesTarget) * 100)
     : 0;
 
+  const fiberConsumed = summary.totals.fiber || 0;
+  const fiberRemainingToday = Math.max(0, Math.round((targetFiber - fiberConsumed) * 10) / 10);
+  const percentFiberConsumedSoFar = targetFiber > 0
+    ? Math.round((fiberConsumed / targetFiber) * 100)
+    : 0;
+
+  const proteinConsumed = summary.totals.protein || 0;
+  const proteinRemainingToday = Math.max(0, Math.round((targetProtein - proteinConsumed) * 10) / 10);
+  const percentProteinConsumedSoFar = targetProtein > 0
+    ? Math.round((proteinConsumed / targetProtein) * 100)
+    : 0;
+
+  let fiberPacingGuidance = '';
+  if (percentFiberConsumedSoFar >= 70) {
+    fiberPacingGuidance = `FIBER PACING ALERT: The user has ALREADY consumed ${fiberConsumed}g of their ${targetFiber}g fiber target (~${percentFiberConsumedSoFar}% of daily goal)! This is an exceptional fiber start. You MUST NOT claim or imply the user has a 'fiber gap' or 'fiber deficiency' today. If addressing elevated LDL, praise their high total fiber intake and suggest only modest soluble-fiber sources (oats, chia, lentils) specifically for lipid clearance without calling it a deficit.`;
+  } else if (isDayInProgress) {
+    fiberPacingGuidance = `Fiber consumed so far: ${fiberConsumed}g of ${targetFiber}g (~${percentFiberConsumedSoFar}%). Remaining fiber to budget for today: ${fiberRemainingToday}g.`;
+  }
+
   const guidanceForAI = isDayInProgress
-    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning/afternoon expenditure recorded so far (${totalBurned} kcal), NOT 24-hour total burn. This is NOT a severe deficit or low intake. The user's eating window is STILL ACTIVELY OPEN: their latest meal was at ${lastMealTime || 'N/A'}, but upcoming meals (afternoon fuel, dinner, evening snacks) are still ahead. DO NOT state or imply that 'the eating window closed at ${lastMealTime || 'N/A'}'. You MUST advise on upcoming meals for TODAY to budget the remaining ${caloriesRemainingToday} kcal and remaining protein/fiber. 'actionableAdjustment' must give timing advice for remaining meals TODAY (not tomorrow)!`
-    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal. 'actionableAdjustment' should suggest a timing tweak for tomorrow.`;
+    ? `DAY IN PROGRESS: Current local time is ${currentLocalTime} (${dayPhase}). The user is in the middle of their day. They have consumed ${totalCalories} of ${caloriesTarget} kcal (~${percentTargetConsumedSoFar}% of daily target). The interim net balance (${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal) reflects morning/afternoon expenditure recorded so far (${totalBurned} kcal), NOT 24-hour total burn. This is NOT a severe deficit or low intake. The user's eating window is STILL ACTIVELY OPEN: their latest meal was at ${lastMealTime || 'N/A'}, but upcoming meals (afternoon fuel, dinner, evening snacks) are still ahead. DO NOT state or imply that 'the eating window closed at ${lastMealTime || 'N/A'}'. You MUST advise on upcoming meals for TODAY to budget the remaining ${caloriesRemainingToday} kcal and remaining ${proteinRemainingToday}g protein. ${fiberPacingGuidance} 'actionableAdjustment' must give timing advice for remaining meals TODAY (not tomorrow)!`
+    : `DAY COMPLETED: Full 24-hour evaluation for ${date}. Total intake: ${totalCalories} kcal, Total burned: ${totalBurned} kcal, Final net balance: ${netEnergyBalance > 0 ? '+' : ''}${netEnergyBalance} kcal. ${fiberPacingGuidance} 'actionableAdjustment' should suggest a timing tweak for tomorrow.`;
 
   const dayPacingContext = {
     isToday,
@@ -343,6 +373,14 @@ export function buildDailyCoachPayload(
     dailyCalorieTarget: caloriesTarget,
     caloriesRemainingToday,
     percentTargetConsumedSoFar,
+    fiberConsumedSoFar: fiberConsumed,
+    dailyFiberTarget: targetFiber,
+    fiberRemainingToday,
+    percentFiberConsumedSoFar,
+    proteinConsumedSoFar: proteinConsumed,
+    dailyProteinTarget: targetProtein,
+    proteinRemainingToday,
+    percentProteinConsumedSoFar,
     burnRecordedSoFar: totalBurned,
     interimNetBalance: netEnergyBalance,
     guidanceForAI
