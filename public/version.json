@@ -1,5 +1,5 @@
 {
-  "version": "1.7.4",
+  "version": "1.7.5",
   "releaseDate": "2026-09-28",
-  "notes": "Redesigned main dashboard into a structured 3-tab workspace (Daily Log, AI Coach, Trends & Health) beneath the always-visible Hero Caloric Balance card."
+  "notes": "Fixed contrast in Chrono-Nutrition & Timing Strategy in light themes, ensuring high-contrast readable text."
 }

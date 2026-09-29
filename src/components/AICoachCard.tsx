@@ -405,13 +405,13 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                   {dailyInsight.chronoNutrition.timingDiagnosis}
                 </p>
 
-                <div className="pt-1 border-t border-slate-800/80 flex items-start space-x-2 text-xs text-purple-200">
+                <div className="pt-2 border-t border-slate-800/80 flex items-start space-x-2 text-xs text-slate-300 leading-relaxed">
                   <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <span>
-                    <strong className="text-white">
+                    <strong className="text-white font-semibold">
                       {isToday ? "Today's Timing Strategy:" : "Timing Tweak for Tomorrow:"}
                     </strong>{' '}
-                    {dailyInsight.chronoNutrition.actionableAdjustment}
+                    <span>{dailyInsight.chronoNutrition.actionableAdjustment}</span>
                   </span>
                 </div>
               </div>

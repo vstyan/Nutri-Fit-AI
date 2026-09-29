@@ -226,49 +226,56 @@ html.theme-teal-breeze {
   [class*="bg-purple-950"] {
     background-color: rgb(243 232 255 / 0.8) !important;
   }
-  [class*="text-purple-300"] {
+  [class*="text-purple-300"],
+  [class*="text-purple-200"] {
     color: rgb(126 34 206) !important;
   }
 
   [class*="bg-amber-950"] {
     background-color: rgb(254 243 199 / 0.8) !important;
   }
-  [class*="text-amber-300"] {
+  [class*="text-amber-300"],
+  [class*="text-amber-200"] {
     color: rgb(180 83 9) !important;
   }
 
   [class*="bg-emerald-950"] {
     background-color: rgb(209 250 229 / 0.8) !important;
   }
-  [class*="text-emerald-300"] {
+  [class*="text-emerald-300"],
+  [class*="text-emerald-200"] {
     color: rgb(4 120 87) !important;
   }
 
   [class*="bg-sky-950"] {
     background-color: rgb(224 242 254 / 0.8) !important;
   }
-  [class*="text-sky-300"] {
+  [class*="text-sky-300"],
+  [class*="text-sky-200"] {
     color: rgb(3 105 161) !important;
   }
 
   [class*="bg-cyan-950"] {
     background-color: rgb(207 250 254 / 0.8) !important;
   }
-  [class*="text-cyan-300"] {
+  [class*="text-cyan-300"],
+  [class*="text-cyan-200"] {
     color: rgb(14 116 144) !important;
   }
 
   [class*="bg-indigo-950"] {
     background-color: rgb(224 231 255 / 0.8) !important;
   }
-  [class*="text-indigo-300"] {
+  [class*="text-indigo-300"],
+  [class*="text-indigo-200"] {
     color: rgb(67 56 202) !important;
   }
 
   [class*="bg-rose-950"] {
     background-color: rgb(255 228 230 / 0.8) !important;
   }
-  [class*="text-rose-300"] {
+  [class*="text-rose-300"],
+  [class*="text-rose-200"] {
     color: rgb(190 18 60) !important;
   }
 }
