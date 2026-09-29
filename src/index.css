@@ -145,37 +145,93 @@ html, body {
    ========================================================================== */
 html.theme-teal-breeze,
 html.theme-nordic-teal {
-  /* Invert text-white for general headings, stats, and card text */
-  .text-white {
-    color: rgb(15 23 42);
+  /* 1. All headings & section titles are ALWAYS dark high-contrast slate in light mode */
+  h1, h2, h3, h4, h5, h6 {
+    color: rgb(var(--color-slate-100)) !important;
   }
 
-  /* Keep crisp white text on colored CTA buttons, pills, gradients, and dark chips */
-  button[class*="text-white"],
-  a[class*="text-white"],
-  button span.text-white,
-  a span.text-white,
-  [class*="bg-cyan-"] .text-white,
-  [class*="bg-teal-"] .text-white,
-  [class*="bg-emerald-"] .text-white,
-  [class*="bg-indigo-"] .text-white,
-  [class*="bg-purple-"] .text-white,
-  [class*="bg-rose-"] .text-white,
-  [class*="bg-blue-"] .text-white,
-  [class*="bg-amber-"] .text-white,
-  [class*="bg-gradient-"] .text-white,
-  [class*="bg-black"] .text-white,
-  [class*="bg-slate-900"] button .text-white {
+  /* 2. Invert general text-white to dark high-contrast slate (stat numbers, card text, inputs) */
+  .text-white {
+    color: rgb(var(--color-slate-100)) !important;
+  }
+
+  /* 3. Solid colored CTA buttons & gradient buttons maintain crisp white text */
+  button.bg-cyan-600,
+  button.bg-cyan-700,
+  button.bg-emerald-600,
+  button.bg-emerald-700,
+  button.bg-indigo-600,
+  button.bg-indigo-700,
+  button.bg-purple-600,
+  button.bg-purple-700,
+  button.bg-rose-600,
+  button.bg-rose-700,
+  button.bg-teal-600,
+  button.bg-teal-700,
+  button.bg-sky-600,
+  button.bg-blue-600,
+  button.from-emerald-600,
+  button.from-indigo-600,
+  button.from-purple-600,
+  button.from-rose-600,
+  button.from-cyan-600,
+  a.from-emerald-600,
+  a.from-indigo-600,
+  a.from-purple-600,
+  a.from-rose-600,
+  a.from-cyan-600 {
     color: #ffffff !important;
   }
 
-  /* Floating Action Button and Logo contrast */
+  /* Descendants inside those specific solid colored buttons keep white text */
+  button.bg-cyan-600 *,
+  button.bg-cyan-700 *,
+  button.bg-emerald-600 *,
+  button.bg-emerald-700 *,
+  button.bg-indigo-600 *,
+  button.bg-indigo-700 *,
+  button.bg-purple-600 *,
+  button.bg-purple-700 *,
+  button.bg-rose-600 *,
+  button.bg-rose-700 *,
+  button.bg-teal-600 *,
+  button.bg-teal-700 *,
+  button.bg-sky-600 *,
+  button.bg-blue-600 *,
+  button.from-emerald-600 *,
+  button.from-indigo-600 *,
+  button.from-purple-600 *,
+  button.from-rose-600 *,
+  button.from-cyan-600 *,
+  a.from-emerald-600 *,
+  a.from-indigo-600 *,
+  a.from-purple-600 *,
+  a.from-rose-600 *,
+  a.from-cyan-600 * {
+    color: #ffffff !important;
+  }
+
+  /* 4. Floating Action Button & Header Logo keep dark text on bright lime-cyan gradients */
   button[aria-label="Log meal"],
-  .bg-gradient-to-tr {
+  button[aria-label="Log meal"] *,
+  .bg-gradient-to-tr.from-cyan-500 {
     color: #020617 !important;
   }
 
-  /* Card elevation & shadows for crisp daylight viewing */
+  /* 5. Hero Card background - clean white card with subtle well gradient instead of dark cyan-950 */
+  .bg-gradient-to-br.from-slate-900 {
+    background-image: linear-gradient(135deg, rgb(255 255 255) 0%, rgb(255 255 255) 75%, rgb(var(--color-slate-800)) 100%) !important;
+    border-color: rgb(var(--color-slate-700)) !important;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03) !important;
+  }
+
+  /* 6. Card elevation & borders for daylight viewing */
+  [class*="bg-slate-900"] {
+    background-color: rgb(255 255 255 / 0.98);
+    border-color: rgb(var(--color-slate-700));
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  }
+
   .glass-panel {
     background: rgb(255 255 255 / 0.95);
     border: 1px solid rgb(var(--color-slate-700));
@@ -188,7 +244,7 @@ html.theme-nordic-teal {
     box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
   }
 
-  /* Pastel badges & pill highlights */
+  /* 7. Pastel badges & pill highlights */
   [class*="bg-purple-950"] {
     background-color: rgb(243 232 255 / 0.8) !important;
   }

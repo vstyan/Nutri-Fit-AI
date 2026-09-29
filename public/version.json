@@ -1,5 +1,5 @@
 {
-  "version": "1.7.1",
+  "version": "1.7.2",
   "releaseDate": "2026-09-28",
-  "notes": "Streamlined Settings into intuitive Configuration 1 (No Tracker) and Configuration 2 (Google Fit Tracker). Added crisp light mode theme options: 'Teal Breeze' and 'Nordic Frost' alongside Pure Black OLED."
+  "notes": "Fixed heading and section title visibility across light themes (Teal Breeze & Nordic Frost), ensuring crisp high-contrast obsidian typography on all cards and dashboards."
 }

@@ -622,7 +622,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* 4. Nutrition, Fiber & Net Carbs Progress Bars */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
             <PieChart className="w-4 h-4 text-cyan-400" />
             <span>Daily Nutrition & Macronutrients</span>
           </h3>
