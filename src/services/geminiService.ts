@@ -8,11 +8,11 @@ import {
 import { DailyCoachPayload, WeeklyCoachPayload } from '../utils/coachAggregator';
 
 const FALLBACK_MODELS = [
+  'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
   'gemini-3.5-flash',
-  'gemini-flash-lite-latest',
+  'gemini-2.0-flash',
 ];
 
 const WORKOUT_RESPONSE_SCHEMA = {
@@ -50,11 +50,23 @@ const NUTRITION_RESPONSE_SCHEMA = {
           unsaturatedFat: { type: 'NUMBER', description: 'Estimated healthy unsaturated fats (monounsaturated + polyunsaturated) in grams' },
           saturatedFat: { type: 'NUMBER', description: 'Estimated saturated fats in grams' },
           transFat: { type: 'NUMBER', description: 'Estimated trans fats in grams' },
-          cholesterol: { type: 'NUMBER', description: 'Estimated dietary cholesterol in milligrams (mg). Plant foods are 0mg. Animal products (meat, poultry, seafood, eggs, dairy, butter) contain cholesterol.' },
+          cholesterol: { type: 'NUMBER', description: 'Estimated dietary cholesterol in milligrams (mg). Plant foods are strictly 0mg. Animal products (meat, poultry, seafood, eggs, dairy, butter) contain cholesterol.' },
           calories: { type: 'NUMBER', description: 'Calories in kcal' },
           confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] }
         },
-        required: ['name', 'portion', 'grams', 'carbs', 'fiber', 'protein', 'fat', 'calories']
+        required: [
+          'name',
+          'portion',
+          'grams',
+          'carbs',
+          'fiber',
+          'protein',
+          'fat',
+          'unsaturatedFat',
+          'saturatedFat',
+          'cholesterol',
+          'calories'
+        ]
       }
     },
     totalCarbs: { type: 'NUMBER', description: 'Sum of total carbohydrates in grams' },
@@ -68,15 +80,27 @@ const NUTRITION_RESPONSE_SCHEMA = {
     totalCalories: { type: 'NUMBER', description: 'Total calories in kcal' },
     dietaryNotes: { type: 'STRING', description: 'Brief health or nutrition note' }
   },
-  required: ['title', 'mealType', 'items', 'totalCarbs', 'totalFiber', 'totalProtein', 'totalFat', 'totalCalories']
+  required: [
+    'title',
+    'mealType',
+    'items',
+    'totalCarbs',
+    'totalFiber',
+    'totalProtein',
+    'totalFat',
+    'totalUnsaturatedFat',
+    'totalSaturatedFat',
+    'totalCholesterol',
+    'totalCalories'
+  ]
 };
 
 function formatNutritionResult(result: any): GeminiAnalysisResult {
-  const totalFiber = Number(result.totalFiber) || 0;
-  const netCarbs = Math.max(0, Math.round(((Number(result.totalCarbs) || 0) - totalFiber) * 10) / 10);
-
   const items = Array.isArray(result.items)
     ? result.items.map((item: any) => {
+        const carbs = Math.round((Number(item.carbs) || 0) * 10) / 10;
+        const fiber = Math.round((Number(item.fiber) || 0) * 10) / 10;
+        const protein = Math.round((Number(item.protein) || 0) * 10) / 10;
         const fat = Math.round((Number(item.fat) || 0) * 10) / 10;
         let saturatedFat = item.saturatedFat !== undefined ? Math.round((Number(item.saturatedFat) || 0) * 10) / 10 : undefined;
         let unsaturatedFat = item.unsaturatedFat !== undefined ? Math.round((Number(item.unsaturatedFat) || 0) * 10) / 10 : undefined;
@@ -93,55 +117,80 @@ function formatNutritionResult(result: any): GeminiAnalysisResult {
           saturatedFat = Math.max(0, Math.round((fat - unsaturatedFat) * 10) / 10);
         }
 
+        // Atwater energy calculation fallback if item calories missing or zero
+        let calories = Math.round(Number(item.calories) || 0);
+        if (calories <= 0 && (carbs > 0 || protein > 0 || fat > 0)) {
+          calories = Math.round((carbs * 4) + (protein * 4) + (fat * 9));
+        }
+
         return {
           name: item.name || 'Ingredient',
           portion: item.portion || `${item.grams || 100}g`,
           grams: Number(item.grams) || 100,
-          carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
-          fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
-          protein: Math.round((Number(item.protein) || 0) * 10) / 10,
+          carbs,
+          fiber,
+          protein,
           fat,
-          unsaturatedFat,
-          saturatedFat,
+          unsaturatedFat: unsaturatedFat ?? 0,
+          saturatedFat: saturatedFat ?? 0,
           transFat,
           cholesterol,
-          calories: Math.round(Number(item.calories) || 0),
+          calories,
           confidence: item.confidence || 'high'
         };
       })
     : [];
 
-  const totalFat = Math.round((Number(result.totalFat) || items.reduce((s: number, it: any) => s + it.fat, 0)) * 10) / 10;
+  const sumCarbs = items.reduce((s: number, it: any) => s + it.carbs, 0);
+  const sumFiber = items.reduce((s: number, it: any) => s + it.fiber, 0);
+  const sumProtein = items.reduce((s: number, it: any) => s + it.protein, 0);
+  const sumFat = items.reduce((s: number, it: any) => s + it.fat, 0);
+  const sumUnsaturatedFat = items.reduce((s: number, it: any) => s + (it.unsaturatedFat || 0), 0);
+  const sumSaturatedFat = items.reduce((s: number, it: any) => s + (it.saturatedFat || 0), 0);
+  const sumTransFat = items.reduce((s: number, it: any) => s + (it.transFat || 0), 0);
+  const sumCholesterol = items.reduce((s: number, it: any) => s + (it.cholesterol || 0), 0);
+  const sumCalories = items.reduce((s: number, it: any) => s + it.calories, 0);
+
+  const totalCarbs = Math.round((result.totalCarbs !== undefined ? Number(result.totalCarbs) : sumCarbs) * 10) / 10;
+  const totalFiber = Math.round((result.totalFiber !== undefined ? Number(result.totalFiber) : sumFiber) * 10) / 10;
+  const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
+  const totalProtein = Math.round((result.totalProtein !== undefined ? Number(result.totalProtein) : sumProtein) * 10) / 10;
+  const totalFat = Math.round((result.totalFat !== undefined ? Number(result.totalFat) : sumFat) * 10) / 10;
 
   const totalUnsaturatedFat = result.totalUnsaturatedFat !== undefined
     ? Math.round((Number(result.totalUnsaturatedFat) || 0) * 10) / 10
-    : Math.round(items.reduce((s: number, it: any) => s + (it.unsaturatedFat || 0), 0) * 10) / 10;
+    : Math.round(sumUnsaturatedFat * 10) / 10;
 
   const totalSaturatedFat = result.totalSaturatedFat !== undefined
     ? Math.round((Number(result.totalSaturatedFat) || 0) * 10) / 10
-    : Math.round(items.reduce((s: number, it: any) => s + (it.saturatedFat || 0), 0) * 10) / 10;
+    : Math.round(sumSaturatedFat * 10) / 10;
 
   const totalTransFat = result.totalTransFat !== undefined
     ? Math.round((Number(result.totalTransFat) || 0) * 10) / 10
-    : Math.round(items.reduce((s: number, it: any) => s + (it.transFat || 0), 0) * 10) / 10;
+    : Math.round(sumTransFat * 10) / 10;
 
   const totalCholesterol = result.totalCholesterol !== undefined
     ? Math.round(Number(result.totalCholesterol) || 0)
-    : Math.round(items.reduce((s: number, it: any) => s + (it.cholesterol || 0), 0));
+    : Math.round(sumCholesterol);
+
+  let totalCalories = Math.round(result.totalCalories !== undefined ? Number(result.totalCalories) : sumCalories);
+  if (totalCalories <= 0 && sumCalories > 0) {
+    totalCalories = Math.round(sumCalories);
+  }
 
   return {
     ...result,
     items,
-    totalCarbs: Math.round((Number(result.totalCarbs) || 0) * 10) / 10,
+    totalCarbs,
     totalFiber,
     netCarbs,
-    totalProtein: Math.round((Number(result.totalProtein) || 0) * 10) / 10,
+    totalProtein,
     totalFat,
     totalUnsaturatedFat,
     totalSaturatedFat,
     totalTransFat,
     totalCholesterol,
-    totalCalories: Math.round(Number(result.totalCalories) || 0)
+    totalCalories
   };
 }
 
@@ -161,33 +210,56 @@ export async function analyzeFoodImage(
   const mimeType = match[1];
   const base64Data = match[2];
 
-  const systemInstruction = `You are an expert nutritionist and visual food analyst.
-Analyze the provided food photo with high precision:
-1. Identify all visible dishes and components.
-2. Estimate the realistic portion size and weight in grams for each item.
-3. Calculate the macronutrients for each component: Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), Dietary Cholesterol (mg - plant foods are 0mg, estimate for meats/eggs/dairy), and Total Calories (kcal).
-4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Cholesterol, Total Calories).
-5. Suggest the most likely meal type (breakfast, lunch, dinner, snack) based on the food type.
-${userNotes ? `User context/notes: "${userNotes}"` : ''}
+  const systemInstruction = `You are a clinical dietitian, nutritional scientist, and expert visual food analyst.
+Analyze the provided food photograph with high precision:
+
+1. COMPONENT IDENTIFICATION:
+   - Identify all distinct dishes, ingredients, sides, sauces, dressings, garnishes, and beverages visible.
+   - Deconstruct complex composite items into realistic constituent components (e.g. burger = bun, patty, cheese, condiments).
+   - If food is sautéed, stir-fried, or dressed, explicitly account for absorbed cooking fats/oils (typically 5-15g per serving).
+
+2. SPATIAL & PORTION ESTIMATION:
+   - Estimate realistic portion sizes and weights in grams using standard visual benchmarks:
+     * Standard dinner plate diameter is ~26 cm (10 in); standard soup/cereal bowl is ~350-500 ml.
+     * Hand references: fist ≈ 1 cup (~150-200g grains/vegetables); palm (no fingers) ≈ 85-115g (3-4 oz) cooked meat/fish; cupped hand ≈ 30g nuts/seeds; thumb tip ≈ 5g butter/oil.
+
+3. MACRONUTRIENT & MICRONUTRIENT PRECISION:
+   - Ground all estimates in USDA FoodData Central nutritional densities.
+   - For every item, provide:
+     * Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g)
+     * Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g)
+     * Saturated Fat (g)
+     * Dietary Cholesterol (mg): Pure plant foods (grains, legumes, veggies, fruits, nuts, vegetable oils) MUST be 0 mg. Animal products (meat, poultry, seafood, eggs, dairy, butter) MUST have accurate cholesterol in mg based on portion weight (e.g. ~186mg per large egg, ~85mg per 100g poultry/meat, ~30mg per tbsp butter).
+     * Calories (kcal): Adhere to the Atwater general factor formula: Calories ≈ (4 × Carbs) + (4 × Protein) + (9 × Fat). Total item calories must align with this balance.
+
+4. ARITHMETIC INTEGRITY:
+   - The root summary totals (totalCarbs, totalFiber, totalProtein, totalFat, totalUnsaturatedFat, totalSaturatedFat, totalCholesterol, totalCalories) must exactly equal the arithmetic sum of the itemized components.
+
+5. MEAL TYPE:
+   - Select the most appropriate meal type (breakfast, lunch, dinner, snack).
 
 Respond strictly in valid JSON matching the requested schema.`;
 
   const requestBody = {
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
     contents: [
       {
+        role: 'user',
         parts: [
-          { text: systemInstruction },
           {
             inlineData: {
               mimeType,
               data: base64Data
             }
-          }
+          },
+          ...(userNotes ? [{ text: `User meal preparation context / notes: "${userNotes}"` }] : [])
         ]
       }
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.1,
       responseMimeType: 'application/json',
       responseSchema: NUTRITION_RESPONSE_SCHEMA
     }
@@ -205,26 +277,47 @@ export async function analyzeFoodText(
     throw new Error('Gemini API key is required. Please add it in Settings.');
   }
 
-  const systemInstruction = `You are an expert nutritionist and dietary calculator.
-The user describes a meal they ate (or transcribed from voice):
-"${textDescription}"
+  const systemInstruction = `You are a clinical dietitian, nutritional scientist, and expert dietary calculator.
+The user describes a meal they ate (typed or transcribed from voice).
 
-1. Identify all ingredients, dishes, and portion descriptions mentioned.
-2. Estimate the realistic weight in grams and portions for each component.
-3. Calculate the macronutrients for each component: Total Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g), Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g), Saturated Fat (g), Dietary Cholesterol (mg - plant foods are 0mg, estimate for meats/eggs/dairy), and Total Calories (kcal).
-4. Sum the totals accurately (Total Fiber, Total Carbs, Net Carbs = Carbs - Fiber, Total Protein, Total Fat, Total Unsaturated Fat, Total Saturated Fat, Total Cholesterol, Total Calories).
-5. Suggest the most likely meal type (breakfast, lunch, dinner, snack).
+1. COMPONENT IDENTIFICATION:
+   - Parse all mentioned ingredients, quantities, preparation styles, and brand names.
+   - Deconstruct complex composite items into realistic constituent components.
+   - If food is sautéed, stir-fried, or dressed, explicitly account for absorbed cooking fats/oils (typically 5-15g per serving).
+
+2. PORTION ESTIMATION:
+   - Convert colloquial or volumetric measures (cups, tablespoons, pieces, slices, bowls) into realistic gram weights.
+   - If portion sizes are unspecified, assume standard standard adult serving sizes (e.g. 1 medium apple ~180g, 1 slice bread ~35g, 1 cup cooked rice ~160g, 1 chicken breast ~150g).
+
+3. MACRONUTRIENT & MICRONUTRIENT PRECISION:
+   - Ground all estimates in USDA FoodData Central nutritional densities.
+   - For every item, provide:
+     * Carbohydrates (g), Dietary Fiber (g), Protein (g), Total Fat (g)
+     * Healthy Unsaturated Fat (monounsaturated + polyunsaturated in g)
+     * Saturated Fat (g)
+     * Dietary Cholesterol (mg): Pure plant foods (grains, legumes, veggies, fruits, nuts, vegetable oils) MUST be 0 mg. Animal products (meat, poultry, seafood, eggs, dairy, butter) MUST have accurate cholesterol in mg based on portion weight (e.g. ~186mg per large egg, ~85mg per 100g poultry/meat, ~30mg per tbsp butter).
+     * Calories (kcal): Adhere to the Atwater general factor formula: Calories ≈ (4 × Carbs) + (4 × Protein) + (9 × Fat). Total item calories must align with this balance.
+
+4. ARITHMETIC INTEGRITY:
+   - The root summary totals (totalCarbs, totalFiber, totalProtein, totalFat, totalUnsaturatedFat, totalSaturatedFat, totalCholesterol, totalCalories) must exactly equal the arithmetic sum of the itemized components.
+
+5. MEAL TYPE:
+   - Select the most appropriate meal type (breakfast, lunch, dinner, snack).
 
 Respond strictly in valid JSON matching the requested schema.`;
 
   const requestBody = {
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
     contents: [
       {
-        parts: [{ text: systemInstruction }]
+        role: 'user',
+        parts: [{ text: `User Meal Description: "${textDescription.trim()}"` }]
       }
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.1,
       responseMimeType: 'application/json',
       responseSchema: NUTRITION_RESPONSE_SCHEMA
     }
@@ -269,13 +362,17 @@ Tasks:
 Respond strictly in valid JSON matching the requested schema.`;
 
   const requestBody = {
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
     contents: [
       {
-        parts: [{ text: systemInstruction }]
+        role: 'user',
+        parts: [{ text: `User Workout Description: "${description.trim()}"` }]
       }
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.1,
       responseMimeType: 'application/json',
       responseSchema: WORKOUT_RESPONSE_SCHEMA
     }

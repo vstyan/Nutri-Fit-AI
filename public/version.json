@@ -1,5 +1,5 @@
 {
-  "version": "1.8.1",
-  "releaseDate": "2026-09-28",
-  "notes": "Added comprehensive Gemini API Key Setup guide to the documentation section with direct AI Studio portal links, step-by-step instructions, and an in-depth breakdown of macronutrient Energy %."
+  "version": "1.8.2",
+  "releaseDate": "2026-09-29",
+  "notes": "Optimized Gemini food analysis for peak speed and USDA clinical accuracy: top-level systemInstruction with server-side prompt prefix caching, zero-thinking budget for ultra-low latency, strict schema enforcement for fat subtypes and dietary cholesterol, and Atwater caloric balance."
 }
