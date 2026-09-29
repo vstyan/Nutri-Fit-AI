@@ -1,5 +1,5 @@
 {
-  "version": "1.7.5",
+  "version": "1.7.6",
   "releaseDate": "2026-09-28",
-  "notes": "Fixed contrast in Chrono-Nutrition & Timing Strategy in light themes, ensuring high-contrast readable text."
+  "notes": "Moved AI Coach Re-analyze action to top header next to tabs, and fixed scroll offset to prevent sticky header from cutting off the card title."
 }

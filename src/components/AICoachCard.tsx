@@ -129,6 +129,17 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
     return () => clearInterval(interval);
   }, [isLoading]);
 
+  const scrollToCardTop = () => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const headerOffset = 85; // Clearance for sticky app header + mobile safe-area
+    // Only scroll if the top of the card is obscured behind the sticky header or scrolled far below
+    if (rect.top < headerOffset || rect.top > window.innerHeight) {
+      const targetY = window.scrollY + rect.top - headerOffset;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+    }
+  };
+
   const handleGenerateDaily = async (forceRefresh = false) => {
     if (!settings.geminiApiKey) {
       setError('Please add your Gemini API Key in Settings to enable AI Coaching.');
@@ -140,8 +151,8 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       return;
     }
 
-    // Smoothly scroll to the top of the coach card immediately
-    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Ensure card header stays properly framed without being cut off under sticky header
+    scrollToCardTop();
     setIsLoading(true);
     setError(null);
 
@@ -162,10 +173,6 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       const result = await generateDailyCoachInsight(payload, settings.geminiApiKey);
       await saveCachedDailyInsight(selectedDate, result);
       setDailyInsight(result);
-      // Ensure focus remains on coach card when fresh analysis completes
-      setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
     } catch (err: any) {
       console.error('Error generating daily coach insight:', err);
       setError(err.message || 'Failed to generate daily insight. Please check your connection or API key.');
@@ -185,7 +192,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
       return;
     }
 
-    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToCardTop();
     setIsLoading(true);
     setError(null);
 
@@ -229,7 +236,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
   ];
 
   return (
-    <div ref={cardRef} className="bg-slate-900/95 border border-indigo-500/25 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl relative overflow-hidden backdrop-blur-sm min-h-[220px]">
+    <div ref={cardRef} className="scroll-mt-20 sm:scroll-mt-24 bg-slate-900/95 border border-indigo-500/25 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl relative overflow-hidden backdrop-blur-sm min-h-[220px]">
       {/* Background Accent Glow */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -252,30 +259,47 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
           </div>
         </div>
 
-        {/* Tab Selector Buttons - Centered, balanced, and responsive */}
-        <div className="w-full sm:w-auto flex items-center justify-center p-1 bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setTab('daily')}
-            className={`flex-1 sm:flex-initial text-center px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[70px] sm:min-w-[85px] ${
-              tab === 'daily'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            Today's Coach
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('weekly')}
-            className={`flex-1 sm:flex-initial text-center px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[70px] sm:min-w-[85px] ${
-              tab === 'weekly'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            Weekly Report
-          </button>
+        {/* Controls: Tab Selector & Top Re-Analyze Action */}
+        <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2">
+          {/* Tab Selector Buttons */}
+          <div className="flex-1 sm:flex-initial flex items-center p-1 bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setTab('daily')}
+              className={`flex-1 sm:flex-initial text-center px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[70px] sm:min-w-[85px] ${
+                tab === 'daily'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              Today's Coach
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('weekly')}
+              className={`flex-1 sm:flex-initial text-center px-3 sm:px-4 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all min-w-[70px] sm:min-w-[85px] ${
+                tab === 'weekly'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              Weekly Report
+            </button>
+          </div>
+
+          {/* Top Re-Analyze Button */}
+          {((tab === 'daily' && !!dailyInsight) || (tab === 'weekly' && !!weeklyInsight)) && (
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => (tab === 'daily' ? handleGenerateDaily(true) : handleGenerateWeekly(true))}
+              className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 active:scale-95 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 shadow-sm disabled:opacity-50"
+              title={tab === 'daily' ? "Re-analyze today's nutrition and timing" : "Re-analyze 7-day multi-day patterns"}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Re-analyze</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -474,17 +498,10 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 </div>
               )}
 
-              {/* Footer Refresh */}
+              {/* Footer Info */}
               <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
                 <span>Updated: {new Date(dailyInsight.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                <button
-                  type="button"
-                  onClick={() => handleGenerateDaily(true)}
-                  className="flex items-center space-x-1 text-indigo-400 hover:text-indigo-300 active:scale-95 transition-all"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Re-analyze</span>
-                </button>
+                <span className="text-[10px] text-slate-400 font-medium">NutriFit Intelligence</span>
               </div>
             </div>
           )}
@@ -632,17 +649,10 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                 </div>
               )}
 
-              {/* Footer Refresh */}
+              {/* Footer Info */}
               <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
                 <span>Generated: {new Date(weeklyInsight.generatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                <button
-                  type="button"
-                  onClick={() => handleGenerateWeekly(true)}
-                  className="flex items-center space-x-1 text-purple-400 hover:text-purple-300 active:scale-95 transition-all"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Re-analyze Week</span>
-                </button>
+                <span className="text-[10px] text-slate-400 font-medium">NutriFit Intelligence</span>
               </div>
             </div>
           )}
