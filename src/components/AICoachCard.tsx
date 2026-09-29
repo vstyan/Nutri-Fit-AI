@@ -297,7 +297,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
               title={tab === 'daily' ? "Re-analyze today's nutrition and timing" : "Re-analyze 7-day multi-day patterns"}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>Re-analyze</span>
+              <span>{isLoading ? 'Analyzing...' : 'Re-analyze'}</span>
             </button>
           )}
         </div>
@@ -322,16 +322,21 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
         </div>
       )}
 
-      {/* Loading Overlay when re-analyzing an existing insight (preserves height & prevents scroll jumps) */}
+      {/* Active Re-Analysis Progress Banner (Always visible at top of card, never blanks page) */}
       {isLoading && ((tab === 'daily' && !!dailyInsight) || (tab === 'weekly' && !!weeklyInsight)) && (
-        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md rounded-2xl z-30 flex flex-col items-center justify-center text-center p-6 space-y-4 animate-in fade-in duration-200">
-          <div className="relative">
-            <div className="w-14 h-14 rounded-full border-2 border-indigo-500/20 border-t-indigo-400 animate-spin" />
-            <Sparkles className="w-6 h-6 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
+        <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl flex items-center space-x-3 animate-in fade-in duration-200">
+          <div className="relative shrink-0">
+            <div className="w-5 h-5 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+            <Sparkles className="w-2.5 h-2.5 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
           </div>
-          <div className="max-w-xs space-y-1">
-            <p className="text-sm font-bold text-white">Analyzing Nutrition & Chrono-Pacing</p>
-            <p className="text-xs text-indigo-300 transition-opacity duration-300">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-indigo-400">
+                {tab === 'daily' ? "Updating Today's AI Coaching Insight..." : "Updating 7-Day Performance Insight..."}
+              </span>
+              <span className="text-[10px] text-indigo-300 font-mono">Live</span>
+            </div>
+            <p className="text-[11px] text-slate-300 truncate mt-0.5">
               {loadingMessages[loadingStep]}
             </p>
           </div>
@@ -375,7 +380,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
               </button>
             </div>
           ) : (
-            <div className="space-y-3.5">
+            <div className={`space-y-3.5 transition-opacity duration-300 ${isLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
               {/* Diagnosis Headline & Adherence Pill */}
               <div className="p-3.5 bg-slate-950/80 border border-indigo-500/30 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div className="space-y-1">
@@ -529,7 +534,7 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
               </button>
             </div>
           ) : (
-            <div className="space-y-3.5">
+            <div className={`space-y-3.5 transition-opacity duration-300 ${isLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
               {/* Executive Diagnosis & Score */}
               <div className="p-3.5 bg-slate-950/80 border border-purple-500/30 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div className="space-y-1">

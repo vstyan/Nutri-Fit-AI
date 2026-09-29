@@ -1,5 +1,5 @@
 {
-  "version": "1.7.6",
+  "version": "1.7.7",
   "releaseDate": "2026-09-28",
-  "notes": "Moved AI Coach Re-analyze action to top header next to tabs, and fixed scroll offset to prevent sticky header from cutting off the card title."
+  "notes": "Fixed AI Coach re-analysis loading experience: replaced full-card frosted overlay with an in-viewport live progress banner and non-blocking background refresh to eliminate blank page appearance."
 }
