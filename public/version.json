@@ -1,5 +1,5 @@
 {
-  "version": "1.7.8",
+  "version": "1.7.9",
   "releaseDate": "2026-09-28",
-  "notes": "Streamlined Daily Log UI by removing the in-card NEAT double-counting comment and transferring comprehensive documentation to the Documentation modal."
+  "notes": "Reordered Daily Nutrition section to position Dietary Cholesterol Intake directly beneath Total Fat, keeping all nutritional progress bars grouped together."
 }

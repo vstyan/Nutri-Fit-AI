@@ -790,29 +790,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           })()}
         </div>
 
-        {/* Dynamic Thermic Effect of Food (TEF) Breakdown */}
-        <div className="bg-slate-950/60 border border-orange-500/20 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-400 shrink-0">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-                <span>Thermic Effect of Food (TEF)</span>
-                <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-950/60 px-1.5 py-0.5 rounded border border-orange-500/30">
-                  +{burnTef} kcal burned
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400">
-                Metabolic digestion cost: Protein (25%) • Carbs (8%) • Fat (2%)
-              </div>
-            </div>
-          </div>
-          <div className="text-left sm:text-right text-[10px] text-slate-400 shrink-0 font-mono bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">
-            <span>P: {tefBreakdown.proteinTef} kcal • C: {tefBreakdown.carbsTef} kcal • F: {tefBreakdown.fatTef} kcal</span>
-          </div>
-        </div>
-
         {/* Heart Health & Dietary Cholesterol Intake */}
         {(() => {
           const cholMg = totals.cholesterol || 0;
@@ -866,6 +843,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           );
         })()}
+
+        {/* Dynamic Thermic Effect of Food (TEF) Breakdown */}
+        <div className="bg-slate-950/60 border border-orange-500/20 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-1.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-orange-400 shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                <span>Thermic Effect of Food (TEF)</span>
+                <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-950/60 px-1.5 py-0.5 rounded border border-orange-500/30">
+                  +{burnTef} kcal burned
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Metabolic digestion cost: Protein (25%) • Carbs (8%) • Fat (2%)
+              </div>
+            </div>
+          </div>
+          <div className="text-left sm:text-right text-[10px] text-slate-400 shrink-0 font-mono bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">
+            <span>P: {tefBreakdown.proteinTef} kcal • C: {tefBreakdown.carbsTef} kcal • F: {tefBreakdown.fatTef} kcal</span>
+          </div>
+        </div>
       </div>
 
           {/* Meals Timeline with Quick Favorites */}
