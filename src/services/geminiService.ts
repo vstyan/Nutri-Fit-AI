@@ -523,7 +523,7 @@ const DAILY_COACH_SCHEMA = {
   properties: {
     headline: {
       type: 'STRING',
-      description: '1-2 sentence sharp behavioral & metabolic diagnosis. Do NOT just repeat numbers visible on a dashboard; diagnose the cause-and-effect relationship between timing, hunger, and targets.'
+      description: '1-2 sentence sharp behavioral & metabolic diagnosis written in plain, direct English. State what happened and the exact single action to take. Absolutely NO jargon like "mindful closure" or "carbohydrate concentration".'
     },
     adherenceScore: {
       type: 'NUMBER',
@@ -537,11 +537,11 @@ const DAILY_COACH_SCHEMA = {
         eatingWindowHours: { type: 'NUMBER', description: 'Duration of eating window in hours' },
         timingDiagnosis: {
           type: 'STRING',
-          description: 'Deep analysis of meal pacing and spacing. If day is in progress (isDayInProgress is true), note that the eating window is still ongoing/open and evaluate pacing up to now—DO NOT say the eating window has closed. If day is completed, evaluate full window.'
+          description: 'Deep analysis of meal pacing and spacing in plain English. If day is in progress (isDayInProgress is true), note that the eating window is still ongoing/open and evaluate pacing up to now—DO NOT say the eating window has closed. If day is completed, evaluate full window.'
         },
         actionableAdjustment: {
           type: 'STRING',
-          description: 'Actionable timing advice. If day is in progress, give timing advice for remaining meals TODAY (e.g. snack or dinner spacing). If day is completed, give timing tweaks for tomorrow.'
+          description: 'Concrete, plain-English action to take right now (e.g. "Close the kitchen for tonight; skip the remaining 100 kcal" or "Have a 30g protein snack by 3:00 PM"). Avoid vague or flowery phrases.'
         }
       },
       required: ['timingDiagnosis', 'actionableAdjustment']
@@ -552,7 +552,7 @@ const DAILY_COACH_SCHEMA = {
         patternTitle: { type: 'STRING', description: 'Concise title of hidden trend detected' },
         observation: {
           type: 'STRING',
-          description: 'Non-obvious trend or day-of-week pattern that a human would miss looking at raw numbers.'
+          description: 'Non-obvious trend or day-of-week pattern in plain English that a human would miss looking at raw numbers.'
         },
         underlyingDriver: { type: 'STRING', description: 'Probable behavioral cause' }
       },
@@ -565,7 +565,7 @@ const DAILY_COACH_SCHEMA = {
         headline: { type: 'STRING', description: 'What needs rebalancing over the next 24-48 hours' },
         dailyMicroAdjustment: {
           type: 'STRING',
-          description: 'Specific compensatory advice. If day is in progress, budget remaining calories and macros across the rest of today. If day is completed, specify adjustments for tomorrow.'
+          description: 'Specific, direct action advice in plain English. If day is in progress, state exactly what to eat or do for upcoming meals today. If day is completed, specify adjustments for tomorrow.'
         }
       },
       required: ['status', 'headline', 'dailyMicroAdjustment']
@@ -716,8 +716,14 @@ CRITICAL COACHING INSTRUCTIONS:
    - If the user has elevated LDL or cholesterol context (isLdlElevated is true), prioritize cardio-protective foods rich in soluble fiber and omega-3s, and avoid high-saturated-fat choices.
    - Include realistic serving suggestions and the optimal time of day to eat them.
 
-9. TONE:
-   - Direct, motivating, objective, and coach-like. No generic medical disclaimers.
+9. TONE & PLAIN ENGLISH (CRITICAL):
+   - Speak in clear, down-to-earth, direct English like an elite athletic coach speaking to a real person—NEVER use academic jargon, flowery expressions, or cryptic pseudo-intellectual phrases.
+   - FORBIDDEN JARGON & PHRASING:
+     * NEVER use "mindful closure" (instead say: "Close your kitchen for tonight", "Finish eating for the day", or "Stop eating for tonight").
+     * NEVER use "carbohydrate concentration" (instead say: "a carb-heavy meal late at night" or "late-night carbs").
+     * NEVER use vague or poetic fluff like "nourish your journey", "embrace mindful eating", or "intentional caloric distribution".
+   - Make all advice 100% concrete and actionable:
+     * Tell the user exactly what to do: e.g. "You're at 2,400 of your 2,500 kcal and have had plenty of carbs today. Don't worry about the remaining 100 kcal—close the kitchen for tonight, drink water, and get some rest."
 
 Respond strictly in valid JSON matching the requested schema.`;
 

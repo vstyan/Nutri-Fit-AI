@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.8.4';
+export const APP_VERSION = '1.8.5';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';

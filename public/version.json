@@ -1,5 +1,5 @@
 {
-  "version": "1.8.4",
+  "version": "1.8.5",
   "releaseDate": "2026-09-29",
-  "notes": "Added clean Google Gemini AI accuracy disclaimer to the AI Coach tab to remind users to double-check data and recommendations."
+  "notes": "Refined AI Coach language to mandate plain, down-to-earth English and concrete action steps, strictly forbidding cryptic jargon like 'mindful closure' or 'carbohydrate concentration'."
 }
