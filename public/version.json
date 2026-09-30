@@ -1,5 +1,5 @@
 {
-  "version": "1.8.13",
+  "version": "1.8.14",
   "releaseDate": "2026-09-29",
-  "notes": "Fixed workout calorie calculations: queried Google Fit bucketBySession for exact session calories, eliminated multi-session hour double-counting via proportional time allocation, and enforced physiological limits."
+  "notes": "Removed synthetic workout intensity labels across the app and AI Coach chips to avoid misleading classifications when workout timers run long."
 }

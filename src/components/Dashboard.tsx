@@ -629,11 +629,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 {workout.durationMinutes}m
                               </span>
                             )}
-                            {workout.intensity && (
-                              <span className="text-[9px] text-emerald-300/80 bg-emerald-950/50 px-1.5 py-0.2 rounded border border-emerald-500/20 capitalize shrink-0">
-                                {workout.intensity}
-                              </span>
-                            )}
                           </div>
                           <p className="text-[11px] text-slate-400 truncate mt-0.5" title={workout.description}>
                             "{workout.description}"

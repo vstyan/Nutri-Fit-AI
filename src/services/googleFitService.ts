@@ -356,8 +356,6 @@ export function detectWorkoutsFromFitData(
     }
 
     const rawActivityName = session.name || GOOGLE_FIT_ACTIVITY_MAP[session.activityType] || 'Workout Session';
-    const calPerMin = sessionActiveKcal / durationMinutes;
-    const intensity = calPerMin >= 9 ? 'vigorous' : (calPerMin >= 6 ? 'high' : (calPerMin >= 3.5 ? 'moderate' : 'low'));
 
     detectedWorkouts.push({
       id: `gfit-session-${session.id || session.startTimeMillis}`,
@@ -366,7 +364,6 @@ export function detectWorkoutsFromFitData(
       description: `Tracked workout session synced from Google Fit (${rawActivityName}, ${Math.round(sessionActiveKcal)} kcal, ${durationMinutes} min).`,
       caloriesBurned: Math.round(sessionActiveKcal),
       durationMinutes,
-      intensity,
       explanation: `Google Fit tracked session with ${Math.round(sessionActiveKcal)} active calories burned.`
     });
   }
@@ -414,8 +411,6 @@ export function detectWorkoutsFromFitData(
       };
 
       const timeRangeLabel = `${formatDisplayHour(startHour)} - ${formatDisplayHour(endHour)}`;
-      const calPerMin = combinedActive / durationMinutes;
-      const intensity = calPerMin >= 9 ? 'vigorous' : (calPerMin >= 6 ? 'high' : (calPerMin >= 3.5 ? 'moderate' : 'low'));
 
       detectedWorkouts.push({
         id: `gfit-jump-${dateStr}-${startHour}`,
@@ -424,7 +419,6 @@ export function detectWorkoutsFromFitData(
         description: `Calorie burn spike detected by Google Fit (${Math.round(combinedActive)} active kcal burned between ${timeRangeLabel}).`,
         caloriesBurned: Math.round(combinedActive),
         durationMinutes,
-        intensity,
         explanation: `Identified by high-intensity energy expenditure surge exceeding resting baseline.`
       });
     }

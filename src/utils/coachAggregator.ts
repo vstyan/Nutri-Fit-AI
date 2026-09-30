@@ -389,7 +389,7 @@ export function buildDailyCoachPayload(
     dedicatedWorkoutCalories = workoutsLogged.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
     hasSignificantWorkout = true;
     const workoutParts = workoutsLogged.map(w => 
-      `${w.title}${w.time ? ` at ${w.time}` : ''} (${w.caloriesBurned} kcal${w.durationMinutes ? `, ${w.durationMinutes} min` : ''}${w.intensity ? `, ${w.intensity} intensity` : ''})`
+      `${w.title}${w.time ? ` at ${w.time}` : ''} (${w.caloriesBurned} kcal${w.durationMinutes ? `, ${w.durationMinutes} min` : ''})`
     );
     workoutSummary = `Dedicated workouts logged: ${workoutParts.join('; ')} (Total dedicated workout burn: ${dedicatedWorkoutCalories} kcal). Total day expenditure so far: ${totalBurned} kcal.`;
   } else if (isTrackerMode) {
