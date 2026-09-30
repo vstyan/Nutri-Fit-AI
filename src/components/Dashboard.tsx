@@ -47,6 +47,8 @@ interface DashboardProps {
   favoriteMeals: MealRecord[];
   yesterdayMeals: MealRecord[];
   isSyncingGoogleFit?: boolean;
+  isSyncingHealthConnect?: boolean;
+  isNativeAndroid?: boolean;
   onOpenCapture: () => void;
   onDeleteMeal: (mealId: string) => void;
   onEditMeal: (meal: MealRecord) => void;
@@ -62,6 +64,8 @@ interface DashboardProps {
   onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
   onSyncGoogleFit?: () => Promise<void>;
+  onConnectHealthConnect?: () => void;
+  onSyncHealthConnect?: () => Promise<void> | void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -73,6 +77,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   favoriteMeals,
   yesterdayMeals,
   isSyncingGoogleFit = false,
+  isSyncingHealthConnect = false,
+  isNativeAndroid = false,
   onOpenCapture,
   onDeleteMeal,
   onEditMeal,
@@ -87,7 +93,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenSettings,
   onOpenDocumentation,
   onConnectGoogleFit,
-  onSyncGoogleFit
+  onSyncGoogleFit,
+  onConnectHealthConnect,
+  onSyncHealthConnect
 }) => {
   const [isLipidModalOpen, setIsLipidModalOpen] = useState(false);
   const [lipidModalTab, setLipidModalTab] = useState<'log' | 'history'>('log');
@@ -133,6 +141,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);
   const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
+  const isSensorConnected = !!(settings.healthConnectConnected || settings.googleFitConnected);
+  const sensorName = settings.healthConnectConnected ? 'Health Connect' : settings.googleFitConnected ? 'Google Fit' : 'Tracker';
 
   // TDEE Engine: Total Burned = BMR + NEAT + EAT + TEF
   const tdeeBreakdown = calculateTDEE({
@@ -141,6 +151,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     meals: summary.meals,
     source: activity.source,
     isGoogleFitConnected: settings.googleFitConnected,
+    isHealthConnectConnected: settings.healthConnectConnected,
     includeResting
   });
 
@@ -184,10 +195,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <h2 className="text-base font-extrabold text-white">Daily Caloric Balance</h2>
               <p className="text-xs text-slate-400">
-                {includeResting && !settings.googleFitConnected
+                {includeResting && !isSensorConnected
                   ? 'Food Intake vs. Total Daily Burn (TDEE)' 
-                  : settings.googleFitConnected
-                  ? 'Food Intake vs. Total Daily Burn (Google Fit + TEF)'
+                  : isSensorConnected
+                  ? `Food Intake vs. Total Daily Burn (${sensorName} + TEF)`
                   : 'Food Intake vs. Total Daily Burn (Tracker + TEF)'}
               </p>
             </div>
@@ -208,9 +219,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div 
             className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center"
             title={
-              includeResting && !settings.googleFitConnected 
+              includeResting && !isSensorConnected 
                 ? `${burnBmr} kcal Rest + ${burnNeat} kcal NEAT + ${burnTef} kcal TEF + ${burnEat} kcal Exercise` 
-                : `${burnEat} kcal ${settings.googleFitConnected ? 'Google Fit' : 'Tracker'} + ${burnTef} kcal TEF`
+                : `${burnEat} kcal ${sensorName} + ${burnTef} kcal TEF`
             }
           >
             <div className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
@@ -220,11 +231,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
             <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 font-medium truncate">
-              {includeResting && !settings.googleFitConnected 
+              {includeResting && !isSensorConnected 
                 ? 'Rest + Active' 
-                : settings.googleFitConnected
-                ? 'Google Fit + TEF'
-                : 'Tracker + TEF'}
+                : `${sensorName} + TEF`}
             </div>
           </div>
 
@@ -357,13 +366,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={onOpenSettings}
               className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 min-h-[36px] px-3 py-1.5 rounded-xl border border-slate-700 active:scale-95 transition"
             >
-              {includeResting && !settings.googleFitConnected ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
+              {includeResting && !isSensorConnected ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
             </button>
           </div>
         </div>
 
-        {/* Google Fit Live Sync Widget */}
-        {settings.googleFitConnected ? (
+        {/* Sensor Live Sync Widget (Health Connect on Android / Google Fit on Web & Android) */}
+        {settings.healthConnectConnected ? (
+          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 gap-2">
+            <div className="flex items-center space-x-1.5 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="text-xs font-semibold text-emerald-300 truncate">Health Connect Connected</span>
+            </div>
+            {onSyncHealthConnect && (
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2.5 shrink-0">
+                {(activity.lastSyncedAt || settings.healthConnectLastSync) && (
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium whitespace-nowrap">
+                    Last sync: {(() => {
+                      const ts = activity.lastSyncedAt || settings.healthConnectLastSync;
+                      if (!ts) return '';
+                      const d = new Date(ts);
+                      if (isNaN(d.getTime())) return '';
+                      const isToday = d.toDateString() === new Date().toDateString();
+                      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                      return isToday ? timeStr : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
+                    })()}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={onSyncHealthConnect}
+                  disabled={isSyncingHealthConnect}
+                  className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50 shrink-0"
+                  title="Sync latest calories burned from Health Connect"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingHealthConnect ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span>{isSyncingHealthConnect ? 'Syncing...' : 'Sync Health Connect'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : settings.googleFitConnected ? (
           <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 gap-2">
             <div className="flex items-center space-x-1.5 min-w-0">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
@@ -408,6 +451,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             )}
           </div>
+        ) : isNativeAndroid && onConnectHealthConnect ? (
+          <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs text-slate-300">Auto-sync burn from Health Connect?</span>
+            </div>
+            <button
+              type="button"
+              onClick={onConnectHealthConnect}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-emerald-950/50 border border-emerald-500/30 hover:bg-emerald-900/50 active:scale-95 transition shadow-sm shrink-0"
+            >
+              <span>Connect Health Connect</span>
+            </button>
+          </div>
         ) : onConnectGoogleFit ? (
           <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
             <div className="flex items-center space-x-2">
@@ -425,7 +482,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         ) : null}
 
         {/* Burn Display: 4-pillar breakdown (Rest + NEAT + TEF + Exercise) */}
-        {includeResting && !settings.googleFitConnected ? (
+        {includeResting && !isSensorConnected ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
               {/* 1. Rest (BMR) */}
@@ -480,11 +537,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           </div>
-        ) : settings.googleFitConnected ? (
+        ) : isSensorConnected ? (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
               <div className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20">
-                <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">1. Google Fit Burn</span>
+                <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">1. {sensorName} Burn</span>
                 <span className="font-extrabold text-white text-base mt-0.5 block">{burnEat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
                 <span className="text-[9px] text-slate-400">Rest + NEAT + Exercise</span>
               </div>
@@ -498,7 +555,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30">
                 <span className="text-[10px] text-emerald-300 font-semibold block uppercase tracking-wider">3. Total Burned (TDEE)</span>
                 <span className="font-extrabold text-white text-base mt-0.5 block">{totalBurned} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
-                <span className="text-[9px] text-emerald-400 font-medium">Google Fit + TEF</span>
+                <span className="text-[9px] text-emerald-400 font-medium">{sensorName} + TEF</span>
               </div>
             </div>
           </div>
@@ -524,9 +581,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Input Field for Workout / Tracker Burn (Hidden when Google Fit is connected) */}
-        {/* Input Field for Workout / Tracker Burn (Hidden when Google Fit is connected) */}
-        {!settings.googleFitConnected && (
+        {/* Input Field for Workout / Tracker Burn (Hidden when Sensor is connected) */}
+        {!isSensorConnected && (
           <div className="space-y-2 pt-1">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
@@ -934,8 +990,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </button>
       </div>
 
-      {/* Voice Workout Modal - Only shown when Google Fit is not connected */}
-      {!settings.googleFitConnected && (
+      {/* Voice Workout Modal - Only shown when no automated sensor is connected */}
+      {!isSensorConnected && (
         <VoiceWorkoutModal
           isOpen={isVoiceWorkoutOpen}
           geminiApiKey={settings.geminiApiKey}

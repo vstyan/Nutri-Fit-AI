@@ -45,6 +45,12 @@ import {
 import { calculateBMR, calculateDailyTEF, calculateTDEE } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
 import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesResult } from './services/googleFitService';
+import { 
+  isNativeAndroid, 
+  requestHealthConnectPermissions, 
+  syncHealthConnectDaily, 
+  openHealthConnectSettings 
+} from './services/healthBridge';
 
 export function App() {
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateString());
@@ -66,6 +72,11 @@ export function App() {
   // Google Fit state
   const [isConnectingGoogleFit, setIsConnectingGoogleFit] = useState(false);
   const [isSyncingGoogleFit, setIsSyncingGoogleFit] = useState(false);
+
+  // Health Connect state (Android APK)
+  const isAndroidApp = isNativeAndroid();
+  const [isConnectingHealthConnect, setIsConnectingHealthConnect] = useState(false);
+  const [isSyncingHealthConnect, setIsSyncingHealthConnect] = useState(false);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -162,7 +173,9 @@ export function App() {
       } else if (!loaded.storagePromptDismissed) {
         setIsStoragePromptOpen(true);
       }
-      if (loaded.googleFitConnected) {
+      if (loaded.healthConnectConnected) {
+        handleSyncHealthConnect(selectedDate, loaded, false);
+      } else if (loaded.googleFitConnected) {
         handleSyncGoogleFit(selectedDate, loaded, false, true);
       }
     });
@@ -360,8 +373,117 @@ export function App() {
     }
   }, [selectedDate, settings, showOfflineNotice]);
 
+  // Health Connect Connect Handler (Native Android APK)
+  const handleConnectHealthConnect = async () => {
+    setIsConnectingHealthConnect(true);
+    try {
+      const res = await requestHealthConnectPermissions();
+      if (res.success) {
+        const now = new Date().toISOString();
+        const updatedSettings: AppSettings = {
+          ...settings,
+          includeRestingCalories: false,
+          healthConnectConnected: true,
+          healthSyncProvider: 'health_connect',
+          healthConnectLastSync: now,
+          googleFitConnected: false // Avoid conflicting background syncs
+        };
+        await saveAppSettings(updatedSettings);
+        setSettings(updatedSettings);
 
-  // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit
+        // Immediately sync data for current selected date
+        await handleSyncHealthConnect(selectedDate, updatedSettings, true);
+      } else {
+        if (res.error) {
+          alert(`Health Connect permission notice: ${res.error}`);
+        }
+      }
+    } catch (err: any) {
+      console.error('Health Connect connection failed:', err);
+      alert(err?.message || 'Failed to connect Health Connect.');
+    } finally {
+      setIsConnectingHealthConnect(false);
+    }
+  };
+
+  // Health Connect Disconnect Handler
+  const handleDisconnectHealthConnect = async () => {
+    const updatedSettings: AppSettings = {
+      ...settings,
+      includeRestingCalories: true,
+      healthConnectConnected: false,
+      healthConnectLastSync: undefined,
+      healthSyncProvider: 'manual'
+    };
+    await saveAppSettings(updatedSettings);
+    setSettings(updatedSettings);
+  };
+
+  // Health Connect Sync Calories for a Date
+  const handleSyncHealthConnect = useCallback(async (
+    date: string = selectedDate,
+    currentSettings: AppSettings = settings,
+    isManual: boolean = false
+  ) => {
+    if (!currentSettings.healthConnectConnected) {
+      if (isManual) {
+        alert('Health Connect is not connected. Please connect Health Connect first in Settings.');
+      }
+      return;
+    }
+
+    setIsSyncingHealthConnect(true);
+    try {
+      const healthResult = await syncHealthConnectDaily(date);
+      if (healthResult) {
+        const includeResting = currentSettings.includeRestingCalories !== false;
+        const profileBmr = calculateBMR(currentSettings.profile);
+        const baseBmr = includeResting ? profileBmr : 0;
+        const currentMeals = await getMealsForDate(date, currentSettings);
+        const tef = calculateDailyTEF(currentMeals);
+
+        // Health Connect daily burn (wearable totalCalories if available, otherwise baseBmr + activeCalories)
+        const burnValue = healthResult.totalCalories > 0 
+          ? healthResult.totalCalories 
+          : (baseBmr + healthResult.activeCalories);
+
+        const currentActivity = await getActivityForDate(date, currentSettings);
+        const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
+
+        const updatedActivity: DailyActivity = {
+          date,
+          activeCaloriesBurned: burnValue,
+          baseBmrCalories: baseBmr,
+          neatCalories: 0, // Health Connect / wearable already accounts for NEAT; 0 added to prevent double counting
+          tefCalories: tef,
+          totalCaloriesBurned: burnValue + tef,
+          workouts: existingWorkouts,
+          source: 'health_connect',
+          lastSyncedAt: healthResult.lastSyncedAt,
+          lastUpdated: new Date().toISOString()
+        };
+
+        await saveActivityForDate(updatedActivity, currentSettings);
+        setActivity(updatedActivity);
+
+        const updatedSettings: AppSettings = {
+          ...currentSettings,
+          healthConnectLastSync: healthResult.lastSyncedAt
+        };
+        await saveAppSettings(updatedSettings);
+        setSettings(updatedSettings);
+      }
+    } catch (err: any) {
+      console.warn('Health Connect sync notice:', err);
+      if (isManual) {
+        alert('Failed to sync Health Connect: ' + (err?.message || 'Unknown error'));
+      }
+    } finally {
+      setIsSyncingHealthConnect(false);
+    }
+  }, [selectedDate, settings]);
+
+  // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit / Health Connect
   useEffect(() => {
     const handleActiveState = () => {
       if (document.visibilityState === 'visible' || (typeof document.hasFocus === 'function' && document.hasFocus())) {
@@ -379,7 +501,9 @@ export function App() {
           setSelectedDate(todayStr);
         }
 
-        if (settings.googleFitConnected) {
+        if (settings.healthConnectConnected) {
+          handleSyncHealthConnect(targetDate, settings, false);
+        } else if (settings.googleFitConnected) {
           handleSyncGoogleFit(targetDate, settings, false, true);
         }
       }
@@ -401,7 +525,7 @@ export function App() {
       window.removeEventListener('pageshow', handleActiveState);
       window.removeEventListener('online', handleOnline);
     };
-  }, [selectedDate, settings, handleSyncGoogleFit]);
+  }, [selectedDate, settings, handleSyncGoogleFit, handleSyncHealthConnect]);
 
   // Periodic background sync every 5 minutes while app is open and visible
   useEffect(() => {
@@ -414,7 +538,9 @@ export function App() {
           return;
         }
 
-        if (settings.googleFitConnected) {
+        if (settings.healthConnectConnected) {
+          handleSyncHealthConnect(selectedDate, settings, false);
+        } else if (settings.googleFitConnected) {
           // Run silent check (only if token is currently active)
           handleSyncGoogleFit(selectedDate, settings, false, false);
         }
@@ -422,14 +548,16 @@ export function App() {
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedDate, settings, handleSyncGoogleFit]);
+  }, [selectedDate, settings, handleSyncGoogleFit, handleSyncHealthConnect]);
 
-  // Auto-sync Google Fit when date changes if connected
+  // Auto-sync Health Connect or Google Fit when date changes if connected
   useEffect(() => {
-    if (settings.googleFitConnected) {
+    if (settings.healthConnectConnected) {
+      handleSyncHealthConnect(selectedDate, settings, false);
+    } else if (settings.googleFitConnected) {
       handleSyncGoogleFit(selectedDate, settings, false, true);
     }
-  }, [selectedDate, settings.googleFitConnected]);
+  }, [selectedDate, settings.healthConnectConnected, settings.googleFitConnected, handleSyncHealthConnect, handleSyncGoogleFit]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
@@ -452,6 +580,7 @@ export function App() {
     const profileBmr = calculateBMR(currentSettings.profile);
     const baseBmr = includeResting ? (dayActivity.baseBmrCalories || profileBmr) : 0;
     const isFit = dayActivity.source === 'google_fit' || !!currentSettings.googleFitConnected;
+    const isHC = dayActivity.source === 'health_connect' || !!currentSettings.healthConnectConnected;
 
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
@@ -459,6 +588,7 @@ export function App() {
       meals: dayMeals,
       source: dayActivity.source,
       isGoogleFitConnected: currentSettings.googleFitConnected,
+      isHealthConnectConnected: currentSettings.healthConnectConnected,
       includeResting
     });
 
@@ -468,7 +598,7 @@ export function App() {
       neatCalories: tdeeBreakdown.neat,
       tefCalories: dayTef,
       totalCaloriesBurned: tdeeBreakdown.totalBurned,
-      source: isFit ? 'google_fit' : (dayActivity.source || 'manual')
+      source: isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual'))
     };
 
     // Save updated activity
@@ -632,6 +762,7 @@ export function App() {
       meals,
       source: activity.source,
       isGoogleFitConnected: settings.googleFitConnected,
+      isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
 
@@ -664,6 +795,7 @@ export function App() {
       meals,
       source: activity.source,
       isGoogleFitConnected: settings.googleFitConnected,
+      isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
 
@@ -701,6 +833,7 @@ export function App() {
       meals,
       source: activity.source,
       isGoogleFitConnected: settings.googleFitConnected,
+      isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
 
@@ -808,6 +941,7 @@ export function App() {
     meals,
     source: activity.source,
     isGoogleFitConnected: settings.googleFitConnected,
+    isHealthConnectConnected: settings.healthConnectConnected,
     includeResting
   });
 
@@ -881,6 +1015,8 @@ export function App() {
           favoriteMeals={favoriteMeals}
           yesterdayMeals={yesterdayMeals}
           isSyncingGoogleFit={isSyncingGoogleFit}
+          isSyncingHealthConnect={isSyncingHealthConnect}
+          isNativeAndroid={isAndroidApp}
           onOpenCapture={() => setIsCaptureOpen(true)}
           onDeleteMeal={handleDeleteMeal}
           onEditMeal={handleEditMeal}
@@ -896,6 +1032,8 @@ export function App() {
           onOpenDocumentation={handleOpenDocumentation}
           onConnectGoogleFit={handleConnectGoogleFit}
           onSyncGoogleFit={() => handleSyncGoogleFit(selectedDate, settings, true)}
+          onConnectHealthConnect={handleConnectHealthConnect}
+          onSyncHealthConnect={() => handleSyncHealthConnect(selectedDate, settings, true)}
         />
       </main>
 
@@ -931,11 +1069,16 @@ export function App() {
         isOpen={isSettingsOpen}
         settings={settings}
         isConnectingGoogleFit={isConnectingGoogleFit}
+        isConnectingHealthConnect={isConnectingHealthConnect}
+        isNativeAndroid={isAndroidApp}
         onSaveSettings={handleSaveSettings}
         onClose={() => setIsSettingsOpen(false)}
         onOpenDocumentation={handleOpenDocumentation}
         onConnectGoogleFit={handleConnectGoogleFit}
         onDisconnectGoogleFit={handleDisconnectGoogleFit}
+        onConnectHealthConnect={handleConnectHealthConnect}
+        onDisconnectHealthConnect={handleDisconnectHealthConnect}
+        onOpenHealthConnectSettings={openHealthConnectSettings}
         onOpenTerms={() => {
           setIsTermsBlocking(false);
           setIsTermsOpen(true);

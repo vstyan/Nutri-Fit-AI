@@ -16,10 +16,12 @@ describe('Calorie Engine & TDEE Calculations (Baseline)', () => {
       expect(neat).toBe(270);
     });
 
-    it('returns 0 for NEAT when Google Fit is connected to prevent double-counting', () => {
+    it('returns 0 for NEAT when Google Fit or Health Connect is connected to prevent double-counting', () => {
       const bmr = 1800;
       expect(calculateNEAT({ bmr, source: 'google_fit' })).toBe(0);
       expect(calculateNEAT({ bmr, isGoogleFitConnected: true })).toBe(0);
+      expect(calculateNEAT({ bmr, source: 'health_connect' })).toBe(0);
+      expect(calculateNEAT({ bmr, isHealthConnectConnected: true })).toBe(0);
     });
 
     it('returns 0 for NEAT when includeResting is false', () => {
@@ -168,6 +170,23 @@ describe('Calorie Engine & TDEE Calculations (Baseline)', () => {
       expect(tdee.eat).toBe(2200);
       expect(tdee.tef).toBe(81);
       expect(tdee.totalBurned).toBe(2281); // 2200 + 81
+    });
+
+    it('calculates Android Health Connect integrated TDEE: Health Connect Burn + TEF without double-counting NEAT', () => {
+      const hcBurn = 2450; // Android Health Connect wearable tracked active + resting burn
+      const tdee = calculateTDEE({
+        bmr: 1800,
+        activeCalories: hcBurn,
+        meals: dummyMeals,
+        isHealthConnectConnected: true,
+        source: 'health_connect'
+      });
+
+      expect(tdee.isHealthConnect).toBe(true);
+      expect(tdee.neat).toBe(0); // 0 added to prevent double counting
+      expect(tdee.eat).toBe(2450);
+      expect(tdee.tef).toBe(81);
+      expect(tdee.totalBurned).toBe(2531); // 2450 + 81
     });
   });
 });

@@ -36,8 +36,9 @@ export interface TDEEBreakdown {
   neat: number;       // Non-Exercise Activity Thermogenesis
   eat: number;        // Exercise Activity Thermogenesis (active workouts/exercise)
   tef: number;        // Thermic Effect of Food
-  totalBurned: number;// Total = BMR + NEAT + EAT + TEF (or Google Fit total + TEF)
+  totalBurned: number;// Total = BMR + NEAT + EAT + TEF (or Google Fit / Health Connect total + TEF)
   isGoogleFit: boolean;
+  isHealthConnect?: boolean;
 }
 
 /**
@@ -196,19 +197,26 @@ export function calculateDailyTEF(meals: MealRecord[]): number {
 
 /**
  * Non-Exercise Activity Thermogenesis (NEAT) calculation:
- * - When pulling data from Google Fit: 0 added (no action required, Google Fit already accounts for NEAT).
+ * - When pulling data from Google Fit or Health Connect: 0 added (no action required, device sensors already account for NEAT).
  * - When relying on manual entry: Provides a baseline sedentary NEAT floor (BMR * 0.15).
  */
 export function calculateNEAT(params: {
   bmr: number;
-  source?: 'manual' | 'google_fit';
+  source?: 'manual' | 'google_fit' | 'health_connect';
   isGoogleFitConnected?: boolean;
+  isHealthConnectConnected?: boolean;
   includeResting?: boolean;
 }): number {
-  const { bmr, source, isGoogleFitConnected = false, includeResting = true } = params;
+  const {
+    bmr,
+    source,
+    isGoogleFitConnected = false,
+    isHealthConnectConnected = false,
+    includeResting = true
+  } = params;
 
-  // Google Fit already measures NEAT (steps, incidental movement) in its tracked data
-  if (source === 'google_fit' || isGoogleFitConnected) {
+  // External sensors (Google Fit, Health Connect) already measure NEAT in tracked data
+  if (source === 'google_fit' || source === 'health_connect' || isGoogleFitConnected || isHealthConnectConnected) {
     return 0;
   }
 
@@ -227,10 +235,11 @@ export function calculateNEAT(params: {
  */
 export function calculateTDEE(params: {
   bmr: number;
-  activeCalories: number; // manual workout calories (EAT) or Google Fit tracked calories
+  activeCalories: number; // manual workout calories (EAT) or Google Fit / Health Connect tracked calories
   meals: MealRecord[];
-  source?: 'manual' | 'google_fit';
+  source?: 'manual' | 'google_fit' | 'health_connect';
   isGoogleFitConnected?: boolean;
+  isHealthConnectConnected?: boolean;
   includeResting?: boolean;
 }): TDEEBreakdown {
   const {
@@ -239,24 +248,28 @@ export function calculateTDEE(params: {
     meals,
     source,
     isGoogleFitConnected = false,
+    isHealthConnectConnected = false,
     includeResting = true
   } = params;
 
   const isGoogleFit = source === 'google_fit' || isGoogleFitConnected;
+  const isHealthConnect = source === 'health_connect' || isHealthConnectConnected;
+  const isSensorSource = isGoogleFit || isHealthConnect;
   const tef = calculateDailyTEF(meals);
 
-  if (isGoogleFit) {
-    // Google Fit already accounts for BMR, NEAT, and EAT in its tracked total.
+  if (isSensorSource) {
+    // Sensor devices already account for BMR, NEAT, and EAT in tracked total.
     // NEAT is 0 added to prevent double counting.
-    // Total Burned = Google Fit burn + TEF.
-    const fitTotal = Math.round(activeCalories);
+    // Total Burned = Sensor tracked burn + TEF.
+    const sensorTotal = Math.round(activeCalories);
     return {
       bmr: includeResting ? bmr : 0,
       neat: 0,
-      eat: fitTotal,
+      eat: sensorTotal,
       tef,
-      totalBurned: fitTotal + tef,
-      isGoogleFit: true
+      totalBurned: sensorTotal + tef,
+      isGoogleFit,
+      isHealthConnect
     };
   }
 

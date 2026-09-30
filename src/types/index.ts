@@ -94,7 +94,7 @@ export interface DailyActivity {
   totalCaloriesBurned: number; // Total TDEE: BMR + NEAT + EAT + TEF
   workouts?: WorkoutEntry[];
   notes?: string;
-  source?: 'manual' | 'google_fit';
+  source?: 'manual' | 'google_fit' | 'health_connect';
   lastSyncedAt?: string;
   lastUpdated: string;
 }
@@ -144,6 +144,9 @@ export interface AppSettings {
   googleFitTokenExpiry?: number;
   googleFitLastSync?: string;
   googleFitUserEmail?: string;
+  healthConnectConnected?: boolean;
+  healthConnectLastSync?: string;
+  healthSyncProvider?: 'manual' | 'google_fit' | 'health_connect';
   includeRestingCalories?: boolean;
   themeMode?: ThemeMode;
   termsAcceptedVersion?: string;

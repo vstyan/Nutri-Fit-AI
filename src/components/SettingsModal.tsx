@@ -55,11 +55,16 @@ interface SettingsModalProps {
   isOpen: boolean;
   settings: AppSettings;
   isConnectingGoogleFit?: boolean;
+  isConnectingHealthConnect?: boolean;
+  isNativeAndroid?: boolean;
   onSaveSettings: (settings: AppSettings, explicitKeyUpdate?: boolean) => void;
   onClose: () => void;
   onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
   onDisconnectGoogleFit?: () => void;
+  onConnectHealthConnect?: () => void;
+  onDisconnectHealthConnect?: () => void;
+  onOpenHealthConnectSettings?: () => void;
   onOpenTerms?: () => void;
 }
 
@@ -67,11 +72,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   settings,
   isConnectingGoogleFit = false,
+  isConnectingHealthConnect = false,
+  isNativeAndroid = false,
   onSaveSettings,
   onClose,
   onOpenDocumentation,
   onConnectGoogleFit,
   onDisconnectGoogleFit,
+  onConnectHealthConnect,
+  onDisconnectHealthConnect,
+  onOpenHealthConnectSettings,
   onOpenTerms
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
@@ -638,13 +648,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
               </div>
 
-              {/* Configuration 2: Google Fit Tracker */}
+              {/* Configuration 2: Fitness Tracker (Health Connect on Android, Google Fit on Web/iOS) */}
               <div
                 onClick={() => {
                   setFormData(prev => ({ ...prev, includeRestingCalories: false }));
                 }}
                 className={`p-3.5 rounded-xl border text-left cursor-pointer transition space-y-3 ${
-                  settings.googleFitConnected || formData.includeRestingCalories === false
+                  settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
                     ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
                     : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
                 }`}
@@ -652,97 +662,172 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      settings.googleFitConnected || formData.includeRestingCalories === false
+                      settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
                         ? 'border-cyan-400 bg-cyan-400'
                         : 'border-slate-600'
                     }`}>
-                      {(settings.googleFitConnected || formData.includeRestingCalories === false) && (
+                      {(settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false) && (
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
                       )}
                     </div>
                     <span className={`text-xs font-bold ${
-                      settings.googleFitConnected || formData.includeRestingCalories === false
+                      settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
                         ? 'text-cyan-400'
                         : 'text-slate-300'
                     }`}>
-                      Configuration 2 — Google Fit Tracker
+                      {isNativeAndroid
+                        ? 'Configuration 2 — Android Health Connect'
+                        : 'Configuration 2 — Google Fit Tracker'}
                     </span>
                   </div>
                   <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                    settings.googleFitConnected
+                    settings.healthConnectConnected || settings.googleFitConnected
                       ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
                       : 'bg-slate-800 text-slate-400 border-slate-700'
                   }`}>
-                    {settings.googleFitConnected ? '✓ Connected' : 'Not Connected'}
+                    {settings.healthConnectConnected
+                      ? '✓ Health Connect'
+                      : settings.googleFitConnected
+                      ? '✓ Google Fit'
+                      : 'Not Connected'}
                   </span>
                 </div>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed pl-6.5">
-                  Live auto-sync directly from Google Fit, Wear OS, Pixel Watch, or Galaxy Watch. Google Fit tracks both resting calories and daily activity together in its daily burned total.
+                  {isNativeAndroid
+                    ? 'Syncs burned calories, steps, and workouts directly from Android Health Connect (Samsung Health, Google Pixel, Withings, Garmin, or Wear OS).'
+                    : 'Live auto-sync directly from Google Fit, Wear OS, Pixel Watch, or Galaxy Watch. Google Fit tracks both resting calories and daily activity together in its daily burned total.'}
                 </p>
 
-                {/* Integrated Google Fit Controls inside Configuration 2 */}
-                <div className="pl-6.5 space-y-2.5">
-                  {settings.googleFitConnected ? (
-                    <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
-                      <div>
-                        <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
-                          <Activity className="w-3.5 h-3.5" />
-                          <span>Live Auto-Sync Active</span>
+                {/* Android Native Health Connect Controls */}
+                {isNativeAndroid && (
+                  <div className="pl-6.5 space-y-2.5">
+                    {settings.healthConnectConnected ? (
+                      <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+                        <div>
+                          <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>Health Connect Active</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {settings.healthConnectLastSync
+                              ? `Last synced: ${new Date(settings.healthConnectLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                              : 'Auto-syncs on app open'}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-400">
-                          {settings.googleFitLastSync 
-                            ? `Last synced: ${new Date(settings.googleFitLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                            : 'Syncs automatically on app open'}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          {onOpenHealthConnectSettings && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenHealthConnectSettings();
+                              }}
+                              className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition"
+                            >
+                              App Permissions
+                            </button>
+                          )}
+                          {onDisconnectHealthConnect && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDisconnectHealthConnect();
+                                setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                              }}
+                              className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
+                            >
+                              Disconnect
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {onDisconnectGoogleFit && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDisconnectGoogleFit();
-                            setFormData(prev => ({ ...prev, includeRestingCalories: true }));
-                          }}
-                          className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
-                        >
-                          Disconnect
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      {onConnectGoogleFit && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onConnectGoogleFit();
-                          }}
-                          disabled={isConnectingGoogleFit}
-                          className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
-                        >
-                          <Activity className="w-4 h-4" />
-                          <span>{isConnectingGoogleFit ? 'Connecting to Google...' : 'Connect with Google Fit'}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    ) : (
+                      <div className="space-y-2">
+                        {onConnectHealthConnect && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConnectHealthConnect();
+                            }}
+                            disabled={isConnectingHealthConnect}
+                            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
+                          >
+                            <Activity className="w-4 h-4" />
+                            <span>{isConnectingHealthConnect ? 'Requesting Permissions...' : 'Connect Health Connect'}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                  {onOpenDocumentation && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenDocumentation('google-fit');
-                      }}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition pt-1"
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span>How Google Fit sync works &amp; tips for watch users &rarr;</span>
-                    </button>
-                  )}
-                </div>
+                {/* Google Fit Controls (Always on web/iOS, or secondary on Android) */}
+                {(!isNativeAndroid || !settings.healthConnectConnected) && (
+                  <div className="pl-6.5 space-y-2.5">
+                    {settings.googleFitConnected ? (
+                      <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+                        <div>
+                          <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>Google Fit Active</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {settings.googleFitLastSync 
+                              ? `Last synced: ${new Date(settings.googleFitLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                              : 'Syncs automatically on app open'}
+                          </span>
+                        </div>
+                        {onDisconnectGoogleFit && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDisconnectGoogleFit();
+                              setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                            }}
+                            className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
+                          >
+                            Disconnect
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        {onConnectGoogleFit && !isNativeAndroid && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConnectGoogleFit();
+                            }}
+                            disabled={isConnectingGoogleFit}
+                            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
+                          >
+                            <Activity className="w-4 h-4" />
+                            <span>{isConnectingGoogleFit ? 'Connecting to Google...' : 'Connect with Google Fit'}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {onOpenDocumentation && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenDocumentation('google-fit');
+                        }}
+                        className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition pt-1"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>How fitness tracker sync works &amp; tips &rarr;</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

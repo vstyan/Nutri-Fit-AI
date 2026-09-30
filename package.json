@@ -11,6 +11,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capgo/capacitor-health": "^8.11.4",
     "chart.js": "^4.4.8",
     "clsx": "^2.1.1",
     "idb-keyval": "^6.2.1",
@@ -21,6 +24,7 @@
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@types/node": "^22.13.4",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
