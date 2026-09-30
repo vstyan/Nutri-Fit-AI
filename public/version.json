@@ -1,5 +1,5 @@
 {
-  "version": "1.8.9",
+  "version": "1.8.10",
   "releaseDate": "2026-09-29",
-  "notes": "Added automatic workout jump & session detection for Google Fit: analyzes hourly calorie expenditure surges and sessions to detect and celebrate workouts."
+  "notes": "Fixed Google Fit total calorie sync by querying official merge_calories_expended stream to match Google Fit app display while preserving hourly active surge and workout detection."
 }

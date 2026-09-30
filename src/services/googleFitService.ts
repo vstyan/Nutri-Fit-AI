@@ -320,9 +320,11 @@ export function detectWorkoutsFromFitData(
 
 /**
  * Fetches total calories burned for a specific calendar date from Google Fit.
- * Queries both active calories and resting BMR calories using hourly buckets
- * (3,600,000 ms), detects workout sessions and large calorie burn surges,
- * and calculates the true daily total (BMR + Active).
+ * Queries:
+ * 1. The official 24-hour total burn from Google Fit's merge_calories_expended stream
+ *    (matching the exact daily total displayed on Google Fit's home screen, e.g. 2,003 Cal).
+ * 2. 1-hour resolution buckets for active movement (from_activities) to detect workout surges.
+ * 3. Recorded workout sessions from Google Fit Sessions API.
  */
 export async function fetchGoogleFitCalories(
   dateStr: string,
@@ -336,130 +338,10 @@ export async function fetchGoogleFitCalories(
   const startTimeMillis = startOfDay.getTime();
   const endTimeMillis = startTimeMillis + 86400000; // Exact midnight at end of day
 
-  const parseResponse = async (response: Response): Promise<{
-    active: number;
-    bmr: number;
-    total: number;
-    hourlyBuckets: HourlyCalorieBucket[];
-  }> => {
-    const data = await response.json();
-    let totalActive = 0;
-    let totalBmr = 0;
-    let totalMerged = 0;
-    let totalOther = 0;
-    const hourlyBuckets: HourlyCalorieBucket[] = [];
-
-    if (data.bucket && Array.isArray(data.bucket)) {
-      for (const bucket of data.bucket) {
-        const startMillis = Number(bucket.startTimeMillis) || 0;
-        const endMillis = Number(bucket.endTimeMillis) || 0;
-        const bucketDate = new Date(startMillis);
-        const hour = bucketDate.getHours();
-        const startStr = bucketDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        const endStr = new Date(endMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-        let bActive = 0;
-        let bBmr = 0;
-        let bMerged = 0;
-        let bOther = 0;
-
-        if (bucket.dataset && Array.isArray(bucket.dataset)) {
-          for (const dataset of bucket.dataset) {
-            const dsId = (dataset.dataSourceId || '').toLowerCase();
-            let sum = 0;
-            if (dataset.point && Array.isArray(dataset.point)) {
-              for (const point of dataset.point) {
-                if (point.value && Array.isArray(point.value)) {
-                  for (const val of point.value) {
-                    const num = typeof val.fpVal === 'number' 
-                      ? val.fpVal 
-                      : (typeof val.intVal === 'number' ? val.intVal : 0);
-                    sum += num;
-                  }
-                }
-              }
-            }
-            if (dsId.includes('merge_calories_expended')) {
-              bMerged += sum;
-            } else if (dsId.includes('from_activities')) {
-              bActive += sum;
-            } else if (dsId.includes('from_bmr') || dsId.includes('bmr')) {
-              bBmr += sum;
-            } else {
-              bOther += sum;
-            }
-          }
-        }
-
-        const bTotal = bMerged > 0 ? bMerged : (bActive + bBmr > 0 ? (bActive + bBmr) : bOther);
-
-        totalMerged += bMerged;
-        totalActive += bActive;
-        totalBmr += bBmr;
-        totalOther += bOther;
-
-        hourlyBuckets.push({
-          hour,
-          startTime: startStr,
-          endTime: endStr,
-          startMillis,
-          endMillis,
-          activeCalories: bActive,
-          bmrCalories: bBmr,
-          totalCalories: bTotal
-        });
-      }
-    }
-
-    const calculatedTotal = totalMerged > 0 
-      ? totalMerged 
-      : (totalActive + totalBmr > 0 ? (totalActive + totalBmr) : totalOther);
-
-    return {
-      active: totalActive,
-      bmr: totalBmr,
-      total: calculatedTotal,
-      hourlyBuckets
-    };
-  };
-
-  // Attempt 1: Query both from_activities and from_bmr with 1-hour buckets
-  let result = { active: 0, bmr: 0, total: 0, hourlyBuckets: [] as HourlyCalorieBucket[] };
-
-  const primaryResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      aggregateBy: [
-        {
-          dataTypeName: 'com.google.calories.expended',
-          dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:from_activities'
-        },
-        {
-          dataTypeName: 'com.google.calories.expended',
-          dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:from_bmr'
-        }
-      ],
-      bucketByTime: { durationMillis: 3600000 },
-      startTimeMillis,
-      endTimeMillis
-    })
-  });
-
-  if (primaryResponse.status === 401) {
-    throw new Error('UNAUTHORIZED');
-  }
-
-  if (primaryResponse.ok) {
-    result = await parseResponse(primaryResponse);
-  }
-
-  // Attempt 2: If primary was empty, try merge_calories_expended with 1-hour buckets
-  if (result.total <= 0) {
-    const mergeResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+  // 1. Fetch official 24-hour total burn from Google Fit's merge_calories_expended stream
+  let dailyTotal = 0;
+  try {
+    const dailyResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -472,24 +354,91 @@ export async function fetchGoogleFitCalories(
             dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended'
           }
         ],
-        bucketByTime: { durationMillis: 3600000 },
+        bucketByTime: { durationMillis: 86400000 },
         startTimeMillis,
         endTimeMillis
       })
     });
 
-    if (mergeResponse.status === 401) {
+    if (dailyResponse.status === 401) {
       throw new Error('UNAUTHORIZED');
     }
 
-    if (mergeResponse.ok) {
-      result = await parseResponse(mergeResponse);
+    if (dailyResponse.ok) {
+      const dailyData = await dailyResponse.json();
+      if (dailyData.bucket && Array.isArray(dailyData.bucket)) {
+        for (const bucket of dailyData.bucket) {
+          if (bucket.dataset && Array.isArray(bucket.dataset)) {
+            for (const dataset of bucket.dataset) {
+              if (dataset.point && Array.isArray(dataset.point)) {
+                for (const point of dataset.point) {
+                  if (point.value && Array.isArray(point.value)) {
+                    for (const val of point.value) {
+                      const num = typeof val.fpVal === 'number' ? val.fpVal : (typeof val.intVal === 'number' ? val.intVal : 0);
+                      dailyTotal += num;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err.message === 'UNAUTHORIZED') throw err;
+    console.warn('Google Fit daily merge query error:', err);
+  }
+
+  // Fallback for daily total if merge_calories_expended returned 0
+  if (dailyTotal <= 0) {
+    try {
+      const fallbackResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          aggregateBy: [{ dataTypeName: 'com.google.calories.expended' }],
+          bucketByTime: { durationMillis: 86400000 },
+          startTimeMillis,
+          endTimeMillis
+        })
+      });
+      if (fallbackResponse.status === 401) throw new Error('UNAUTHORIZED');
+      if (fallbackResponse.ok) {
+        const fbData = await fallbackResponse.json();
+        if (fbData.bucket && Array.isArray(fbData.bucket)) {
+          for (const bucket of fbData.bucket) {
+            if (bucket.dataset && Array.isArray(bucket.dataset)) {
+              for (const dataset of bucket.dataset) {
+                if (dataset.point && Array.isArray(dataset.point)) {
+                  for (const point of dataset.point) {
+                    if (point.value && Array.isArray(point.value)) {
+                      for (const val of point.value) {
+                        const num = typeof val.fpVal === 'number' ? val.fpVal : (typeof val.intVal === 'number' ? val.intVal : 0);
+                        dailyTotal += num;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (fbErr: any) {
+      if (fbErr.message === 'UNAUTHORIZED') throw fbErr;
+      console.warn('Google Fit fallback daily query error:', fbErr);
     }
   }
 
-  // Attempt 3: 24h whole-day aggregate fallback if hourly returns no data
-  if (result.total <= 0) {
-    const fallbackResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+  // 2. Fetch 1-hour resolution buckets for active burn (from_activities) and hourly surge detection
+  let totalActive = 0;
+  const hourlyBuckets: HourlyCalorieBucket[] = [];
+  try {
+    const hourlyResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -497,43 +446,85 @@ export async function fetchGoogleFitCalories(
       },
       body: JSON.stringify({
         aggregateBy: [
-          { dataTypeName: 'com.google.calories.expended' }
+          {
+            dataTypeName: 'com.google.calories.expended',
+            dataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:from_activities'
+          }
         ],
-        bucketByTime: { durationMillis: 86400000 },
+        bucketByTime: { durationMillis: 3600000 },
         startTimeMillis,
         endTimeMillis
       })
     });
 
-    if (fallbackResponse.status === 401) {
+    if (hourlyResponse.status === 401) {
       throw new Error('UNAUTHORIZED');
     }
 
-    if (fallbackResponse.ok) {
-      result = await parseResponse(fallbackResponse);
-    } else if (!primaryResponse.ok) {
-      const errorText = await primaryResponse.text();
-      throw new Error(`Google Fit API error (${primaryResponse.status}): ${errorText}`);
+    if (hourlyResponse.ok) {
+      const hData = await hourlyResponse.json();
+      if (hData.bucket && Array.isArray(hData.bucket)) {
+        for (const bucket of hData.bucket) {
+          const startMillis = Number(bucket.startTimeMillis) || 0;
+          const endMillis = Number(bucket.endTimeMillis) || 0;
+          const bucketDate = new Date(startMillis);
+          const hour = bucketDate.getHours();
+          const startStr = bucketDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          const endStr = new Date(endMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+          let bActive = 0;
+          if (bucket.dataset && Array.isArray(bucket.dataset)) {
+            for (const dataset of bucket.dataset) {
+              if (dataset.point && Array.isArray(dataset.point)) {
+                for (const point of dataset.point) {
+                  if (point.value && Array.isArray(point.value)) {
+                    for (const val of point.value) {
+                      const num = typeof val.fpVal === 'number' ? val.fpVal : (typeof val.intVal === 'number' ? val.intVal : 0);
+                      bActive += num;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          totalActive += bActive;
+          hourlyBuckets.push({
+            hour,
+            startTime: startStr,
+            endTime: endStr,
+            startMillis,
+            endMillis,
+            activeCalories: bActive,
+            bmrCalories: 0,
+            totalCalories: bActive
+          });
+        }
+      }
     }
+  } catch (err: any) {
+    if (err.message === 'UNAUTHORIZED') throw err;
+    console.warn('Google Fit hourly from_activities query error:', err);
   }
 
-  // Fetch Google Fit Sessions to cross-reference and detect workouts
+  // 3. Fetch Google Fit Sessions to cross-reference and detect workouts
   const sessions = await fetchGoogleFitSessions(startTimeMillis, endTimeMillis, accessToken);
 
-  // Run workout jump detection on hourly buckets and recorded sessions
-  const effectiveBmr = userProfileBmr && userProfileBmr > 0 ? userProfileBmr : result.bmr;
-  const detectedWorkouts = detectWorkoutsFromFitData(result.hourlyBuckets, sessions, dateStr, effectiveBmr);
+  // 4. Run workout jump detection
+  const effectiveBmr = userProfileBmr && userProfileBmr > 0 ? userProfileBmr : Math.max(0, dailyTotal - totalActive);
+  const detectedWorkouts = detectWorkoutsFromFitData(hourlyBuckets, sessions, dateStr, effectiveBmr);
 
-  console.log(`[Google Fit Sync ${dateStr}] Active: ${result.active.toFixed(1)} kcal, BMR: ${result.bmr.toFixed(1)} kcal => Total: ${result.total.toFixed(1)} kcal. Detected workouts: ${detectedWorkouts.length}`);
+  // If dailyTotal was somehow 0, fall back to totalActive
+  const finalTotal = dailyTotal > 0 ? dailyTotal : totalActive;
 
-  const activeExpended = result.active > 0 ? result.active : (result.total > effectiveBmr ? result.total - effectiveBmr : 0);
+  console.log(`[Google Fit Sync ${dateStr}] Google Fit Official Total: ${finalTotal.toFixed(1)} kcal, Active Steps/Exercise: ${totalActive.toFixed(1)} kcal, Detected Workouts: ${detectedWorkouts.length}`);
 
   return {
-    totalCalories: Math.round(result.total),
-    activeCalories: Math.round(activeExpended),
-    bmrCalories: Math.round(result.bmr),
+    totalCalories: Math.round(finalTotal),
+    activeCalories: Math.round(totalActive),
+    bmrCalories: Math.round(Math.max(0, finalTotal - totalActive)),
     lastSyncedAt: new Date().toISOString(),
-    hourlyBuckets: result.hourlyBuckets,
+    hourlyBuckets,
     detectedWorkouts
   };
 }

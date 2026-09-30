@@ -308,7 +308,7 @@ export function App() {
 
         const updatedActivity: DailyActivity = {
           date,
-          activeCaloriesBurned: dedicatedWorkoutCalories > 0 ? dedicatedWorkoutCalories : (fitResult.activeCalories || 0),
+          activeCaloriesBurned: fitTotal,
           baseBmrCalories: baseBmr,
           neatCalories: 0, // Google Fit already accounts for NEAT; 0 added to prevent double counting
           tefCalories: tef,
