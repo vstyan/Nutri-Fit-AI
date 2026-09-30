@@ -1,5 +1,5 @@
 {
-  "version": "1.8.12",
+  "version": "1.8.13",
   "releaseDate": "2026-09-29",
-  "notes": "Fixed date selector contrast across light and dark modes: resolved washed-out chevron icons on mobile tap/hover and improved amber contrast when viewing historical records."
+  "notes": "Fixed workout calorie calculations: queried Google Fit bucketBySession for exact session calories, eliminated multi-session hour double-counting via proportional time allocation, and enforced physiological limits."
 }

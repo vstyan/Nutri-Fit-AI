@@ -293,17 +293,19 @@ export function App() {
         const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
         const detectedWorkouts = Array.isArray(fitResult.detectedWorkouts) ? fitResult.detectedWorkouts : [];
 
-        // Deduplicate detected workouts against existing manual workouts (e.g. within 45 min)
+        // Preserve non-Google Fit manual workouts entered by user
+        const manualWorkouts = existingWorkouts.filter(w => !w.id.startsWith('gfit-'));
+
+        // Deduplicate detected workouts against user's manual workouts (e.g. within 45 min)
         const nonDuplicateDetected = detectedWorkouts.filter(dw => {
           const dwTime = new Date(dw.timestamp).getTime();
-          return !existingWorkouts.some(ew => {
-            if (ew.id === dw.id) return true;
-            const ewTime = new Date(ew.timestamp).getTime();
-            return !isNaN(ewTime) && !isNaN(dwTime) && Math.abs(ewTime - dwTime) < 45 * 60 * 1000;
+          return !manualWorkouts.some(mw => {
+            const mwTime = new Date(mw.timestamp).getTime();
+            return !isNaN(mwTime) && !isNaN(dwTime) && Math.abs(mwTime - dwTime) < 45 * 60 * 1000;
           });
         });
 
-        const mergedWorkouts = [...existingWorkouts, ...nonDuplicateDetected];
+        const mergedWorkouts = [...manualWorkouts, ...nonDuplicateDetected];
         const dedicatedWorkoutCalories = mergedWorkouts.reduce((s, w) => s + (w.caloriesBurned || 0), 0);
 
         const updatedActivity: DailyActivity = {

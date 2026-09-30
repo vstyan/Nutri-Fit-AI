@@ -26,6 +26,7 @@ export interface GoogleFitSession {
   startTimeMillis: number;
   endTimeMillis: number;
   activityType: number;
+  caloriesBurned?: number;
 }
 
 export interface GoogleFitCaloriesResult {
@@ -162,13 +163,17 @@ export const GOOGLE_FIT_ACTIVITY_MAP: Record<number, string> = {
 };
 
 /**
- * Fetches recorded workout sessions for a given time window from Google Fit Sessions API.
+ * Fetches recorded workout sessions for a given time window from Google Fit Sessions API,
+ * and queries Google Fit's aggregate dataset with bucketBySession to extract exact calories burned per session.
  */
 export async function fetchGoogleFitSessions(
   startTimeMillis: number,
   endTimeMillis: number,
   accessToken: string
 ): Promise<GoogleFitSession[]> {
+  const sessionsMap = new Map<string, GoogleFitSession>();
+
+  // 1. Fetch raw recorded sessions from Google Fit sessions endpoint
   try {
     const isoStart = new Date(startTimeMillis).toISOString();
     const isoEnd = new Date(endTimeMillis).toISOString();
@@ -181,30 +186,100 @@ export async function fetchGoogleFitSessions(
         }
       }
     );
-    if (!response.ok) {
-      return [];
-    }
-    const data = await response.json();
-    if (data.session && Array.isArray(data.session)) {
-      return data.session.map((s: any) => ({
-        id: s.id || `session-${s.startTimeMillis}`,
-        name: s.name || '',
-        description: s.description || '',
-        startTimeMillis: Number(s.startTimeMillis),
-        endTimeMillis: Number(s.endTimeMillis),
-        activityType: Number(s.activityType) || 108
-      }));
+    if (response.ok) {
+      const data = await response.json();
+      if (data.session && Array.isArray(data.session)) {
+        for (const s of data.session) {
+          const sId = s.id || `session-${s.startTimeMillis}`;
+          sessionsMap.set(sId, {
+            id: sId,
+            name: s.name || '',
+            description: s.description || '',
+            startTimeMillis: Number(s.startTimeMillis),
+            endTimeMillis: Number(s.endTimeMillis),
+            activityType: Number(s.activityType) || 108
+          });
+        }
+      }
     }
   } catch (err) {
     console.warn('Google Fit sessions lookup notice:', err);
   }
-  return [];
+
+  // 2. Query aggregate dataset with bucketBySession to fetch exact calories per session directly from Google Fit
+  try {
+    const aggResponse = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        aggregateBy: [
+          { dataTypeName: 'com.google.calories.expended' }
+        ],
+        bucketBySession: { minDurationMillis: 0 },
+        startTimeMillis,
+        endTimeMillis
+      })
+    });
+
+    if (aggResponse.ok) {
+      const aggData = await aggResponse.json();
+      if (aggData.bucket && Array.isArray(aggData.bucket)) {
+        for (const b of aggData.bucket) {
+          const sess = b.session;
+          if (!sess) continue;
+
+          let sessionCalories = 0;
+          if (b.dataset && Array.isArray(b.dataset)) {
+            for (const ds of b.dataset) {
+              if (ds.point && Array.isArray(ds.point)) {
+                for (const pt of ds.point) {
+                  if (pt.value && Array.isArray(pt.value)) {
+                    for (const v of pt.value) {
+                      const num = typeof v.fpVal === 'number' ? v.fpVal : (typeof v.intVal === 'number' ? v.intVal : 0);
+                      sessionCalories += num;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          const sId = sess.id || `session-${sess.startTimeMillis || b.startTimeMillis}`;
+          const existing = sessionsMap.get(sId);
+          if (existing) {
+            if (sessionCalories > 0) {
+              existing.caloriesBurned = Math.round(sessionCalories);
+            }
+          } else {
+            sessionsMap.set(sId, {
+              id: sId,
+              name: sess.name || '',
+              description: sess.description || '',
+              startTimeMillis: Number(sess.startTimeMillis || b.startTimeMillis),
+              endTimeMillis: Number(sess.endTimeMillis || b.endTimeMillis),
+              activityType: Number(sess.activityType) || 108,
+              caloriesBurned: sessionCalories > 0 ? Math.round(sessionCalories) : undefined
+            });
+          }
+        }
+      }
+    }
+  } catch (aggErr) {
+    console.warn('Google Fit session calories aggregate notice:', aggErr);
+  }
+
+  return Array.from(sessionsMap.values());
 }
 
 /**
  * Detects workout sessions and significant calorie burn surges from Google Fit data.
  * - Recognizes explicit tracked Google Fit sessions (from smartwatches/Fitbit/Wear OS/apps).
- * - Detects large jumps in burned calories in specific time windows (e.g. >= 150 active kcal/hr).
+ * - Accurately divides calories among multiple sessions within the same hour bucket without double/triple counting.
+ * - Enforces physiological sanity caps to prevent unrealistic multi-hour active burn inflation.
+ * - Detects large jumps in burned calories in remaining uncovered time windows.
  */
 export function detectWorkoutsFromFitData(
   hourlyBuckets: HourlyCalorieBucket[],
@@ -217,30 +292,72 @@ export function detectWorkoutsFromFitData(
 
   const avgHourlyBmr = totalBmr > 0 ? (totalBmr / 24) : 70;
 
-  // 1. Process explicit Google Fit Sessions first (e.g. from smartwatch/wearable/app)
-  for (const session of sessions) {
-    // Ignore sleep sessions (activityType 72) or negligible sessions (< 5 min)
-    if (session.activityType === 72) continue;
-    const durationMinutes = Math.max(1, Math.round((session.endTimeMillis - session.startTimeMillis) / (60 * 1000)));
-    if (durationMinutes < 5) continue;
+  // Filter valid exercise sessions (ignore sleep activityType 72, and negligible sessions < 5 min)
+  const validSessions = sessions.filter(session => {
+    if (session.activityType === 72) return false;
+    const durationMinutes = Math.max(1, Math.round((session.endTimeMillis - session.startTimeMillis) / 60000));
+    return durationMinutes >= 5;
+  });
 
-    // Find overlapping hourly buckets to sum active calories
-    let sessionActiveKcal = 0;
+  // Pre-calculate total workout overlap (in ms) per hourly bucket to prevent double/triple counting across multiple sessions
+  const bucketWorkoutOverlapMap = new Map<number, number>();
+  for (const session of validSessions) {
     for (const b of hourlyBuckets) {
-      if (b.endMillis > session.startTimeMillis && b.startMillis < session.endTimeMillis) {
-        coveredBucketHours.add(b.hour);
-        const bActive = b.activeCalories > 0 ? b.activeCalories : Math.max(0, b.totalCalories - avgHourlyBmr);
-        sessionActiveKcal += bActive;
+      const overlapStart = Math.max(session.startTimeMillis, b.startMillis);
+      const overlapEnd = Math.min(session.endTimeMillis, b.endMillis);
+      if (overlapEnd > overlapStart) {
+        const overlapMs = overlapEnd - overlapStart;
+        bucketWorkoutOverlapMap.set(b.hour, (bucketWorkoutOverlapMap.get(b.hour) || 0) + overlapMs);
+      }
+    }
+  }
+
+  // 1. Process explicit Google Fit Sessions with non-overlapping proportional allocation
+  for (const session of validSessions) {
+    const durationMinutes = Math.max(1, Math.round((session.endTimeMillis - session.startTimeMillis) / 60000));
+
+    let sessionActiveKcal = 0;
+
+    // A) If Google Fit's bucketBySession returned exact calories for this session, use it!
+    if (session.caloriesBurned && session.caloriesBurned > 0) {
+      sessionActiveKcal = session.caloriesBurned;
+      for (const b of hourlyBuckets) {
+        if (b.endMillis > session.startTimeMillis && b.startMillis < session.endTimeMillis) {
+          coveredBucketHours.add(b.hour);
+        }
+      }
+    } else {
+      // B) Proportional time-slice allocation across overlapping hours without multi-session duplication
+      for (const b of hourlyBuckets) {
+        const overlapStart = Math.max(session.startTimeMillis, b.startMillis);
+        const overlapEnd = Math.min(session.endTimeMillis, b.endMillis);
+        if (overlapEnd > overlapStart) {
+          coveredBucketHours.add(b.hour);
+          const overlapMs = overlapEnd - overlapStart;
+          const totalWorkoutMsInHour = bucketWorkoutOverlapMap.get(b.hour) || (60 * 60 * 1000);
+          const bActive = b.activeCalories > 0 ? b.activeCalories : Math.max(0, b.totalCalories - avgHourlyBmr);
+
+          // Proportional share: session gets its exact slice of the hour's active calories
+          const share = bActive * (overlapMs / Math.max(overlapMs, totalWorkoutMsInHour));
+          sessionActiveKcal += share;
+        }
       }
     }
 
+    // Physiological sanity capping: no human burns > 14 kcal/min in routine workouts
+    const maxPhysiologicalKcal = Math.round(durationMinutes * 14);
+    if (sessionActiveKcal > maxPhysiologicalKcal) {
+      sessionActiveKcal = maxPhysiologicalKcal;
+    }
+
+    // Fallback if session active kcal is still 0
     if (sessionActiveKcal <= 0) {
-      sessionActiveKcal = Math.round(durationMinutes * 6);
+      sessionActiveKcal = Math.round(durationMinutes * 5);
     }
 
     const rawActivityName = session.name || GOOGLE_FIT_ACTIVITY_MAP[session.activityType] || 'Workout Session';
     const calPerMin = sessionActiveKcal / durationMinutes;
-    const intensity = calPerMin >= 8 ? 'vigorous' : (calPerMin >= 5 ? 'high' : (calPerMin >= 3 ? 'moderate' : 'low'));
+    const intensity = calPerMin >= 9 ? 'vigorous' : (calPerMin >= 6 ? 'high' : (calPerMin >= 3.5 ? 'moderate' : 'low'));
 
     detectedWorkouts.push({
       id: `gfit-session-${session.id || session.startTimeMillis}`,
@@ -298,7 +415,7 @@ export function detectWorkoutsFromFitData(
 
       const timeRangeLabel = `${formatDisplayHour(startHour)} - ${formatDisplayHour(endHour)}`;
       const calPerMin = combinedActive / durationMinutes;
-      const intensity = calPerMin >= 7 ? 'vigorous' : (calPerMin >= 4.5 ? 'high' : 'moderate');
+      const intensity = calPerMin >= 9 ? 'vigorous' : (calPerMin >= 6 ? 'high' : (calPerMin >= 3.5 ? 'moderate' : 'low'));
 
       detectedWorkouts.push({
         id: `gfit-jump-${dateStr}-${startHour}`,
