@@ -4,7 +4,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "./scripts/notify_user.sh stop",
+        "command": "if [ -x \"$HOME/.gemini/config/scripts/notify_user.sh\" ]; then \"$HOME/.gemini/config/scripts/notify_user.sh\" stop; elif [ -x \"./scripts/notify_user.sh\" ]; then \"./scripts/notify_user.sh\" stop; else ./.agents/scripts/notify_user.sh stop; fi",
         "timeout": 10
       }
     ],
@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/notify_user.sh question",
+            "command": "if [ -x \"$HOME/.gemini/config/scripts/notify_user.sh\" ]; then \"$HOME/.gemini/config/scripts/notify_user.sh\" question; elif [ -x \"./scripts/notify_user.sh\" ]; then \"./scripts/notify_user.sh\" question; else ./.agents/scripts/notify_user.sh question; fi",
             "timeout": 10
           }
         ]
