@@ -367,7 +367,6 @@ export function buildDailyCoachPayload(
     : 0;
 
   // Workout detection & detailed expenditure analysis
-  const activeCalories = summary.activity.activeCaloriesBurned || 0;
   const rawWorkouts = summary.activity.workouts || [];
   const workoutsLogged = rawWorkouts.map(w => ({
     title: w.title,
@@ -378,22 +377,35 @@ export function buildDailyCoachPayload(
     description: w.description
   }));
 
-  const hasSignificantWorkout = activeCalories >= 150 || workoutsLogged.length > 0;
   const activeBurnSource = summary.activity.source || (settings.googleFitConnected ? 'google_fit' : 'manual');
+  const isTrackerMode = activeBurnSource === 'google_fit' || settings.includeRestingCalories === false;
+  const rawActiveField = summary.activity.activeCaloriesBurned || 0;
 
+  let dedicatedWorkoutCalories = 0;
+  let hasSignificantWorkout = false;
   let workoutSummary = '';
+
   if (workoutsLogged.length > 0) {
+    dedicatedWorkoutCalories = workoutsLogged.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
+    hasSignificantWorkout = true;
     const workoutParts = workoutsLogged.map(w => 
       `${w.title}${w.time ? ` at ${w.time}` : ''} (${w.caloriesBurned} kcal${w.durationMinutes ? `, ${w.durationMinutes} min` : ''}${w.intensity ? `, ${w.intensity} intensity` : ''})`
     );
-    workoutSummary = `Workouts logged: ${workoutParts.join('; ')}. Total active exercise burn: ${activeCalories} kcal.`;
-  } else if (activeCalories >= 150) {
-    const sourceLabel = activeBurnSource === 'google_fit' ? 'Google Fit tracker sync' : 'manual active entry';
-    workoutSummary = `Substantial workout expenditure detected: ~${activeCalories} active calories recorded (${sourceLabel}), representing a strenuous workout session.`;
-  } else if (activeCalories > 0) {
-    workoutSummary = `Light physical activity recorded: ${activeCalories} active calories.`;
+    workoutSummary = `Dedicated workouts logged: ${workoutParts.join('; ')} (Total dedicated workout burn: ${dedicatedWorkoutCalories} kcal). Total day expenditure so far: ${totalBurned} kcal.`;
+  } else if (isTrackerMode) {
+    // In tracker mode without itemized workouts, the value (e.g. 1537 kcal) is the FULL-DAY cumulative burn (BMR + incidental steps + general movement), NOT an isolated workout session!
+    dedicatedWorkoutCalories = 0;
+    hasSignificantWorkout = false;
+    workoutSummary = `Total daily expenditure recorded by fitness tracker so far is ${totalBurned} kcal (combining resting basal metabolism and routine daytime movement). No dedicated high-intensity workout session was logged today.`;
+  } else if (rawActiveField >= 150) {
+    // Manual standalone mode where user specifically typed exercise calories into the workout field
+    dedicatedWorkoutCalories = rawActiveField;
+    hasSignificantWorkout = true;
+    workoutSummary = `Manual workout/exercise burn entered: ${dedicatedWorkoutCalories} active kcal today.`;
   } else {
-    workoutSummary = 'No heavy workouts or active exercise logged today. Baseline resting / recovery day.';
+    dedicatedWorkoutCalories = rawActiveField;
+    hasSignificantWorkout = false;
+    workoutSummary = `Baseline activity: ${rawActiveField > 0 ? `${rawActiveField} active kcal` : 'No heavy workouts logged today (rest/recovery day)'}. Total day expenditure: ${totalBurned} kcal.`;
   }
 
   const primaryGoals = settings.goals.primaryGoals || [];
@@ -403,9 +415,11 @@ export function buildDailyCoachPayload(
 
   let workoutGuidance = '';
   if (hasSignificantWorkout) {
-    workoutGuidance = `WORKOUT & EXERCISE DETECTED: The user burned ${activeCalories} active calories today! (${workoutSummary}). You MUST acknowledge and celebrate this workout in 'workoutAnalysis.encouragement' with genuine, high-energy praise. In 'workoutAnalysis.fuelingAdvice', explain how their diet should adjust to properly recover from this workout (protein for muscle synthesis, carbs for glycogen repletion, fluid/electrolytes), keeping their primary goals (${primaryGoals.join(', ') || 'fitness & health'}) in mind.`;
+    workoutGuidance = `WORKOUT & EXERCISE DETECTED: (${workoutSummary}). You MUST acknowledge and celebrate this specific workout in 'workoutAnalysis.encouragement' with genuine, high-energy praise. In 'workoutAnalysis.fuelingAdvice', explain how their diet should adjust to properly recover from this workout (protein for muscle synthesis, carbs for glycogen repletion, fluid/electrolytes), keeping their primary goals (${primaryGoals.join(', ') || 'fitness & health'}) in mind.`;
+  } else if (isTrackerMode) {
+    workoutGuidance = `FITNESS TRACKER DAY MONITORING (NO DEDICATED WORKOUT LOGGED): ${workoutSummary}. CRITICAL: Do NOT claim the user burned ${totalBurned} kcal in a single workout! The ${totalBurned} kcal is their entire day's cumulative expenditure (mostly resting BMR baseline + routine steps). In 'workoutAnalysis.activitySummary', state: 'Total day burn: ~${totalBurned} kcal (resting metabolism & daily movement)'. In 'workoutAnalysis.encouragement', provide positive reinforcement for their day-long active movement and consistency. In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for daily energy and goal support without claiming they ran a massive marathon workout.`;
   } else {
-    workoutGuidance = `REST / RECOVERY DAY: Active burn is low (${activeCalories} kcal). In 'workoutAnalysis', provide positive reinforcement for rest/recovery and explain baseline fueling for rest days.`;
+    workoutGuidance = `REST / RECOVERY DAY: Active burn is low (${dedicatedWorkoutCalories} kcal). In 'workoutAnalysis', provide positive reinforcement for rest/recovery and explain baseline fueling for rest days.`;
   }
 
   let fiberPacingGuidance = '';
@@ -476,7 +490,7 @@ export function buildDailyCoachPayload(
     todayExpenditure: {
       bmrCalories: summary.activity.baseBmrCalories || 0,
       neatCalories: summary.activity.neatCalories || 0,
-      activeCalories,
+      activeCalories: dedicatedWorkoutCalories,
       tefCalories: summary.activity.tefCalories || 0,
       totalBurned,
       netEnergyBalance,

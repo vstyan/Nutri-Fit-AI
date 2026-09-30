@@ -723,21 +723,23 @@ CRITICAL COACHING INSTRUCTIONS:
    - If their goal includes "Improve endurance": emphasize complex carbohydrate refueling and hydration.
 
 4. FACTOR IN WORKOUTS, CALORIES BURNED & ATHLETIC FUELING (CRITICAL):
-   - Inspect 'todayExpenditure.activeCalories', 'todayExpenditure.workoutsLogged', and 'todayExpenditure.workoutSummary'.
-   - NEVER evaluate nutrition in isolation from physical activity! Calories burned from workouts dramatically alter metabolic recovery demands.
-   - If a workout or substantial active burn (>= 150 active kcal) is detected:
+   - Inspect 'todayExpenditure.hasSignificantWorkout', 'todayExpenditure.workoutsLogged', 'todayExpenditure.activeCalories', and 'todayExpenditure.workoutSummary'.
+   - NEVER evaluate nutrition in isolation from physical activity! Dedicated workouts alter metabolic recovery demands.
+   - If a dedicated workout or substantial workout entry is detected ('todayExpenditure.hasSignificantWorkout' is true):
      * Set 'workoutAnalysis.workoutDetected' to true.
-     * In 'workoutAnalysis.activitySummary', provide a concise 1-sentence recap (e.g., "${payload.todayExpenditure.activeCalories} kcal active workout burn recorded today").
+     * In 'workoutAnalysis.activitySummary', provide a concise 1-sentence recap of the specific workout (e.g., "${payload.todayExpenditure.workoutSummary}").
      * In 'workoutAnalysis.encouragement', provide genuine, enthusiastic athletic encouragement celebrating their dedication and sweat equity.
      * In 'workoutAnalysis.fuelingAdvice', explain clearly how their nutrition should adjust to recover from this workout:
        - Post-workout protein synthesis: replenish amino acids for muscle tissue repair.
        - Glycogen restoration: smart complex carbohydrates to restock depleted muscle and liver glycogen.
        - Hydration and electrolyte balance.
        - If the workout occurred earlier in the day (e.g. morning/midday), assess whether subsequent meals provided adequate recovery or if upcoming meals today should supply extra recovery nutrients.
-   - If active burn is low (< 150 active kcal and no workouts logged):
+   - If NO dedicated workout was logged ('todayExpenditure.hasSignificantWorkout' is false):
      * Set 'workoutAnalysis.workoutDetected' to false.
-     * In 'workoutAnalysis.encouragement', provide positive reinforcement for rest, bodily recovery, and preparing for the next training session.
-     * In 'workoutAnalysis.fuelingAdvice', explain baseline rest-day nutrition (e.g. keeping protein steady for muscle preservation while moderating dense carbohydrate loads).
+     * In 'workoutAnalysis.activitySummary', state: 'Total day burn so far: ~${payload.todayExpenditure.totalBurned} kcal (resting metabolism & daily movement)'.
+     * CRITICAL: Do NOT claim or hallucinate that the user burned ${payload.todayExpenditure.totalBurned} kcal in a single workout session! That number is their entire cumulative day burn (basal metabolic rate + incidental steps and activity).
+     * In 'workoutAnalysis.encouragement', provide positive reinforcement for their daily movement consistency and adherence to their goals.
+     * In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for steady daily energy, satiety, and goal support.
 
 5. RELY ON TIMESTAMPS, NOT MEAL LABELS:
    - Examine actual 24h meal timestamps (e.g., 08:15, 10:05, 13:20). Do NOT deduce behavior from meal labels like 'breakfast' or 'dinner'—users frequently eat multiple morning fuelings or log items under default tags. Evaluate the spacing and nutritional composition of meals chronologically.

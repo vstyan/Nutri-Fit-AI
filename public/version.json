@@ -1,5 +1,5 @@
 {
-  "version": "1.8.7",
+  "version": "1.8.8",
   "releaseDate": "2026-09-29",
-  "notes": "Fixed contrast and theme compatibility for AI Coach Workout Fueling & Athletic Recovery card across light and dark modes."
+  "notes": "Differentiated fitness tracker cumulative daily expenditure from dedicated workout sessions to prevent mislabeling all-day burn as a single workout."
 }
