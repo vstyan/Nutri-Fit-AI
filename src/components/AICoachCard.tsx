@@ -16,7 +16,8 @@ import {
   Flame,
   Zap,
   Target,
-  Dumbbell
+  Dumbbell,
+  Activity
 } from 'lucide-react';
 import { 
   DailyCoachInsight, 
@@ -493,22 +494,75 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                     ? 'border-orange-500/35'
                     : 'border-slate-800'
                 }`}>
+                  {/* Card Header */}
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center space-x-2 text-xs font-bold text-orange-400">
                       <Flame className="w-4 h-4 text-orange-500 shrink-0" />
                       <span>Workout Fueling &amp; Athletic Recovery</span>
                     </div>
-                    {dailyInsight.workoutAnalysis.activitySummary && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        dailyInsight.workoutAnalysis.workoutDetected
-                          ? 'bg-orange-950/60 text-orange-300 border-orange-500/30'
-                          : 'bg-slate-800 text-slate-400 border-slate-700'
-                      }`}>
-                        {dailyInsight.workoutAnalysis.workoutDetected ? '🔥 ' : '🛌 '}
-                        {dailyInsight.workoutAnalysis.activitySummary}
-                      </span>
-                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border tracking-wide uppercase ${
+                      dailyInsight.workoutAnalysis.workoutDetected
+                        ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                        : 'bg-slate-800/80 text-slate-400 border-slate-700'
+                    }`}>
+                      {dailyInsight.workoutAnalysis.workoutDetected ? '🔥 Active Workout Day' : '🛌 Rest / Recovery'}
+                    </span>
                   </div>
+
+                  {/* Activity Highlight Box (Clean rectangular callout with left accent) */}
+                  {dailyInsight.workoutAnalysis.activitySummary && (
+                    <div className={`rounded-xl border p-3 ${
+                      dailyInsight.workoutAnalysis.workoutDetected
+                        ? 'border-orange-500/25 border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-950/30 via-slate-900/60 to-slate-900/40 text-slate-200'
+                        : 'border-slate-800 border-l-4 border-l-slate-600 bg-slate-900/60 text-slate-300'
+                    }`}>
+                      <div className="flex items-center space-x-2 text-[11px] font-bold text-orange-300 mb-1.5">
+                        <Activity className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                        <span>
+                          {dailyInsight.workoutAnalysis.workoutDetected ? 'Recorded Physical Activity' : 'Daily Movement Baseline'}
+                        </span>
+                      </div>
+
+                      {dailyInsight.workoutAnalysis.activitySummary.includes(';') ? (
+                        <div className="space-y-2 mt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {dailyInsight.workoutAnalysis.activitySummary
+                              .split(';')
+                              .map((part, idx) => {
+                                const cleanPart = part
+                                  .replace(/^Dedicated workouts logged:\s*/i, '')
+                                  .replace(/\(Total dedicated workout burn:.*$/i, '')
+                                  .trim();
+                                if (!cleanPart) return null;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="bg-slate-950/70 border border-orange-500/20 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 flex items-start space-x-2 shadow-sm"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 mt-1.5" />
+                                    <span className="leading-snug font-medium">{cleanPart}</span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                          {dailyInsight.workoutAnalysis.activitySummary.includes('Total dedicated workout burn') && (
+                            <div className="pt-1 flex flex-wrap items-center justify-between text-[11px] text-orange-300/90 font-medium border-t border-orange-500/15">
+                              <span>
+                                {dailyInsight.workoutAnalysis.activitySummary.match(/\(Total dedicated workout burn:.*?\)/i)?.[0]?.replace(/[()]/g, '') || ''}
+                              </span>
+                              <span>
+                                {dailyInsight.workoutAnalysis.activitySummary.match(/Total day expenditure.*$/i)?.[0] || ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-200 leading-relaxed font-medium">
+                          {dailyInsight.workoutAnalysis.activitySummary}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Encouragement / Workout Praise */}
                   <p className="text-xs text-slate-300 font-medium leading-relaxed">

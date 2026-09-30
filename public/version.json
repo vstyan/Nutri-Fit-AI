@@ -1,5 +1,5 @@
 {
-  "version": "1.8.10",
+  "version": "1.8.11",
   "releaseDate": "2026-09-29",
-  "notes": "Fixed Google Fit total calorie sync by querying official merge_calories_expended stream to match Google Fit app display while preserving hourly active surge and workout detection."
+  "notes": "Redesigned AI Coach workout fueling summary from distorted circular bubble to a structured rectangular callout with distinct workout chips and left accent bar."
 }
