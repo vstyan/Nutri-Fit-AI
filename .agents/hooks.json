@@ -1,0 +1,24 @@
+{
+  "desktop-notifier": {
+    "enabled": true,
+    "Stop": [
+      {
+        "type": "command",
+        "command": "./scripts/notify_user.sh stop",
+        "timeout": 10
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/notify_user.sh question",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
