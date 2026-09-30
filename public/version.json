@@ -1,5 +1,5 @@
 {
-  "version": "1.8.8",
+  "version": "1.8.9",
   "releaseDate": "2026-09-29",
-  "notes": "Differentiated fitness tracker cumulative daily expenditure from dedicated workout sessions to prevent mislabeling all-day burn as a single workout."
+  "notes": "Added automatic workout jump & session detection for Google Fit: analyzes hourly calorie expenditure surges and sessions to detect and celebrate workouts."
 }

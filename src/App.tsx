@@ -257,8 +257,9 @@ export function App() {
     setIsSyncingGoogleFit(true);
     try {
       let fitResult: GoogleFitCaloriesResult;
+      const profileBmr = calculateBMR(currentSettings.profile);
       try {
-        fitResult = await fetchGoogleFitCalories(date, activeToken);
+        fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
       } catch (fetchErr: any) {
         if (fetchErr.message === 'UNAUTHORIZED' && (isManual || allowInteractiveRefresh)) {
           // Token expired mid-call; refresh token using saved user hint
@@ -275,7 +276,7 @@ export function App() {
           };
           await saveAppSettings(currentSettings);
           setSettings(currentSettings);
-          fitResult = await fetchGoogleFitCalories(date, activeToken);
+          fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
         } else {
           throw fetchErr;
         }
@@ -283,19 +284,36 @@ export function App() {
 
       if (fitResult) {
         const includeResting = currentSettings.includeRestingCalories !== false;
-        const profileBmr = calculateBMR(currentSettings.profile);
         const baseBmr = includeResting ? profileBmr : 0;
         const currentMeals = await getMealsForDate(date, currentSettings);
         const tef = calculateDailyTEF(currentMeals);
         const fitTotal = includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories;
 
+        const currentActivity = await getActivityForDate(date, currentSettings);
+        const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
+        const detectedWorkouts = Array.isArray(fitResult.detectedWorkouts) ? fitResult.detectedWorkouts : [];
+
+        // Deduplicate detected workouts against existing manual workouts (e.g. within 45 min)
+        const nonDuplicateDetected = detectedWorkouts.filter(dw => {
+          const dwTime = new Date(dw.timestamp).getTime();
+          return !existingWorkouts.some(ew => {
+            if (ew.id === dw.id) return true;
+            const ewTime = new Date(ew.timestamp).getTime();
+            return !isNaN(ewTime) && !isNaN(dwTime) && Math.abs(ewTime - dwTime) < 45 * 60 * 1000;
+          });
+        });
+
+        const mergedWorkouts = [...existingWorkouts, ...nonDuplicateDetected];
+        const dedicatedWorkoutCalories = mergedWorkouts.reduce((s, w) => s + (w.caloriesBurned || 0), 0);
+
         const updatedActivity: DailyActivity = {
           date,
-          activeCaloriesBurned: fitResult.totalCalories,
+          activeCaloriesBurned: dedicatedWorkoutCalories > 0 ? dedicatedWorkoutCalories : (fitResult.activeCalories || 0),
           baseBmrCalories: baseBmr,
           neatCalories: 0, // Google Fit already accounts for NEAT; 0 added to prevent double counting
           tefCalories: tef,
           totalCaloriesBurned: fitTotal + tef,
+          workouts: mergedWorkouts,
           source: 'google_fit',
           lastSyncedAt: fitResult.lastSyncedAt,
           lastUpdated: new Date().toISOString()
