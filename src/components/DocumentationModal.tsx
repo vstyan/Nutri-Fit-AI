@@ -80,7 +80,7 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
               </span>
             </div>
             <p className="text-slate-200 leading-relaxed">
-              NutriFit AI is powered by Google&apos;s multimodal <strong>Gemini 2.5 Flash</strong> model to perform real-time photo meal recognition, natural language voice workout estimation, and the behavioral AI Coach.
+              NutriFit AI is powered by Google&apos;s multimodal <strong>Gemini 3.8 Flash</strong> model to perform real-time photo meal recognition, natural language voice workout estimation, and the behavioral AI Coach.
             </p>
             <p className="text-slate-300 leading-relaxed">
               Because NutriFit AI is designed as a <strong>private, client-side app with no monthly subscriptions or centralized server fees</strong>, each user connects directly to Google using their own free API key from Google AI Studio.

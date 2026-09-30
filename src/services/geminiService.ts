@@ -8,11 +8,12 @@ import {
 import { DailyCoachPayload, WeeklyCoachPayload } from '../utils/coachAggregator';
 
 const FALLBACK_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
   'gemini-3.5-flash',
-  'gemini-2.0-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
 ];
 
 const WORKOUT_RESPONSE_SCHEMA = {
@@ -389,15 +390,15 @@ Respond strictly in valid JSON matching the requested schema.`;
 }
 
 function getThinkingConfig(model: string) {
-  // Gemini 2.5 series: setting thinkingBudget to 0 explicitly disables thinking for lowest latency
-  if (model.includes('2.5')) {
-    return { thinkingBudget: 0 };
-  }
-  // Gemini 3.x series: 'minimal' is the lowest latency setting (near zero thinking tokens)
+  // Gemini 3.x series: 'low' is supported across 3.8, 3.7, 3.6, 3.5 for lowest latency & cost.
+  // Note: 'minimal' is NOT supported on Gemini 3.8 & 3.7 and triggers an API error.
   if (model.includes('3.') || model.includes('3-')) {
-    return { thinkingLevel: 'minimal' };
+    return { thinkingLevel: 'low' };
   }
-  // Older models (e.g. Gemini 2.0 / legacy): do not support thinkingConfig
+  // Gemini 2.5 series: supports thinkingLevel 'low'
+  if (model.includes('2.5')) {
+    return { thinkingLevel: 'low' };
+  }
   return undefined;
 }
 
