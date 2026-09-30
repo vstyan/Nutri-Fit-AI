@@ -220,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
       }));
     } else {
-      if (selectedPrimaryGoals.length >= 3) return;
+      if (selectedPrimaryGoals.length >= 5) return;
       setFormData(prev => ({
         ...prev,
         goals: {
@@ -234,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAddCustomGoal = () => {
     const trimmed = customGoalInput.trim();
     if (!trimmed) return;
-    if (selectedPrimaryGoals.length >= 3) return;
+    if (selectedPrimaryGoals.length >= 5) return;
     if (selectedPrimaryGoals.includes(trimmed)) {
       setCustomGoalInput('');
       return;
@@ -817,26 +817,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* 3b. Primary Diet & Exercise Goals (Top 3) */}
+            {/* 3b. Primary Diet & Exercise Goals (Top 5) */}
             <div className="pt-3 border-t border-slate-800 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Primary Diet &amp; Exercise Goals (Top 3)</span>
+                  <span>Primary Diet &amp; Exercise Goals (Top 5)</span>
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  selectedPrimaryGoals.length === 3
+                  selectedPrimaryGoals.length === 5
                     ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
                     : selectedPrimaryGoals.length > 0
                       ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
                       : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}>
-                  {selectedPrimaryGoals.length}/3 Selected
+                  {selectedPrimaryGoals.length}/5 Selected
                 </span>
               </div>
 
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Choose or enter up to 3 primary goals so NutriFit AI Coach can factor your exact mission (e.g. fat loss, muscle gain, cholesterol, endurance) into every metabolic diagnosis, nutrient timing, and food recommendation.
+                Choose or enter up to 5 primary goals so NutriFit AI Coach can factor your exact mission (e.g. fat loss, muscle gain, cholesterol, endurance) into every metabolic diagnosis, nutrient timing, and food recommendation.
               </p>
 
               {/* Selected Goals Badges */}
@@ -869,7 +869,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex flex-wrap gap-1.5">
                   {POPULAR_GOAL_PRESETS.map((preset, idx) => {
                     const isSelected = selectedPrimaryGoals.includes(preset);
-                    const isMaxReached = selectedPrimaryGoals.length >= 3 && !isSelected;
+                    const isMaxReached = selectedPrimaryGoals.length >= 5 && !isSelected;
                     return (
                       <button
                         key={idx}
@@ -905,10 +905,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         handleAddCustomGoal();
                       }
                     }}
-                    disabled={selectedPrimaryGoals.length >= 3}
+                    disabled={selectedPrimaryGoals.length >= 5}
                     placeholder={
-                      selectedPrimaryGoals.length >= 3
-                        ? 'Maximum 3 goals selected (remove one to add another)'
+                      selectedPrimaryGoals.length >= 5
+                        ? 'Maximum 5 goals selected (remove one to add another)'
                         : 'Or type custom goal (e.g. Marathon prep, Lower blood pressure)...'
                     }
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:border-cyan-500"
@@ -917,7 +917,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddCustomGoal}
-                  disabled={!customGoalInput.trim() || selectedPrimaryGoals.length >= 3}
+                  disabled={!customGoalInput.trim() || selectedPrimaryGoals.length >= 5}
                   className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />

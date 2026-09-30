@@ -125,7 +125,7 @@ export interface UserGoals {
   dailyProteinTarget: number; // g
   dailyFatTarget: number; // g
   dailyCholesterolTarget?: number; // mg (e.g. 300)
-  primaryGoals?: string[]; // Top 1 to 3 primary diet/exercise goals
+  primaryGoals?: string[]; // Top 1 to 5 primary diet/exercise goals
 }
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';

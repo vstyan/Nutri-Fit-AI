@@ -1,5 +1,5 @@
 {
-  "version": "1.8.14",
+  "version": "1.8.15",
   "releaseDate": "2026-09-29",
-  "notes": "Removed synthetic workout intensity labels across the app and AI Coach chips to avoid misleading classifications when workout timers run long."
+  "notes": "Expanded primary diet and exercise goals selection limit from top 3 to top 5 goals."
 }
