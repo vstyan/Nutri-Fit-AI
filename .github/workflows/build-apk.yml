@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Set up Java JDK 17
@@ -45,6 +45,8 @@ jobs:
         run: mkdir -p android/app/src/main/assets
 
       - name: Sync Capacitor Android assets and plugins
+        env:
+          CAPACITOR_TELEMETRY: '0'
         run: npx cap sync android
 
       - name: Build Android Debug APK
