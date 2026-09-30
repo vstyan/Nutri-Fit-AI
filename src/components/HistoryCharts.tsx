@@ -422,8 +422,8 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center space-x-2.5 w-full lg:w-auto">
           <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400 shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
@@ -433,74 +433,76 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </div>
         </div>
 
-        {/* Metric Selector Buttons - Centered, balanced, and responsive */}
-        <div className="w-full sm:w-auto flex items-center justify-start sm:justify-center p-1 bg-slate-800/90 rounded-xl border border-slate-700/80 shadow-inner overflow-x-auto no-scrollbar gap-0.5 sm:gap-1">
-          <button
-            type="button"
-            onClick={() => setMetric('calories')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'calories'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Calories
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('protein')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'protein'
-                ? 'bg-rose-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Protein
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('carbs')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'carbs'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Net Carbs
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('cholesterol')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'cholesterol'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Dietary Chol
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('weight')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'weight'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Weight
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('lipids')}
-            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
-              metric === 'lipids'
-                ? 'bg-rose-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            Blood Lipids
-          </button>
+        {/* Metric Selector Buttons - Clean Responsive 3x2 Grid on Mobile, 6-col on Tablet/Desktop */}
+        <div className="w-full lg:w-auto p-1 bg-slate-800/90 rounded-xl border border-slate-700/80 shadow-inner">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+            <button
+              type="button"
+              onClick={() => setMetric('calories')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'calories'
+                  ? 'bg-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Calories
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('protein')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'protein'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Protein
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('carbs')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'carbs'
+                  ? 'bg-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Net Carbs
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('cholesterol')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'cholesterol'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Dietary Chol
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('weight')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'weight'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Weight
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('lipids')}
+              className={`text-center px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg active:scale-95 transition-all truncate flex items-center justify-center min-h-[34px] ${
+                metric === 'lipids'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+              }`}
+            >
+              Blood Lipids
+            </button>
+          </div>
         </div>
       </div>
 
