@@ -495,6 +495,7 @@ export function App() {
       const netCIn = Math.max(0, Math.round((cIn - fibIn) * 10) / 10);
       const protIn = Math.round(mList.reduce((s, m) => s + (m.totalProtein || 0), 0) * 10) / 10;
       const fatIn = Math.round(mList.reduce((s, m) => s + (m.totalFat || 0), 0) * 10) / 10;
+      const cholIn = Math.round(mList.reduce((s, m) => s + (m.totalCholesterol || 0), 0));
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
 
       const pastBmr = includeResting ? calculateBMR(currentSettings.profile) : 0;
@@ -514,6 +515,7 @@ export function App() {
         netCarbsIntake: netCIn,
         proteinIntake: protIn,
         fatIntake: fatIn,
+        cholesterolIntake: cholIn,
         carbsBurned: 0,
         caloriesIntake: calIn,
         caloriesBurned: pastBreakdown.totalBurned

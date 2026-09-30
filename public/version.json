@@ -1,5 +1,5 @@
 {
-  "version": "1.8.17",
+  "version": "1.8.18",
   "releaseDate": "2026-09-30",
-  "notes": "Added first-install Terms of Service & Health Disclaimer acceptance gate and in-app legal agreement viewer in Settings."
+  "notes": "Added 7-Day Dietary Cholesterol tracking to Historical Trends & Charts with daily limit guideline, weekly cumulative budget stats, and adherence monitoring."
 }

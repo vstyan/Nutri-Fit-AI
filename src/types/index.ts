@@ -1,5 +1,5 @@
 declare const __APP_VERSION__: string;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.17';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.18';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -106,6 +106,7 @@ export interface HistoryDayRecord {
   netCarbsIntake?: number;
   proteinIntake?: number;
   fatIntake?: number;
+  cholesterolIntake?: number; // total dietary cholesterol in mg
   carbsBurned: number;
   caloriesIntake: number;
   caloriesBurned: number;

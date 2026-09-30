@@ -896,6 +896,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             includeResting={includeResting}
             calorieTarget={goals.dailyCaloriesTarget}
             proteinTarget={goals.dailyProteinTarget}
+            cholesterolTarget={goals.dailyCholesterolTarget || 300}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

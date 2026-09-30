@@ -35,6 +35,7 @@ interface HistoryChartsProps {
   includeResting?: boolean;
   calorieTarget?: number;
   proteinTarget?: number;
+  cholesterolTarget?: number;
 }
 
 export const HistoryCharts: React.FC<HistoryChartsProps> = ({
@@ -44,9 +45,10 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   isImperial = true,
   includeResting = true,
   calorieTarget,
-  proteinTarget
+  proteinTarget,
+  cholesterolTarget = 300
 }) => {
-  const [metric, setMetric] = useState<'calories' | 'protein' | 'carbs' | 'weight' | 'lipids'>('calories');
+  const [metric, setMetric] = useState<'calories' | 'protein' | 'carbs' | 'cholesterol' | 'weight' | 'lipids'>('calories');
 
   const labels = historyData.map(d => {
     const dt = new Date(d.date + 'T00:00:00');
@@ -89,6 +91,15 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
   const proteinAdherencePct = proteinTarget && proteinTarget > 0 ? Math.round((avgProtein / proteinTarget) * 100) : null;
   const proteinCalories = Math.round(avgProtein * 4);
   const proteinCaloriesPct = avgConsumed > 0 ? Math.round((proteinCalories / avgConsumed) * 100) : null;
+
+  // Dietary cholesterol averages & limit adherence calculations
+  const effectiveCholesterolTarget = cholesterolTarget && cholesterolTarget > 0 ? cholesterolTarget : 300;
+  const cholLoggedDays = historyData.filter(d => (d.cholesterolIntake || 0) > 0);
+  const totalCholesterol7d = historyData.reduce((sum, d) => sum + (d.cholesterolIntake || 0), 0);
+  const avgCholesterol = Math.round(totalCholesterol7d / (historyData.length || 1));
+  const weeklyCholesterolLimit = effectiveCholesterolTarget * (historyData.length || 7);
+  const daysOverCholLimit = historyData.filter(d => (d.cholesterolIntake || 0) > effectiveCholesterolTarget).length;
+  const cholAdherencePct = effectiveCholesterolTarget > 0 ? Math.round((avgCholesterol / effectiveCholesterolTarget) * 100) : null;
 
   // Calorie, Protein, and Carb datasets
   const barChartData: any = {
@@ -165,6 +176,47 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
                   pointRadius: 0,
                   pointHoverRadius: 5,
                   pointBackgroundColor: '#f43f5e',
+                  pointBorderColor: '#ffffff',
+                  pointStyle: 'line',
+                  fill: false,
+                  tension: 0,
+                  order: 1,
+                }
+              ]
+            : [])
+        ]
+      : metric === 'cholesterol'
+      ? [
+          {
+            type: 'bar',
+            label: 'Dietary Cholesterol (mg)',
+            data: historyData.map(d => d.cholesterolIntake || 0),
+            backgroundColor: historyData.map(d => {
+              const val = d.cholesterolIntake || 0;
+              return val > effectiveCholesterolTarget ? 'rgba(244, 63, 94, 0.75)' : 'rgba(168, 85, 247, 0.75)';
+            }),
+            borderColor: historyData.map(d => {
+              const val = d.cholesterolIntake || 0;
+              return val > effectiveCholesterolTarget ? '#f43f5e' : '#a855f7';
+            }),
+            borderWidth: 1.5,
+            borderRadius: 6,
+            pointStyle: 'circle',
+            order: 2,
+          },
+          ...(effectiveCholesterolTarget > 0
+            ? [
+                {
+                  type: 'line',
+                  label: `Daily Limit (${effectiveCholesterolTarget} mg)`,
+                  data: historyData.map(() => effectiveCholesterolTarget),
+                  borderColor: '#f59e0b',
+                  backgroundColor: 'transparent',
+                  borderWidth: 2,
+                  borderDash: [6, 4],
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  pointBackgroundColor: '#f59e0b',
                   pointBorderColor: '#ffffff',
                   pointStyle: 'line',
                   fill: false,
@@ -377,7 +429,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </div>
           <div className="min-w-0">
             <h2 className="text-base font-bold text-white truncate">Historical Trends & Charts</h2>
-            <p className="text-xs text-slate-400 truncate">Calories, protein, net carbs, weight, and blood lipids progression</p>
+            <p className="text-xs text-slate-400 truncate">Calories, protein, net carbs, dietary cholesterol, weight, and blood lipids progression</p>
           </div>
         </div>
 
@@ -418,6 +470,17 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setMetric('cholesterol')}
+            className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
+              metric === 'cholesterol'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+            }`}
+          >
+            Dietary Chol
+          </button>
+          <button
+            type="button"
             onClick={() => setMetric('weight')}
             className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg active:scale-95 transition-all whitespace-nowrap min-w-[58px] sm:min-w-[68px] ${
               metric === 'weight'
@@ -436,7 +499,7 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
             }`}
           >
-            Lipids
+            Blood Lipids
           </button>
         </div>
       </div>
@@ -659,6 +722,99 @@ export const HistoryCharts: React.FC<HistoryChartsProps> = ({
                 {avgFiber}
               </span>
               <span className="text-[10px] sm:text-xs text-slate-400 font-medium">g / day</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dietary Cholesterol 7-Day Averages & Limit Adherence Bar */}
+      {metric === 'cholesterol' && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-1">
+          {/* 1. Avg Daily Intake */}
+          <div className="bg-slate-950/70 border border-purple-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  avgCholesterol > effectiveCholesterolTarget ? 'bg-rose-400' : 'bg-purple-400'
+                }`} />
+                <span className="sm:hidden">Avg Intake</span>
+                <span className="hidden sm:inline">7-Day Avg Intake</span>
+              </span>
+              {cholLoggedDays.length > 0 && cholLoggedDays.length < historyData.length && (
+                <span className="text-[10px] text-slate-500 hidden sm:inline">{cholLoggedDays.length}/7d</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                avgCholesterol > effectiveCholesterolTarget ? 'text-rose-300' : 'text-purple-300'
+              }`}>
+                {avgCholesterol > 0 ? avgCholesterol.toLocaleString() : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">mg / day</span>
+            </div>
+          </div>
+
+          {/* 2. 7-Day Cumulative vs Limit */}
+          <div className="bg-slate-950/70 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  totalCholesterol7d > weeklyCholesterolLimit ? 'bg-rose-400' : 'bg-emerald-400'
+                }`} />
+                <span className="sm:hidden">7-Day Total</span>
+                <span className="hidden sm:inline">7-Day Total vs Limit</span>
+              </span>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">
+                {weeklyCholesterolLimit.toLocaleString()} mg limit
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                totalCholesterol7d > weeklyCholesterolLimit ? 'text-rose-300' : 'text-emerald-300'
+              }`}>
+                {totalCholesterol7d > 0 ? totalCholesterol7d.toLocaleString() : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">
+                {totalCholesterol7d > 0
+                  ? totalCholesterol7d <= weeklyCholesterolLimit
+                    ? 'within limit'
+                    : `+${(totalCholesterol7d - weeklyCholesterolLimit).toLocaleString()} mg over`
+                  : 'mg total'}
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Limit Adherence / Days Over Limit */}
+          <div className="bg-slate-950/70 border border-amber-500/30 rounded-xl p-2.5 sm:p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${
+                  daysOverCholLimit > 0 ? 'bg-amber-400' : 'bg-emerald-400'
+                }`} />
+                <span className="sm:hidden">Adherence</span>
+                <span className="hidden sm:inline">Limit Adherence</span>
+              </span>
+              {effectiveCholesterolTarget && (
+                <span className="text-[10px] text-slate-500 hidden sm:inline">&le;{effectiveCholesterolTarget}mg/d</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1">
+              <span className={`text-base sm:text-xl font-bold ${
+                cholAdherencePct !== null
+                  ? cholAdherencePct <= 100
+                    ? 'text-emerald-300'
+                    : 'text-amber-300'
+                  : 'text-slate-300'
+              }`}>
+                {cholAdherencePct !== null ? `${cholAdherencePct}%` : '—'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-400 font-medium">
+                {cholAdherencePct !== null
+                  ? daysOverCholLimit === 0
+                    ? '0 days over'
+                    : `${daysOverCholLimit}d over limit`
+                  : 'no target'}
+              </span>
             </div>
           </div>
         </div>
