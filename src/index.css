@@ -129,7 +129,10 @@ html.theme-teal-breeze {
   }
 
   /* 2. Invert general text-white to dark high-contrast slate (stat numbers, card text, inputs) */
-  .text-white {
+  .text-white,
+  [class*="hover:text-white"]:hover,
+  [class*="hover:text-white"]:focus,
+  [class*="focus:text-white"]:focus {
     color: rgb(var(--color-slate-100)) !important;
   }
 
@@ -232,11 +235,14 @@ html.theme-teal-breeze {
   }
 
   [class*="bg-amber-950"] {
-    background-color: rgb(254 243 199 / 0.8) !important;
+    background-color: rgb(254 243 199 / 0.88) !important;
   }
+  [class*="text-amber-500"],
+  [class*="text-amber-400"],
   [class*="text-amber-300"],
-  [class*="text-amber-200"] {
-    color: rgb(180 83 9) !important;
+  [class*="text-amber-200"],
+  [class*="text-amber-100"] {
+    color: rgb(146 64 14) !important;
   }
 
   [class*="bg-emerald-950"] {

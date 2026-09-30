@@ -74,33 +74,41 @@ export const Header: React.FC<HeaderProps> = ({
         }`}>
           <button
             onClick={handlePrevDay}
-            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 active:scale-90 transition"
+            className={`w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl active:scale-90 transition ${
+              isToday
+                ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 focus:bg-slate-800/80'
+                : 'text-amber-400 hover:text-amber-200 hover:bg-amber-500/20 active:bg-amber-500/30'
+            }`}
             title="Previous Day"
             aria-label="Previous Day"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
           </button>
           
           <button
             onClick={() => onDateChange(todayStr)}
             className={`h-10 sm:h-11 px-3 sm:px-3.5 text-xs sm:text-sm font-semibold flex items-center space-x-1.5 rounded-xl active:scale-95 transition ${
               isToday 
-                ? 'text-slate-200 hover:text-cyan-400' 
-                : 'text-amber-300 hover:text-amber-200'
+                ? 'text-slate-200 hover:text-cyan-400 hover:bg-slate-800/40' 
+                : 'text-amber-300 hover:text-amber-100 hover:bg-amber-500/10'
             }`}
             title={isToday ? "Current Date (Today)" : "Viewing non-today date - Tap to return to Today"}
           >
-            <Calendar className={`w-4 h-4 ${isToday ? 'text-cyan-400' : 'text-amber-400'}`} />
+            <Calendar className={`w-4 h-4 shrink-0 ${isToday ? 'text-cyan-400' : 'text-amber-400'}`} />
             <span className="whitespace-nowrap">{formatDisplayDate(selectedDate)}</span>
           </button>
 
           <button
             onClick={handleNextDay}
-            className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 active:scale-90 transition"
+            className={`w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl active:scale-90 transition ${
+              isToday
+                ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 focus:bg-slate-800/80'
+                : 'text-amber-400 hover:text-amber-200 hover:bg-amber-500/20 active:bg-amber-500/30'
+            }`}
             title="Next Day"
             aria-label="Next Day"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
           </button>
         </div>
 
@@ -144,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Settings Button - Large, Touch-Friendly */}
           <button
             onClick={onOpenSettings}
-            className="w-10 h-10 sm:w-11 sm:h-11 bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 hover:text-white border border-slate-700/80 rounded-2xl transition flex items-center justify-center shadow-sm"
+            className="w-10 h-10 sm:w-11 sm:h-11 bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 hover:text-slate-100 border border-slate-700/80 rounded-2xl transition flex items-center justify-center shadow-sm"
             title="Settings & Profile"
             aria-label="Settings"
           >

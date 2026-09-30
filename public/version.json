@@ -1,5 +1,5 @@
 {
-  "version": "1.8.11",
+  "version": "1.8.12",
   "releaseDate": "2026-09-29",
-  "notes": "Redesigned AI Coach workout fueling summary from distorted circular bubble to a structured rectangular callout with distinct workout chips and left accent bar."
+  "notes": "Fixed date selector contrast across light and dark modes: resolved washed-out chevron icons on mobile tap/hover and improved amber contrast when viewing historical records."
 }
