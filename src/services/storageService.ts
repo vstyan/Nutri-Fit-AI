@@ -206,6 +206,8 @@ export function getInitialSettingsSynchronous(): AppSettings {
           ? parsed.geminiApiKey.trim()
           : stickyKey,
         includeRestingCalories: parsed.includeRestingCalories !== undefined ? parsed.includeRestingCalories : true,
+        termsAcceptedVersion: parsed.termsAcceptedVersion || localStorage.getItem('nutrifit_terms_accepted_version') || undefined,
+        termsAcceptedDate: parsed.termsAcceptedDate || localStorage.getItem('nutrifit_terms_accepted_date') || undefined,
         profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },
         goals: { ...DEFAULT_SETTINGS.goals, ...(parsed.goals || {}) }
       };
@@ -214,6 +216,8 @@ export function getInitialSettingsSynchronous(): AppSettings {
 
   return {
     ...DEFAULT_SETTINGS,
+    termsAcceptedVersion: localStorage.getItem('nutrifit_terms_accepted_version') || undefined,
+    termsAcceptedDate: localStorage.getItem('nutrifit_terms_accepted_date') || undefined,
     geminiApiKey: stickyKey
   };
 }
@@ -242,6 +246,8 @@ export async function getAppSettings(): Promise<AppSettings> {
       includeRestingCalories: (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories) !== undefined
         ? (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories)
         : true,
+      termsAcceptedVersion: (parsedLocal?.termsAcceptedVersion ?? idbSaved?.termsAcceptedVersion) || localStorage.getItem('nutrifit_terms_accepted_version') || undefined,
+      termsAcceptedDate: (parsedLocal?.termsAcceptedDate ?? idbSaved?.termsAcceptedDate) || localStorage.getItem('nutrifit_terms_accepted_date') || undefined,
       profile: { ...DEFAULT_PROFILE, ...(idbSaved?.profile || {}), ...(parsedLocal?.profile || {}) },
       goals: { ...DEFAULT_SETTINGS.goals, ...(idbSaved?.goals || {}) },
       geminiApiKey: (parsedLocal?.geminiApiKey || idbSaved?.geminiApiKey || '').trim()
@@ -306,6 +312,22 @@ export async function saveAppSettings(settings: AppSettings, explicitKeyUpdate =
       console.warn('Could not sync settings to Google Drive:', e);
     }
   }
+}
+
+export async function saveTermsAccepted(version: string, settings: AppSettings): Promise<AppSettings> {
+  const acceptedDate = new Date().toISOString();
+  try {
+    localStorage.setItem('nutrifit_terms_accepted_version', version);
+    localStorage.setItem('nutrifit_terms_accepted_date', acceptedDate);
+  } catch {}
+
+  const updatedSettings: AppSettings = {
+    ...settings,
+    termsAcceptedVersion: version,
+    termsAcceptedDate: acceptedDate
+  };
+  await saveAppSettings(updatedSettings);
+  return updatedSettings;
 }
 
 const IDB_TIMEOUT_MS = 2500;

@@ -1,5 +1,5 @@
 declare const __APP_VERSION__: string;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.16';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.17';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -145,6 +145,8 @@ export interface AppSettings {
   googleFitUserEmail?: string;
   includeRestingCalories?: boolean;
   themeMode?: ThemeMode;
+  termsAcceptedVersion?: string;
+  termsAcceptedDate?: string;
   profile: UserProfile;
   goals: UserGoals;
 }

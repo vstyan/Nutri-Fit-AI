@@ -8,6 +8,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { StoragePromptModal } from './components/StoragePromptModal';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { DocumentationModal } from './components/DocumentationModal';
+import { TermsModal } from './components/TermsModal';
+import { TERMS_VERSION } from './constants/termsContent';
 import { 
   AppSettings, 
   MealRecord, 
@@ -37,7 +39,8 @@ import {
   getAllFavoriteMeals,
   toggleFavoriteMeal,
   DEFAULT_SETTINGS,
-  getInitialSettingsSynchronous
+  getInitialSettingsSynchronous,
+  saveTermsAccepted
 } from './services/storageService';
 import { calculateBMR, calculateDailyTEF, calculateTDEE } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
@@ -118,6 +121,14 @@ export function App() {
   const [editingMeal, setEditingMeal] = useState<MealRecord | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoragePromptOpen, setIsStoragePromptOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(() => {
+    const init = getInitialSettingsSynchronous();
+    return !init.termsAcceptedVersion || init.termsAcceptedVersion !== TERMS_VERSION;
+  });
+  const [isTermsBlocking, setIsTermsBlocking] = useState(() => {
+    const init = getInitialSettingsSynchronous();
+    return !init.termsAcceptedVersion || init.termsAcceptedVersion !== TERMS_VERSION;
+  });
 
   // Theme mode sync (Pure Black OLED vs Teal Breeze vs Midnight Slate)
   useEffect(() => {
@@ -144,7 +155,11 @@ export function App() {
   useEffect(() => {
     getAppSettings().then(loaded => {
       setSettings(loaded);
-      if (!loaded.storagePromptDismissed) {
+      const termsAccepted = loaded.termsAcceptedVersion === TERMS_VERSION;
+      if (!termsAccepted) {
+        setIsTermsBlocking(true);
+        setIsTermsOpen(true);
+      } else if (!loaded.storagePromptDismissed) {
         setIsStoragePromptOpen(true);
       }
       if (loaded.googleFitConnected) {
@@ -743,6 +758,17 @@ export function App() {
     setIsStoragePromptOpen(false);
   };
 
+  // Accept Terms of Service & Health Disclaimer
+  const handleAcceptTerms = async () => {
+    const updated = await saveTermsAccepted(TERMS_VERSION, settings);
+    setSettings(updated);
+    setIsTermsOpen(false);
+    setIsTermsBlocking(false);
+    if (!updated.storagePromptDismissed) {
+      setIsStoragePromptOpen(true);
+    }
+  };
+
   // Compute Daily Summary totals including Fiber, Net Carbs, and dynamic TEF
   const totalCarbs = Math.round(meals.reduce((sum, m) => sum + (m.totalCarbs || 0), 0) * 10) / 10;
   const totalFiber = Math.round(meals.reduce((sum, m) => sum + (m.totalFiber || 0), 0) * 10) / 10;
@@ -908,6 +934,10 @@ export function App() {
         onOpenDocumentation={handleOpenDocumentation}
         onConnectGoogleFit={handleConnectGoogleFit}
         onDisconnectGoogleFit={handleDisconnectGoogleFit}
+        onOpenTerms={() => {
+          setIsTermsBlocking(false);
+          setIsTermsOpen(true);
+        }}
       />
 
       {/* NutriFit AI Guide & Documentation Modal */}
@@ -923,6 +953,15 @@ export function App() {
         currentLocation={settings.storageLocation}
         onSelect={handleSelectStorageLocation}
         onClose={() => setIsStoragePromptOpen(false)}
+      />
+
+      {/* Terms of Service & Health Disclaimer Modal */}
+      <TermsModal
+        isOpen={isTermsOpen}
+        isBlocking={isTermsBlocking}
+        acceptedDate={settings.termsAcceptedDate}
+        onAccept={handleAcceptTerms}
+        onClose={() => setIsTermsOpen(false)}
       />
 
       {/* PWA Update Notification Prompt */}

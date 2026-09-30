@@ -1,5 +1,5 @@
 {
-  "version": "1.8.16",
+  "version": "1.8.17",
   "releaseDate": "2026-09-30",
-  "notes": "Upgraded Gemini AI engine to models/gemini-3.8-flash for faster meal recognition, enhanced AI Coach reasoning, and full compatibility with latest Google Gemini API."
+  "notes": "Added first-install Terms of Service & Health Disclaimer acceptance gate and in-app legal agreement viewer in Settings."
 }

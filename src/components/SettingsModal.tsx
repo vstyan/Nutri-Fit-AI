@@ -20,8 +20,11 @@ import {
   Activity,
   Palette,
   BookOpen,
-  Plus
+  Plus,
+  ShieldAlert,
+  FileText
 } from 'lucide-react';
+import { TERMS_VERSION } from '../constants/termsContent';
 
 const POPULAR_GOAL_PRESETS = [
   'Lose body fat & lean down',
@@ -57,6 +60,7 @@ interface SettingsModalProps {
   onOpenDocumentation?: (section?: string) => void;
   onConnectGoogleFit?: () => void;
   onDisconnectGoogleFit?: () => void;
+  onOpenTerms?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -67,7 +71,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onOpenDocumentation,
   onConnectGoogleFit,
-  onDisconnectGoogleFit
+  onDisconnectGoogleFit,
+  onOpenTerms
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -1158,6 +1163,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <p className="text-[11px] text-slate-400">
                 You can toggle between Dark and Light modes at any time. Changes preview immediately.
               </p>
+            </div>
+
+            {/* Legal & Health Disclaimer */}
+            <div className="space-y-3 pt-3 border-t border-slate-800">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-amber-400" />
+                  Legal &amp; Health Disclaimer
+                </span>
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  v{TERMS_VERSION} Accepted
+                </span>
+              </label>
+
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Terms of Service &amp; Health Disclaimer</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {settings.termsAcceptedDate 
+                      ? `Agreed on ${new Date(settings.termsAcceptedDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}. Binding agreement covering informational use, experimental AI output, and assumption of risk.`
+                      : 'Binding agreement covering informational use, experimental AI output, and assumption of risk.'}
+                  </div>
+                </div>
+
+                {onOpenTerms && (
+                  <button
+                    type="button"
+                    onClick={onOpenTerms}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-xs font-semibold transition flex items-center space-x-1.5 shrink-0 self-stretch sm:self-auto justify-center cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>View Agreement</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* App Updates & Version */}
