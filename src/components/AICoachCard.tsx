@@ -488,20 +488,20 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
 
               {/* 2. Workout Fueling & Athletic Recovery */}
               {dailyInsight.workoutAnalysis && (
-                <div className={`p-3.5 rounded-xl space-y-2.5 border transition ${
+                <div className={`p-3.5 bg-slate-950/70 rounded-xl space-y-2.5 border transition ${
                   dailyInsight.workoutAnalysis.workoutDetected
-                    ? 'bg-gradient-to-r from-orange-950/40 via-amber-950/30 to-slate-950/80 border-orange-500/40 shadow-sm'
-                    : 'bg-slate-950/70 border-slate-800'
+                    ? 'border-orange-500/35'
+                    : 'border-slate-800'
                 }`}>
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center space-x-2 text-xs font-bold text-orange-300">
-                      <Flame className="w-4 h-4 text-orange-400" />
+                    <div className="flex items-center space-x-2 text-xs font-bold text-orange-400">
+                      <Flame className="w-4 h-4 text-orange-500 shrink-0" />
                       <span>Workout Fueling &amp; Athletic Recovery</span>
                     </div>
                     {dailyInsight.workoutAnalysis.activitySummary && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         dailyInsight.workoutAnalysis.workoutDetected
-                          ? 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                          ? 'bg-orange-950/60 text-orange-300 border-orange-500/30'
                           : 'bg-slate-800 text-slate-400 border-slate-700'
                       }`}>
                         {dailyInsight.workoutAnalysis.workoutDetected ? '🔥 ' : '🛌 '}
@@ -511,13 +511,13 @@ export const AICoachCard: React.FC<AICoachCardProps> = ({
                   </div>
 
                   {/* Encouragement / Workout Praise */}
-                  <p className="text-xs text-slate-200 font-medium leading-relaxed">
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
                     {dailyInsight.workoutAnalysis.encouragement}
                   </p>
 
                   {/* Dietary Adjustment & Fueling Advice */}
                   <div className="pt-2 border-t border-slate-800/80 flex items-start space-x-2 text-xs text-slate-300 leading-relaxed">
-                    <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <span>
                       <strong className="text-white font-semibold">Dietary Fueling Adjustment:</strong>{' '}
                       <span>{dailyInsight.workoutAnalysis.fuelingAdvice}</span>

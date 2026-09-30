@@ -278,4 +278,15 @@ html.theme-teal-breeze {
   [class*="text-rose-200"] {
     color: rgb(190 18 60) !important;
   }
+
+  [class*="bg-orange-950"],
+  [class*="bg-orange-500"] {
+    background-color: rgb(255 237 213 / 0.85) !important;
+  }
+  [class*="text-orange-500"],
+  [class*="text-orange-400"],
+  [class*="text-orange-300"],
+  [class*="text-orange-200"] {
+    color: rgb(194 65 12) !important;
+  }
 }
