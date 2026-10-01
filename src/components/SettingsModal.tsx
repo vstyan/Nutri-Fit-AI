@@ -106,7 +106,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Goal customization state
   const [customGoalInput, setCustomGoalInput] = useState('');
 
-  // Sync formData whenever settings changes or modal opens
+  // Sync formData ONLY when modal transitions from closed to open
   useEffect(() => {
     if (isOpen) {
       setFormData(settings);
@@ -122,7 +122,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setAvailableVersionInfo(null);
       setIsCheckingUpdate(false);
     }
-  }, [isOpen, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

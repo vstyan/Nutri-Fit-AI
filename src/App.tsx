@@ -510,10 +510,10 @@ export function App() {
     }
   }, [selectedDate]);
 
-  // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit / Health Connect
+  // Listen for visibility change / pageshow to automatically advance date and auto-sync Fit / Health Connect (with 5-minute cooldown)
   useEffect(() => {
     const handleActiveState = () => {
-      if (document.visibilityState === 'visible' || (typeof document.hasFocus === 'function' && document.hasFocus())) {
+      if (document.visibilityState === 'visible') {
         const todayStr = getLocalDateString();
         const elapsedMinutes = (Date.now() - lastActiveTimeRef.current) / (60 * 1000);
         lastActiveTimeRef.current = Date.now();
@@ -526,6 +526,19 @@ export function App() {
         if (selectedDate < todayStr && (elapsedMinutes > 15 || selectedDate === addDaysToDateString(todayStr, -1))) {
           targetDate = todayStr;
           setSelectedDate(todayStr);
+        }
+
+        // Avoid hammering background sync on transient view changes: require at least 5 minutes since last sync
+        const lastHealthSync = settingsRef.current.healthConnectLastSync
+          ? new Date(settingsRef.current.healthConnectLastSync).getTime()
+          : 0;
+        const lastFitSync = settingsRef.current.googleFitLastSync
+          ? new Date(settingsRef.current.googleFitLastSync).getTime()
+          : 0;
+        const lastSync = Math.max(lastHealthSync, lastFitSync);
+
+        if (Date.now() - lastSync < 5 * 60 * 1000) {
+          return;
         }
 
         if (settingsRef.current.healthConnectConnected) {
@@ -542,13 +555,11 @@ export function App() {
     };
 
     document.addEventListener('visibilitychange', handleActiveState);
-    window.addEventListener('focus', handleActiveState);
     window.addEventListener('pageshow', handleActiveState);
     window.addEventListener('online', handleOnline);
 
     return () => {
       document.removeEventListener('visibilitychange', handleActiveState);
-      window.removeEventListener('focus', handleActiveState);
       window.removeEventListener('pageshow', handleActiveState);
       window.removeEventListener('online', handleOnline);
     };

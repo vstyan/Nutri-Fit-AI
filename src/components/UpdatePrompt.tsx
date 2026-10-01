@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, Sparkles, X, ShieldCheck } from 'lucide-react';
 import { APP_VERSION } from '../types';
+import { isNativeAndroid } from '../services/healthBridge';
 
 interface VersionInfo {
   version: string;
@@ -9,7 +10,7 @@ interface VersionInfo {
   notes?: string;
 }
 
-export const UpdatePrompt: React.FC = () => {
+const PWAUpdatePromptContent: React.FC = () => {
   const [remoteVersionInfo, setRemoteVersionInfo] = useState<VersionInfo | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -175,4 +176,11 @@ export const UpdatePrompt: React.FC = () => {
       </div>
     </aside>
   );
+};
+
+export const UpdatePrompt: React.FC = () => {
+  if (isNativeAndroid()) {
+    return null;
+  }
+  return <PWAUpdatePromptContent />;
 };
