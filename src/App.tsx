@@ -394,7 +394,7 @@ export function App() {
         const now = new Date().toISOString();
         const updatedSettings: AppSettings = {
           ...settings,
-          includeRestingCalories: false,
+          includeRestingCalories: true,
           healthConnectConnected: true,
           healthSyncProvider: 'health_connect',
           healthConnectLastSync: now,
@@ -451,16 +451,27 @@ export function App() {
     try {
       const healthResult = await syncHealthConnectDaily(date);
       if (healthResult) {
-        const includeResting = activeSettings.includeRestingCalories !== false;
         const profileBmr = calculateBMR(activeSettings.profile);
-        const baseBmr = includeResting ? profileBmr : 0;
+        const restingBmr = (healthResult.basalCalories && healthResult.basalCalories > 0)
+          ? healthResult.basalCalories
+          : profileBmr;
+
+        let burnValue: number;
+        let baseBmr: number;
+
+        if (healthResult.totalCalories > 0) {
+          // Wearable reported exact cumulative or 24-hr total burn (e.g. 1237 kcal)
+          burnValue = healthResult.totalCalories;
+          baseBmr = 0; // Already included inside wearable total
+        } else {
+          // Wearable only logged active calories (e.g. 317 kcal) without totalCalories records.
+          // Add resting BMR so user's daily burn includes basal expenditure!
+          baseBmr = restingBmr;
+          burnValue = baseBmr + healthResult.activeCalories;
+        }
+
         const currentMeals = await getMealsForDate(date, activeSettings);
         const tef = calculateDailyTEF(currentMeals);
-
-        // Health Connect daily burn (wearable totalCalories if available, otherwise baseBmr + activeCalories)
-        const burnValue = healthResult.totalCalories > 0 
-          ? healthResult.totalCalories 
-          : (baseBmr + healthResult.activeCalories);
 
         const currentActivity = await getActivityForDate(date, activeSettings);
         const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];

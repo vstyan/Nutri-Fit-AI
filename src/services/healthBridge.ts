@@ -13,6 +13,7 @@ export interface HealthDailySummary {
   date: string; // YYYY-MM-DD
   activeCalories: number; // Active energy burned (EAT/active calories)
   totalCalories: number; // Total energy burned including resting (if provided by wearable)
+  basalCalories?: number; // Basal metabolic rate if recorded by wearable
   steps: number;
   source: 'health_connect' | 'google_fit' | 'manual';
   lastSyncedAt: string; // ISO string
@@ -24,6 +25,27 @@ export interface HealthBridgeStatus {
   isHealthConnectSupported: boolean;
   isAuthorized: boolean;
   error?: string;
+}
+
+/**
+ * Timeout safety helper ensuring native plugin calls never hang or block the app
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number = 4000, fallback: T): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`[HealthBridge] Operation timed out after ${ms}ms`);
+      resolve(fallback);
+    }, ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } catch (err) {
+    console.warn('[HealthBridge] Operation rejected:', err);
+    return fallback;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -46,7 +68,7 @@ export async function isHealthConnectAvailable(): Promise<boolean> {
   }
 
   try {
-    const res = await Health.isAvailable();
+    const res = await withTimeout(Health.isAvailable(), 3000, { available: false, reason: 'timeout' });
     return Boolean(res?.available);
   } catch (err) {
     console.warn('[HealthBridge] isAvailable check failed:', err);
@@ -68,7 +90,7 @@ export async function requestHealthConnectPermissions(): Promise<{
 
   try {
     const status = await Health.requestAuthorization({
-      read: ['calories', 'totalCalories', 'steps', 'workouts'],
+      read: ['calories', 'totalCalories', 'basalCalories', 'steps', 'workouts'],
       write: []
     });
 
@@ -104,7 +126,7 @@ export async function checkHealthConnectStatus(): Promise<HealthBridgeStatus> {
   }
 
   try {
-    const avail = await Health.isAvailable();
+    const avail = await withTimeout(Health.isAvailable(), 3000, { available: false, reason: 'timeout' });
     if (!avail?.available) {
       return {
         isNative: true,
@@ -115,9 +137,13 @@ export async function checkHealthConnectStatus(): Promise<HealthBridgeStatus> {
       };
     }
 
-    const auth = await Health.checkAuthorization({
-      read: ['calories', 'totalCalories', 'steps', 'workouts']
-    });
+    const auth = await withTimeout(
+      Health.checkAuthorization({
+        read: ['calories', 'totalCalories', 'basalCalories', 'steps', 'workouts']
+      }),
+      3000,
+      { readAuthorized: [], readDenied: [], writeAuthorized: [], writeDenied: [] }
+    );
 
     const isAuth = (auth.readAuthorized && auth.readAuthorized.length > 0);
 
@@ -151,7 +177,7 @@ export async function openHealthConnectSettings(): Promise<void> {
 }
 
 /**
- * Synchronizes daily health metrics (active calories, total calories, and steps) for a specific date (YYYY-MM-DD)
+ * Synchronizes daily health metrics (active calories, total calories, basal calories, and steps) for a specific date (YYYY-MM-DD)
  */
 export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDailySummary | null> {
   if (!isNativeAndroid()) {
@@ -169,66 +195,142 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
 
     let activeCalories = 0;
     let totalCalories = 0;
+    let basalCalories = 0;
     let steps = 0;
 
-    // 1. Query Active Calories
+    // 1. Query Active Calories (ActiveCaloriesBurnedRecord)
     try {
-      const activeRes = await Health.queryAggregated({
-        dataType: 'calories',
-        startDate,
-        endDate,
-        bucket: 'day',
-        aggregation: 'sum'
-      });
+      const activeRes = await withTimeout(
+        Health.queryAggregated({
+          dataType: 'calories',
+          startDate,
+          endDate,
+          bucket: 'day',
+          aggregation: 'sum'
+        }),
+        4000,
+        null
+      );
       if (activeRes?.samples && activeRes.samples.length > 0) {
-        activeCalories = Math.round(activeRes.samples.reduce((s, item) => s + (item.value || 0), 0));
+        activeCalories = Math.round(activeRes.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
       }
     } catch (e) {
-      console.warn('[HealthBridge] Query active calories failed:', e);
+      console.warn('[HealthBridge] Query active calories aggregated notice:', e);
     }
 
-    // 2. Query Total Calories
+    // Fallback: If aggregated query returned 0, query individual ActiveCaloriesBurnedRecord samples
+    if (activeCalories <= 0) {
+      try {
+        const activeSamples = await withTimeout(
+          Health.readSamples({
+            dataType: 'calories',
+            startDate,
+            endDate,
+            limit: 2000
+          }),
+          4000,
+          { samples: [] }
+        );
+        if (activeSamples?.samples && activeSamples.samples.length > 0) {
+          activeCalories = Math.round(activeSamples.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+        }
+      } catch (e) {
+        console.warn('[HealthBridge] readSamples active calories notice:', e);
+      }
+    }
+
+    // 2. Query Total Calories (TotalCaloriesBurnedRecord)
+    // NOTE: In @capgo/capacitor-health, aggregateMetrics only supports STEPS, DISTANCE, CALORIES, HYDRATION, DIETARY_ENERGY.
+    // Querying queryAggregated for totalCalories throws IllegalArgumentException.
+    // We query TotalCaloriesBurnedRecord directly via readSamples, which correctly retrieves all recorded energy samples for the day.
     try {
-      const totalRes = await Health.queryAggregated({
-        dataType: 'totalCalories',
-        startDate,
-        endDate,
-        bucket: 'day',
-        aggregation: 'sum'
-      });
+      const totalRes = await withTimeout(
+        Health.readSamples({
+          dataType: 'totalCalories',
+          startDate,
+          endDate,
+          limit: 5000
+        }),
+        4000,
+        { samples: [] }
+      );
       if (totalRes?.samples && totalRes.samples.length > 0) {
-        totalCalories = Math.round(totalRes.samples.reduce((s, item) => s + (item.value || 0), 0));
+        totalCalories = Math.round(totalRes.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
       }
     } catch (e) {
-      // Total calories might not be recorded by all devices; fallback to active calories
-      console.warn('[HealthBridge] Query total calories failed:', e);
+      console.warn('[HealthBridge] readSamples totalCalories notice:', e);
     }
 
-    // 3. Query Steps
+    // 3. Query Basal Metabolic Rate (BasalMetabolicRateRecord)
+    // If wearable or Health Connect reports a basal rate in kcal/day, read the latest sample
     try {
-      const stepsRes = await Health.queryAggregated({
-        dataType: 'steps',
-        startDate,
-        endDate,
-        bucket: 'day',
-        aggregation: 'sum'
-      });
-      if (stepsRes?.samples && stepsRes.samples.length > 0) {
-        steps = Math.round(stepsRes.samples.reduce((s, item) => s + (item.value || 0), 0));
+      const basalRes = await withTimeout(
+        Health.readSamples({
+          dataType: 'basalCalories',
+          startDate,
+          endDate,
+          limit: 100
+        }),
+        4000,
+        { samples: [] }
+      );
+      if (basalRes?.samples && basalRes.samples.length > 0) {
+        const lastSample = basalRes.samples[basalRes.samples.length - 1];
+        const rate = Number(lastSample?.value) || 0;
+        if (rate > 0) {
+          basalCalories = Math.round(rate);
+        }
       }
     } catch (e) {
-      console.warn('[HealthBridge] Query steps failed:', e);
+      console.warn('[HealthBridge] readSamples basalCalories notice:', e);
     }
 
-    // If total calories was not reported separately, fallback to active calories
-    if (totalCalories <= 0 && activeCalories > 0) {
-      totalCalories = activeCalories;
+    // 4. Query Steps (StepsRecord)
+    try {
+      const stepsRes = await withTimeout(
+        Health.queryAggregated({
+          dataType: 'steps',
+          startDate,
+          endDate,
+          bucket: 'day',
+          aggregation: 'sum'
+        }),
+        4000,
+        null
+      );
+      if (stepsRes?.samples && stepsRes.samples.length > 0) {
+        steps = Math.round(stepsRes.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+      }
+    } catch (e) {
+      console.warn('[HealthBridge] Query steps aggregated notice:', e);
+    }
+
+    // Fallback: If aggregated query returned 0, query individual StepsRecord samples
+    if (steps <= 0) {
+      try {
+        const stepsSamples = await withTimeout(
+          Health.readSamples({
+            dataType: 'steps',
+            startDate,
+            endDate,
+            limit: 2000
+          }),
+          4000,
+          { samples: [] }
+        );
+        if (stepsSamples?.samples && stepsSamples.samples.length > 0) {
+          steps = Math.round(stepsSamples.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+        }
+      } catch (e) {
+        console.warn('[HealthBridge] readSamples steps notice:', e);
+      }
     }
 
     return {
       date: dateStr,
       activeCalories,
       totalCalories,
+      basalCalories: basalCalories > 0 ? basalCalories : undefined,
       steps,
       source: 'health_connect',
       lastSyncedAt: new Date().toISOString()
