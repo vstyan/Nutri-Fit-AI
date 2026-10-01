@@ -1,5 +1,5 @@
 {
-  "version": "1.8.25",
+  "version": "1.8.26",
   "releaseDate": "2026-10-01",
-  "notes": "OTA in-app verification build v1.8.25. Verifies seamless over-the-air installation without APK download."
+  "notes": "Fix persistent startup storage location prompt (memorizes choice across app restarts), smooth OTA delivery."
 }

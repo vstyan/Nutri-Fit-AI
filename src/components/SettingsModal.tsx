@@ -429,7 +429,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(formData, true);
+    onSaveSettings({ ...formData, storagePromptDismissed: true }, true);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);

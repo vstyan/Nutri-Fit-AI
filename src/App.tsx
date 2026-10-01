@@ -40,7 +40,8 @@ import {
   toggleFavoriteMeal,
   DEFAULT_SETTINGS,
   getInitialSettingsSynchronous,
-  saveTermsAccepted
+  saveTermsAccepted,
+  saveStorageLocationChoice
 } from './services/storageService';
 import { calculateBMR, calculateDailyTEF, calculateTDEE } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
@@ -946,13 +947,8 @@ export function App() {
 
   // Select storage location from prompt
   const handleSelectStorageLocation = async (location: StorageLocation) => {
-    const updated: AppSettings = {
-      ...settings,
-      storageLocation: location,
-      storagePromptDismissed: true
-    };
+    const updated = await saveStorageLocationChoice(location, settings);
     setSettings(updated);
-    await saveAppSettings(updated);
     setIsStoragePromptOpen(false);
   };
 
@@ -1160,7 +1156,7 @@ export function App() {
         isOpen={isStoragePromptOpen}
         currentLocation={settings.storageLocation}
         onSelect={handleSelectStorageLocation}
-        onClose={() => setIsStoragePromptOpen(false)}
+        onClose={() => handleSelectStorageLocation(settings.storageLocation || 'local_indexeddb')}
       />
 
       {/* Terms of Service & Health Disclaimer Modal */}

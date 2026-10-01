@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Cloud, HardDrive, ShieldCheck, Check, ArrowRight, X } from 'lucide-react';
 import { StorageLocation } from '../types';
 
@@ -15,12 +15,25 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
   onSelect,
   onClose,
 }) => {
+  const [selectedLocation, setSelectedLocation] = useState<StorageLocation>(currentLocation || 'local_indexeddb');
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedLocation(currentLocation || 'local_indexeddb');
+    }
+  }, [isOpen, currentLocation]);
+
   if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    onSelect(selectedLocation);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 relative">
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
           aria-label="Close modal"
@@ -41,9 +54,10 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
         <div className="grid gap-3.5 pt-2">
           {/* Option 1: Google Drive */}
           <button
-            onClick={() => onSelect('google_drive')}
-            className={`flex items-start p-4 rounded-xl border text-left transition relative group ${
-              currentLocation === 'google_drive'
+            type="button"
+            onClick={() => setSelectedLocation('google_drive')}
+            className={`flex items-start p-4 rounded-xl border text-left transition relative group cursor-pointer ${
+              selectedLocation === 'google_drive'
                 ? 'bg-cyan-950/40 border-cyan-500/80 ring-1 ring-cyan-500'
                 : 'bg-slate-800/60 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
             }`}
@@ -62,7 +76,7 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
                 Stores your daily data and photos in a private <code className="text-cyan-300 font-mono">Diet-Exercise-PWA/</code> folder in your personal Google Drive. Safe even if browser cache is cleared.
               </p>
             </div>
-            {currentLocation === 'google_drive' && (
+            {selectedLocation === 'google_drive' && (
               <div className="absolute right-4 top-4 text-cyan-400">
                 <Check className="w-5 h-5" />
               </div>
@@ -71,9 +85,10 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
 
           {/* Option 2: Local Storage (IndexedDB) */}
           <button
-            onClick={() => onSelect('local_indexeddb')}
-            className={`flex items-start p-4 rounded-xl border text-left transition relative group ${
-              currentLocation === 'local_indexeddb'
+            type="button"
+            onClick={() => setSelectedLocation('local_indexeddb')}
+            className={`flex items-start p-4 rounded-xl border text-left transition relative group cursor-pointer ${
+              selectedLocation === 'local_indexeddb'
                 ? 'bg-cyan-950/40 border-cyan-500/80 ring-1 ring-cyan-500'
                 : 'bg-slate-800/60 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
             }`}
@@ -92,7 +107,7 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
                 Stores all logs directly on this device. Fast and private. You can manually export or import JSON backup files whenever you wish.
               </p>
             </div>
-            {currentLocation === 'local_indexeddb' && (
+            {selectedLocation === 'local_indexeddb' && (
               <div className="absolute right-4 top-4 text-cyan-400">
                 <Check className="w-5 h-5" />
               </div>
@@ -106,8 +121,9 @@ export const StoragePromptModal: React.FC<StoragePromptModalProps> = ({
             <span>End-to-end user privacy</span>
           </div>
           <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg transition inline-flex items-center space-x-1"
+            type="button"
+            onClick={handleConfirm}
+            className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white font-semibold rounded-xl transition inline-flex items-center space-x-1.5 shadow-lg shadow-cyan-900/30 cursor-pointer"
           >
             <span>Continue</span>
             <ArrowRight className="w-4 h-4" />

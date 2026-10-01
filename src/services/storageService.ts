@@ -7,7 +7,8 @@ import {
   WeightRecord, 
   BloodLipidRecord,
   DailyCoachInsight,
-  WeeklyCoachInsight
+  WeeklyCoachInsight,
+  StorageLocation
 } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { getPastNDaysDateStrings } from '../utils/dateUtils';
@@ -194,8 +195,14 @@ export async function getStickyGeminiKey(): Promise<string> {
   return '';
 }
 
+export const STORAGE_PROMPT_DISMISSED_KEY = 'nutrifit_storage_prompt_dismissed';
+export const STORAGE_LOCATION_KEY = 'nutrifit_storage_location';
+
 export function getInitialSettingsSynchronous(): AppSettings {
   const stickyKey = getStickyGeminiKeySynchronous();
+  const dismissedSync = localStorage.getItem(STORAGE_PROMPT_DISMISSED_KEY) === 'true';
+  const locationSync = (localStorage.getItem(STORAGE_LOCATION_KEY) as StorageLocation) || undefined;
+
   try {
     const localStr = localStorage.getItem(SETTINGS_KEY);
     if (localStr) {
@@ -203,6 +210,8 @@ export function getInitialSettingsSynchronous(): AppSettings {
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        storagePromptDismissed: parsed.storagePromptDismissed ?? dismissedSync,
+        storageLocation: parsed.storageLocation || locationSync || DEFAULT_SETTINGS.storageLocation,
         geminiApiKey: (parsed.geminiApiKey && parsed.geminiApiKey.trim().length > 0)
           ? parsed.geminiApiKey.trim()
           : stickyKey,
@@ -217,6 +226,8 @@ export function getInitialSettingsSynchronous(): AppSettings {
 
   return {
     ...DEFAULT_SETTINGS,
+    storagePromptDismissed: dismissedSync,
+    storageLocation: locationSync || DEFAULT_SETTINGS.storageLocation,
     termsAcceptedVersion: localStorage.getItem('nutrifit_terms_accepted_version') || undefined,
     termsAcceptedDate: localStorage.getItem('nutrifit_terms_accepted_date') || undefined,
     geminiApiKey: stickyKey
@@ -240,10 +251,15 @@ export async function getAppSettings(): Promise<AppSettings> {
       idbSaved = await withIdbTimeout(get<AppSettings>(SETTINGS_KEY), undefined);
     } catch {}
 
+    const dismissedSync = localStorage.getItem(STORAGE_PROMPT_DISMISSED_KEY) === 'true';
+    const locationSync = (localStorage.getItem(STORAGE_LOCATION_KEY) as StorageLocation) || undefined;
+
     const merged: AppSettings = {
       ...DEFAULT_SETTINGS,
       ...(idbSaved || {}),
       ...(parsedLocal || {}),
+      storagePromptDismissed: Boolean(parsedLocal?.storagePromptDismissed || idbSaved?.storagePromptDismissed || dismissedSync),
+      storageLocation: parsedLocal?.storageLocation || idbSaved?.storageLocation || locationSync || DEFAULT_SETTINGS.storageLocation,
       includeRestingCalories: (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories) !== undefined
         ? (parsedLocal?.includeRestingCalories ?? idbSaved?.includeRestingCalories)
         : true,
@@ -299,6 +315,17 @@ export async function saveAppSettings(settings: AppSettings, explicitKeyUpdate =
     geminiApiKey: effectiveKey
   };
 
+  if (finalSettings.storagePromptDismissed) {
+    try {
+      localStorage.setItem(STORAGE_PROMPT_DISMISSED_KEY, 'true');
+    } catch {}
+  }
+  if (finalSettings.storageLocation) {
+    try {
+      localStorage.setItem(STORAGE_LOCATION_KEY, finalSettings.storageLocation);
+    } catch {}
+  }
+
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(finalSettings));
     await withIdbTimeout(set(SETTINGS_KEY, finalSettings), undefined);
@@ -313,6 +340,21 @@ export async function saveAppSettings(settings: AppSettings, explicitKeyUpdate =
       console.warn('Could not sync settings to Google Drive:', e);
     }
   }
+}
+
+export async function saveStorageLocationChoice(location: StorageLocation, settings: AppSettings): Promise<AppSettings> {
+  try {
+    localStorage.setItem(STORAGE_PROMPT_DISMISSED_KEY, 'true');
+    localStorage.setItem(STORAGE_LOCATION_KEY, location);
+  } catch {}
+
+  const updatedSettings: AppSettings = {
+    ...settings,
+    storageLocation: location,
+    storagePromptDismissed: true
+  };
+  await saveAppSettings(updatedSettings);
+  return updatedSettings;
 }
 
 export async function saveTermsAccepted(version: string, settings: AppSettings): Promise<AppSettings> {
