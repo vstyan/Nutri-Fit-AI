@@ -1,6 +1,6 @@
 {
-  "version": "1.8.24",
+  "version": "1.8.25",
   "releaseDate": "2026-10-01",
-  "checksum": "701c41bb5047d6fff0c8decef8e3816e72fdab85fc11b766b3074cd63c8d4847",
-  "notes": "Seamless in-app OTA update fixes, Capgo checksum validation, Health Connect calorie breakdown & BMR calibration."
+  "checksum": "9deb6359eed6a2a2a63c758b57d2aed0aa054a1585bf88129991bad12320a827",
+  "notes": "OTA in-app verification build v1.8.25. Verifies seamless over-the-air installation without APK download."
 }
