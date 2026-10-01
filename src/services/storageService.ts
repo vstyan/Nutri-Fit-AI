@@ -26,7 +26,8 @@ export const DEFAULT_PROFILE: UserProfile = {
   age: 32,
   weightKg: 75, // ~165 lbs
   heightCm: 175, // ~5'9"
-  unitSystem: 'imperial'
+  unitSystem: 'imperial',
+  customBmr: undefined
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {

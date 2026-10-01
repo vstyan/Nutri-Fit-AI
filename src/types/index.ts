@@ -1,5 +1,5 @@
 declare const __APP_VERSION__: string;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.20';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.23';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -11,6 +11,7 @@ export interface UserProfile {
   weightKg: number; // stored in kg
   heightCm: number; // stored in cm
   unitSystem: UnitSystem;
+  customBmr?: number; // Optional custom/calibrated daily BMR in kcal/day (e.g. to match Google Fit or DEXA test)
 }
 
 export interface WeightRecord {
@@ -97,6 +98,8 @@ export interface DailyActivity {
   source?: 'manual' | 'google_fit' | 'health_connect';
   lastSyncedAt?: string;
   lastUpdated: string;
+  sensorActiveCalories?: number; // Active movement / workout burn from Health Connect or Google Fit
+  sensorRestingCalories?: number; // Prorated resting BMR component for the day
 }
 
 export interface HistoryDayRecord {

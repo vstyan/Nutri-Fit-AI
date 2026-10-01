@@ -22,7 +22,12 @@ import {
   BookOpen,
   Plus,
   ShieldAlert,
-  FileText
+  FileText,
+  Eye,
+  EyeOff,
+  Save,
+  Clipboard,
+  Sliders
 } from 'lucide-react';
 import { TERMS_VERSION } from '../constants/termsContent';
 
@@ -39,6 +44,7 @@ const POPULAR_GOAL_PRESETS = [
 import { AppSettings, Gender, UnitSystem, ThemeMode, APP_VERSION } from '../types';
 import { 
   calculateBMR, 
+  calculateFormulaBMR,
   kgToLbs, 
   lbsToKg, 
   cmToFeetInches, 
@@ -48,7 +54,9 @@ import { getLocalDateString } from '../utils/dateUtils';
 import { 
   exportAllDataAsJson, 
   importBackupJson, 
-  clearAllAppData 
+  clearAllAppData,
+  persistStickyGeminiKey,
+  clearStickyGeminiKey
 } from '../services/storageService';
 import { checkForRemoteUpdate, applyAndroidOTAUpdate } from '../services/updaterService';
 
@@ -107,6 +115,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Goal customization state
   const [customGoalInput, setCustomGoalInput] = useState('');
 
+  // Gemini API key helper states
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyFeedback, setApiKeyFeedback] = useState<string>('');
+
+  // BMR calibration helper states
+  const [isCalibratingBmr, setIsCalibratingBmr] = useState(false);
+
   // Sync formData ONLY when modal transitions from closed to open
   useEffect(() => {
     if (isOpen) {
@@ -122,6 +137,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setUpdateStatus('idle');
       setAvailableVersionInfo(null);
       setIsCheckingUpdate(false);
+      setShowApiKey(false);
+      setApiKeyFeedback('');
+      setIsCalibratingBmr(Boolean(settings.profile.customBmr));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -197,6 +215,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const currentBMR = calculateBMR(formData.profile);
+  const formulaBMR = calculateFormulaBMR(formData.profile);
+
+  const handleSetCustomBmr = (val: number) => {
+    setFormData(prev => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        customBmr: val > 0 ? val : undefined
+      }
+    }));
+  };
+
+  const handlePasteApiKey = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim().length > 0) {
+        const clean = text.trim();
+        setFormData(prev => ({ ...prev, geminiApiKey: clean }));
+        persistStickyGeminiKey(clean);
+        setApiKeyFeedback('Key pasted & stored!');
+        setTimeout(() => setApiKeyFeedback(''), 3000);
+      } else {
+        alert('Clipboard is empty or does not contain text.');
+      }
+    } catch {
+      alert('Could not read clipboard automatically. Please press and hold the input box and tap "Paste".');
+    }
+  };
+
+  const handleSaveApiKeyInstant = () => {
+    const key = (formData.geminiApiKey || '').trim();
+    if (key) {
+      persistStickyGeminiKey(key);
+      onSaveSettings({ ...formData, geminiApiKey: key }, true);
+      setApiKeyFeedback('API Key saved & active!');
+      setTimeout(() => setApiKeyFeedback(''), 3000);
+    } else {
+      clearStickyGeminiKey();
+      onSaveSettings({ ...formData, geminiApiKey: '' }, true);
+      setApiKeyFeedback('API Key cleared.');
+      setTimeout(() => setApiKeyFeedback(''), 3000);
+    }
+  };
 
   const handleProfileChange = (field: keyof typeof formData.profile, value: any) => {
     setFormData(prev => ({
@@ -380,14 +441,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden relative">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 shrink-0">
-          <h2 className="text-lg font-bold text-white">App Settings & Profile</h2>
-          <button
-            onClick={handleModalClose}
-            className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 shrink-0">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-white leading-tight">App Settings &amp; Profile</h2>
+            <p className="text-[11px] text-slate-400">Profile, BMR calibration, API keys &amp; sync</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition shadow flex items-center space-x-1.5 ${
+                saveSuccess
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
+              }`}
+            >
+              {saveSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+              title="Close Settings"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Body */}
@@ -539,24 +628,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
 
-            {/* Calculated BMR Live Display */}
-            <div className="bg-slate-950/80 border border-amber-500/30 rounded-xl p-3.5 flex items-center justify-between mt-2">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400 border border-amber-500/20">
-                  <Flame className="w-5 h-5" />
+            {/* Calculated BMR Live Display & Calibration */}
+            <div className="bg-slate-950/80 border border-amber-500/30 rounded-xl p-3.5 space-y-3 mt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400 border border-amber-500/20">
+                    <Flame className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Your Natural Base Burn (BMR)</div>
+                    <div className="text-[11px] text-slate-400">
+                      {formData.profile.customBmr ? 'Custom / Calibrated Target' : 'Mifflin-St Jeor Scientific Baseline'}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Your Natural Base Burn (BMR)</div>
-                  <div className="text-[11px] text-slate-400">
-                    Mifflin-St Jeor Scientific Baseline
+                <div className="text-right">
+                  <div className="text-xl font-black text-amber-400">{currentBMR.toLocaleString()} <span className="text-xs font-normal text-slate-400">kcal/day</span></div>
+                  <div className="text-[10px] text-slate-400">
+                    Calories burned at complete rest
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xl font-black text-amber-400">{currentBMR.toLocaleString()} <span className="text-xs font-normal text-slate-400">kcal/day</span></div>
-                <div className="text-[10px] text-slate-400">
-                  Calories burned at complete rest
+
+              {/* BMR Alignment / Calibration Controls */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-300 font-medium">BMR Alignment / Calibration:</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCalibratingBmr(prev => !prev)}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center space-x-1"
+                  >
+                    <Sliders className="w-3 h-3" />
+                    <span>{isCalibratingBmr ? 'Hide Calibration' : formData.profile.customBmr ? 'Adjust Calibration' : 'Calibrate to Google Fit'}</span>
+                  </button>
                 </div>
+
+                {isCalibratingBmr && (
+                  <div className="mt-2.5 p-3 bg-slate-900 border border-slate-700/80 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-slate-300 font-semibold block mb-1">
+                          Custom Daily BMR (kcal/day)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.profile.customBmr || ''}
+                          placeholder={String(formulaBMR)}
+                          onChange={e => {
+                            const val = e.target.value === '' ? undefined : parseInt(e.target.value);
+                            handleSetCustomBmr(val || 0);
+                          }}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-bold"
+                        />
+                      </div>
+                      {formData.profile.customBmr && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCustomBmr(0)}
+                          className="self-end px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold rounded-lg border border-slate-700 transition"
+                        >
+                          Reset to Formula ({formulaBMR})
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      💡 <strong>Matching Google Fit:</strong> Google Fit calculates resting burn using your Google Account profile. If Google Fit reported e.g. 1,656 Cal at 9:30 PM with ~310 active calories, its daily resting BMR is ~<strong>1,505 kcal/day</strong>. Setting 1,505 here makes NutriFit match Google Fit&apos;s live total to the single calorie.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1045,13 +1185,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </a>
               </div>
             </div>
-            <input
-              type="password"
-              value={formData.geminiApiKey}
-              onChange={e => setFormData(prev => ({ ...prev, geminiApiKey: e.target.value }))}
-              placeholder="Paste your Google AI Studio API key here"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-            />
+            <div className="space-y-2">
+              <div className="relative flex items-center">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={formData.geminiApiKey}
+                  onChange={e => {
+                    const clean = e.target.value;
+                    setFormData(prev => ({ ...prev, geminiApiKey: clean }));
+                    if (clean.trim()) {
+                      persistStickyGeminiKey(clean.trim());
+                    }
+                  }}
+                  placeholder="Paste your Google AI Studio API key (AIza...)"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-3 pr-20 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                />
+                <div className="absolute right-2 flex items-center space-x-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(prev => !prev)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/60 transition"
+                    title={showApiKey ? 'Hide API key' : 'Show API key'}
+                  >
+                    {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePasteApiKey}
+                    className="p-1.5 text-cyan-400 hover:text-cyan-300 rounded-lg hover:bg-cyan-500/10 transition"
+                    title="Paste from clipboard"
+                  >
+                    <Clipboard className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons & Feedback */}
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={handlePasteApiKey}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-semibold rounded-lg border border-slate-700 flex items-center space-x-1 transition active:scale-95"
+                  >
+                    <Clipboard className="w-3 h-3" />
+                    <span>Paste Key</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveApiKeyInstant}
+                    className="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 text-[11px] font-semibold rounded-lg border border-cyan-500/40 flex items-center space-x-1 transition active:scale-95"
+                  >
+                    <Check className="w-3 h-3" />
+                    <span>Save Key</span>
+                  </button>
+                </div>
+
+                {apiKeyFeedback ? (
+                  <span className="text-[11px] text-emerald-400 font-semibold animate-in fade-in">
+                    {apiKeyFeedback}
+                  </span>
+                ) : formData.geminiApiKey ? (
+                  <span className="text-[10px] text-emerald-400/90 font-medium flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>Key active &amp; ready</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-500">No key saved yet</span>
+                )}
+              </div>
+            </div>
             <p className="text-[11px] text-slate-400">Used by Gemini AI to analyze meal photos and descriptions.</p>
           </div>
 

@@ -18,7 +18,10 @@ import {
   Clock,
   HelpCircle,
   Heart,
-  Utensils
+  Utensils,
+  Info,
+  Settings,
+  X
 } from 'lucide-react';
 import { 
   DailySummary, 
@@ -159,6 +162,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const { bmr: burnBmr, neat: burnNeat, eat: burnEat, tef: burnTef, totalBurned } = tdeeBreakdown;
   const netCalories = totals.calories - totalBurned;
   const isCaloricDeficit = netCalories <= 0;
+
+  const [showHealthBreakdown, setShowHealthBreakdown] = useState(false);
+
+  // Health Connect / Google Fit sensor breakdown values
+  const sensorActiveKcal = activity.sensorActiveCalories !== undefined
+    ? activity.sensorActiveCalories
+    : (isSensorConnected ? Math.max(0, burnEat - baseBmr) : burnEat);
+  const sensorRestingKcal = activity.sensorRestingCalories !== undefined
+    ? activity.sensorRestingCalories
+    : (isSensorConnected ? Math.min(burnEat, baseBmr) : baseBmr);
 
   const tefBreakdown = calculateTEFBreakdown(totals.protein, totals.carbs, totals.fat, totals.calories);
 
@@ -541,13 +554,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
         ) : isSensorConnected ? (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20">
-                <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">1. {sensorName} Burn</span>
+              <button
+                type="button"
+                onClick={() => setShowHealthBreakdown(true)}
+                className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-slate-900/80 transition active:scale-[0.98] text-center w-full group relative focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                title="Tap to view active movement vs. resting BMR breakdown"
+              >
+                <div className="flex items-center justify-center space-x-1">
+                  <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">1. {sensorName} Burn</span>
+                  <HelpCircle className="w-3 h-3 text-slate-500 group-hover:text-emerald-400 transition" />
+                </div>
                 <span className="font-extrabold text-white text-base mt-0.5 block">{burnEat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
-                <span className="text-[9px] text-slate-400">
-                  {summary.date === getLocalDateString() ? 'Burned so far today (Rest + Active)' : 'Rest + NEAT + Exercise'}
+                
+                {/* Active vs Resting Sub-breakdown */}
+                <div className="mt-1 flex items-center justify-center gap-1.5 text-[9px] font-medium leading-none">
+                  <span className="text-emerald-300">Active: {sensorActiveKcal}</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-amber-300/90">Rest: {sensorRestingKcal}</span>
+                </div>
+
+                <span className="text-[9px] text-slate-400 block mt-1">
+                  {summary.date === getLocalDateString() ? 'Burned so far today (Tap for math)' : 'Rest + NEAT + Exercise'}
                 </span>
-              </div>
+              </button>
 
               <div className="bg-slate-950/60 p-2.5 rounded-xl border border-orange-500/20">
                 <span className="text-[10px] text-orange-400 font-semibold block uppercase tracking-wider">2. Thermic Effect (TEF)</span>
@@ -1026,6 +1055,128 @@ export const Dashboard: React.FC<DashboardProps> = ({
           userGender={settings.profile?.gender || 'male'}
           initialTab={lipidModalTab}
         />
+      )}
+
+      {/* Health Connect / Google Fit Calorie Breakdown Modal */}
+      {showHealthBreakdown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white leading-tight">{sensorName} Calorie Breakdown</h3>
+                  <p className="text-[11px] text-slate-400">Active movement vs. resting metabolism</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHealthBreakdown(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 sm:p-5 space-y-4">
+              <div className="space-y-2">
+                {/* 1. Active Movement */}
+                <div className="bg-slate-950/60 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-400 block">1. Active Burn (EAT)</span>
+                    <span className="text-[11px] text-slate-400">
+                      Steps &amp; exercise synced live from {sensorName}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-extrabold text-white block">{sensorActiveKcal} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                  </div>
+                </div>
+
+                {/* 2. Prorated Resting BMR */}
+                <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-amber-400 block">2. Resting Metabolism (BMR)</span>
+                    <span className="text-[11px] text-slate-400">
+                      {summary.date === getLocalDateString() ? 'Prorated burn so far today' : 'Full-day resting baseline'} ({profileBmr} kcal/day)
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-extrabold text-white block">+{sensorRestingKcal} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                    {settings.profile.customBmr ? (
+                      <span className="text-[9px] text-amber-400/90 font-medium">Calibrated BMR</span>
+                    ) : (
+                      <span className="text-[9px] text-slate-400">Mifflin-St Jeor</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subtotal */}
+                <div className="bg-slate-900 border border-slate-700/60 rounded-xl p-2.5 px-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300">= {sensorName} Subtotal</span>
+                  <span className="text-sm font-bold text-white">{burnEat} kcal</span>
+                </div>
+
+                {/* 3. Thermic Effect of Food (TEF) */}
+                <div className="bg-slate-950/60 border border-orange-500/20 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-orange-400 block">3. Food Digestion (TEF)</span>
+                    <span className="text-[11px] text-slate-400">Burned digesting {totals.calories} kcal of logged meals</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-extrabold text-white block">+{burnTef} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
+                  </div>
+                </div>
+
+                {/* Total TDEE */}
+                <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-300">Total Energy Burned (TDEE)</span>
+                  <span className="text-lg font-black text-emerald-300">{totalBurned} kcal</span>
+                </div>
+              </div>
+
+              {/* Informative Explanation Box */}
+              <div className="bg-slate-800/40 border border-slate-700/70 rounded-xl p-3 text-[11px] text-slate-300 leading-relaxed space-y-1.5">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Why Google Fit Displays a Different Total</span>
+                </div>
+                <p>
+                  Google Fit only syncs active workout calories ({sensorActiveKcal} kcal) to Health Connect, while calculating resting burn internally using your Google account profile.
+                </p>
+                <p>
+                  NutriFit calculates your resting burn from your profile settings ({profileBmr} kcal/day). If you want NutriFit to match Google Fit&apos;s daily calorie count exactly, you can fine-tune your age/weight or calibrate your BMR directly in Settings.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHealthBreakdown(false);
+                    onOpenSettings();
+                  }}
+                  className="flex-1 py-2 px-3 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 shadow"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Calibrate BMR in Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHealthBreakdown(false)}
+                  className="py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

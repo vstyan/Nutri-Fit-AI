@@ -1,5 +1,5 @@
 {
-  "version": "1.8.22",
+  "version": "1.8.23",
   "releaseDate": "2026-09-30",
-  "notes": "Added In-App Over-The-Air (OTA) automatic updates for native Android build."
+  "notes": "Health Connect calorie breakdown & BMR calibration to match Google Fit, persistent profile & API key fixes with header Save."
 }

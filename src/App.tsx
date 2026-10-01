@@ -357,7 +357,9 @@ export function App() {
           workouts: mergedWorkouts,
           source: 'google_fit',
           lastSyncedAt: fitResult.lastSyncedAt,
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          sensorActiveCalories: fitResult.totalCalories,
+          sensorRestingCalories: baseBmr
         };
 
         await saveActivityForDate(updatedActivity, activeSettings);
@@ -495,7 +497,9 @@ export function App() {
           workouts: existingWorkouts,
           source: 'health_connect',
           lastSyncedAt: healthResult.lastSyncedAt,
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          sensorActiveCalories: healthResult.activeCalories,
+          sensorRestingCalories: baseBmr
         };
 
         await saveActivityForDate(updatedActivity, activeSettings);
@@ -645,7 +649,13 @@ export function App() {
       neatCalories: tdeeBreakdown.neat,
       tefCalories: dayTef,
       totalCaloriesBurned: tdeeBreakdown.totalBurned,
-      source: isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual'))
+      source: isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual')),
+      sensorActiveCalories: dayActivity.sensorActiveCalories !== undefined
+        ? dayActivity.sensorActiveCalories
+        : ((isHC || isFit) ? Math.max(0, (dayActivity.activeCaloriesBurned || 0) - baseBmr) : undefined),
+      sensorRestingCalories: dayActivity.sensorRestingCalories !== undefined
+        ? dayActivity.sensorRestingCalories
+        : ((isHC || isFit) ? baseBmr : undefined)
     };
 
     // Save updated activity

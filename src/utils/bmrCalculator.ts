@@ -7,7 +7,7 @@ import { UserProfile } from '../types';
  * - Men:   BMR = (10 × weight_kg) + (6.25 × height_cm) - (5 × age) + 5
  * - Women: BMR = (10 × weight_kg) + (6.25 × height_cm) - (5 × age) - 161
  */
-export function calculateBMR(profile: UserProfile): number {
+export function calculateFormulaBMR(profile: Omit<UserProfile, 'customBmr'> | UserProfile): number {
   const { gender, age, weightKg, heightCm } = profile;
 
   if (!age || age <= 0 || !weightKg || weightKg <= 0 || !heightCm || heightCm <= 0) {
@@ -17,6 +17,18 @@ export function calculateBMR(profile: UserProfile): number {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
   const bmr = gender === 'female' ? base - 161 : base + 5;
   return Math.max(800, Math.round(bmr));
+}
+
+/**
+ * Calculates effective daily BMR.
+ * If user has set a calibrated/custom BMR (e.g. to match Google Fit or DEXA scan),
+ * uses that custom BMR. Otherwise calculates using the Mifflin-St Jeor equation.
+ */
+export function calculateBMR(profile: UserProfile): number {
+  if (profile?.customBmr && profile.customBmr > 0) {
+    return Math.max(500, Math.round(profile.customBmr));
+  }
+  return calculateFormulaBMR(profile);
 }
 
 export function kgToLbs(kg: number): number {

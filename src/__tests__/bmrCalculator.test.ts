@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { 
   calculateBMR, 
+  calculateFormulaBMR,
   kgToLbs, 
   lbsToKg, 
   cmToFeetInches, 
@@ -55,6 +56,19 @@ describe('BMR & Unit Conversion Calculations (Baseline)', () => {
         unitSystem: 'metric'
       };
       expect(calculateBMR(invalidProfile)).toBe(1700);
+    });
+
+    it('uses calibrated custom BMR when provided and matches Google Fit baseline', () => {
+      const calibratedProfile: UserProfile = {
+        gender: 'male',
+        age: 32,
+        weightKg: 75,
+        heightCm: 175,
+        unitSystem: 'imperial',
+        customBmr: 1505
+      };
+      expect(calculateBMR(calibratedProfile)).toBe(1505);
+      expect(calculateFormulaBMR(calibratedProfile)).toBe(1689);
     });
   });
 
