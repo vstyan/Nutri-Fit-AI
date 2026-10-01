@@ -61,22 +61,29 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Extract App Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Prepare APK Release Artifact
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v${VERSION}.apk
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NutriFit-AI-v1.8.22-APK
-          path: android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk
+          name: NutriFit-AI-APK
+          path: android/app/build/outputs/apk/debug/NutriFit-AI-*.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload OTA Web Bundle Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NutriFit-AI-v1.8.22-OTA-Bundle
+          name: NutriFit-AI-OTA-Bundle
           path: dist.zip
           if-no-files-found: error
           retention-days: 30
@@ -85,9 +92,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v1.8.22 \
-            android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk \
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          gh release create v${VERSION} \
+            android/app/build/outputs/apk/debug/NutriFit-AI-v${VERSION}.apk \
             dist.zip \
-            --title "NutriFit AI v1.8.22 (In-App Auto-Update Support)" \
-            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v1.8.22. Includes in-app OTA automatic update engine for native Android." \
+            --title "NutriFit AI v${VERSION}" \
+            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v${VERSION}. Delivered seamlessly via In-App Over-The-Air (OTA) update." \
             --clobber || true
