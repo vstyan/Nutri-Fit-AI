@@ -93,9 +93,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
-          gh release create v${VERSION} \
-            android/app/build/outputs/apk/debug/NutriFit-AI-v${VERSION}.apk \
-            dist.zip \
+          APK="android/app/build/outputs/apk/debug/NutriFit-AI-v${VERSION}.apk"
+          gh release create "v${VERSION}" \
             --title "NutriFit AI v${VERSION}" \
-            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v${VERSION}. Delivered seamlessly via In-App Over-The-Air (OTA) update." \
-            --clobber || true
+            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v${VERSION}. Delivered seamlessly via In-App Over-The-Air (OTA) update." || true
+          gh release upload "v${VERSION}" "$APK" dist.zip --clobber
