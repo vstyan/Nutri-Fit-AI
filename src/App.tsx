@@ -77,6 +77,15 @@ export function App() {
   const isAndroidApp = isNativeAndroid();
   const [isConnectingHealthConnect, setIsConnectingHealthConnect] = useState(false);
   const [isSyncingHealthConnect, setIsSyncingHealthConnect] = useState(false);
+
+  // Sync locks & settings ref to prevent infinite re-render sync loops
+  const settingsRef = useRef<AppSettings>(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const isSyncingGoogleFitRef = useRef(false);
+  const isSyncingHealthConnectRef = useRef(false);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -230,80 +239,83 @@ export function App() {
   // Google Fit Sync Calories for a Date (Supports automatic launch & active state re-auth)
   const handleSyncGoogleFit = useCallback(async (
     date: string = selectedDate, 
-    currentSettings: AppSettings = settings,
+    currentSettings?: AppSettings,
     isManual: boolean = false,
     allowInteractiveRefresh: boolean = true
   ) => {
-    if (!currentSettings.googleFitConnected) {
+    let activeSettings = currentSettings || settingsRef.current;
+    if (!activeSettings.googleFitConnected) {
       if (isManual) {
         alert('Google Fit is not connected. Please click Connect Google Fit first.');
       }
       return;
     }
 
-    if (!navigator.onLine) {
-      if (isManual) {
-        showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
-      }
-      return;
-    }
-
-    let activeToken = currentSettings.googleFitAccessToken;
-    const isExpired = !activeToken || (currentSettings.googleFitTokenExpiry && Date.now() >= (currentSettings.googleFitTokenExpiry - 60000));
-
-    // If token is missing or expired, automatically renew using saved user hint
-    if (isExpired && (isManual || allowInteractiveRefresh)) {
-      try {
-        const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-          currentSettings.googleClientId,
-          currentSettings.googleFitUserEmail
-        );
-        activeToken = newToken;
-        currentSettings = {
-          ...currentSettings,
-          googleFitAccessToken: newToken,
-          googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-          googleFitUserEmail: email || currentSettings.googleFitUserEmail
-        };
-        await saveAppSettings(currentSettings);
-        setSettings(currentSettings);
-      } catch (tokenErr) {
-        console.warn('Google Fit automatic renewal paused:', tokenErr);
+    if (isSyncingGoogleFitRef.current) return;
+    isSyncingGoogleFitRef.current = true;
+    setIsSyncingGoogleFit(true);
+    try {
+      if (!navigator.onLine) {
         if (isManual) {
-          if (!navigator.onLine) {
-            showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
-          } else {
-            showOfflineNotice('Google Fit authorization expired. Please connect Google Fit again.');
-          }
+          showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
         }
         return;
       }
-    }
 
-    if (!activeToken) return;
+      let activeToken = activeSettings.googleFitAccessToken;
+      const isExpired = !activeToken || (activeSettings.googleFitTokenExpiry && Date.now() >= (activeSettings.googleFitTokenExpiry - 60000));
 
-    setIsSyncingGoogleFit(true);
-    try {
+      // If token is missing or expired, automatically renew using saved user hint
+      if (isExpired && (isManual || allowInteractiveRefresh)) {
+        try {
+          const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
+            activeSettings.googleClientId,
+            activeSettings.googleFitUserEmail
+          );
+          activeToken = newToken;
+          activeSettings = {
+            ...activeSettings,
+            googleFitAccessToken: newToken,
+            googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
+            googleFitUserEmail: email || activeSettings.googleFitUserEmail
+          };
+          await saveAppSettings(activeSettings);
+          setSettings(activeSettings);
+        } catch (tokenErr) {
+          console.warn('Google Fit automatic renewal paused:', tokenErr);
+          if (isManual) {
+            if (!navigator.onLine) {
+              showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
+            } else {
+              showOfflineNotice('Google Fit authorization expired. Please connect Google Fit again.');
+            }
+          }
+          return;
+        }
+      }
+
+      if (!activeToken) return;
+
       let fitResult: GoogleFitCaloriesResult;
-      const profileBmr = calculateBMR(currentSettings.profile);
+      const profileBmr = calculateBMR(activeSettings.profile);
       try {
         fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
       } catch (fetchErr: any) {
         if (fetchErr.message === 'UNAUTHORIZED' && (isManual || allowInteractiveRefresh)) {
           // Token expired mid-call; refresh token using saved user hint
           const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-            currentSettings.googleClientId,
-            currentSettings.googleFitUserEmail
+            activeSettings.googleClientId,
+            activeSettings.googleFitUserEmail
           );
           activeToken = newToken;
-          currentSettings = {
-            ...currentSettings,
+          activeSettings = {
+            ...activeSettings,
             googleFitAccessToken: newToken,
             googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-            googleFitUserEmail: email || currentSettings.googleFitUserEmail
+            googleFitUserEmail: email || activeSettings.googleFitUserEmail
           };
-          await saveAppSettings(currentSettings);
-          setSettings(currentSettings);
+          await saveAppSettings(activeSettings);
+          setSettings(activeSettings);
           fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
         } else {
           throw fetchErr;
@@ -311,13 +323,13 @@ export function App() {
       }
 
       if (fitResult) {
-        const includeResting = currentSettings.includeRestingCalories !== false;
+        const includeResting = activeSettings.includeRestingCalories !== false;
         const baseBmr = includeResting ? profileBmr : 0;
-        const currentMeals = await getMealsForDate(date, currentSettings);
+        const currentMeals = await getMealsForDate(date, activeSettings);
         const tef = calculateDailyTEF(currentMeals);
         const fitTotal = includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories;
 
-        const currentActivity = await getActivityForDate(date, currentSettings);
+        const currentActivity = await getActivityForDate(date, activeSettings);
         const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
         const detectedWorkouts = Array.isArray(fitResult.detectedWorkouts) ? fitResult.detectedWorkouts : [];
 
@@ -334,7 +346,6 @@ export function App() {
         });
 
         const mergedWorkouts = [...manualWorkouts, ...nonDuplicateDetected];
-        const dedicatedWorkoutCalories = mergedWorkouts.reduce((s, w) => s + (w.caloriesBurned || 0), 0);
 
         const updatedActivity: DailyActivity = {
           date,
@@ -349,11 +360,11 @@ export function App() {
           lastUpdated: new Date().toISOString()
         };
 
-        await saveActivityForDate(updatedActivity, currentSettings);
+        await saveActivityForDate(updatedActivity, activeSettings);
         setActivity(updatedActivity);
 
         const updatedSettings: AppSettings = {
-          ...currentSettings,
+          ...activeSettings,
           googleFitLastSync: fitResult.lastSyncedAt
         };
         await saveAppSettings(updatedSettings);
@@ -369,9 +380,10 @@ export function App() {
         }
       }
     } finally {
+      isSyncingGoogleFitRef.current = false;
       setIsSyncingGoogleFit(false);
     }
-  }, [selectedDate, settings, showOfflineNotice]);
+  }, [selectedDate, showOfflineNotice]);
 
   // Health Connect Connect Handler (Native Android APK)
   const handleConnectHealthConnect = async () => {
@@ -422,24 +434,27 @@ export function App() {
   // Health Connect Sync Calories for a Date
   const handleSyncHealthConnect = useCallback(async (
     date: string = selectedDate,
-    currentSettings: AppSettings = settings,
+    currentSettings?: AppSettings,
     isManual: boolean = false
   ) => {
-    if (!currentSettings.healthConnectConnected) {
+    const activeSettings = currentSettings || settingsRef.current;
+    if (!activeSettings.healthConnectConnected) {
       if (isManual) {
         alert('Health Connect is not connected. Please connect Health Connect first in Settings.');
       }
       return;
     }
 
+    if (isSyncingHealthConnectRef.current) return;
+    isSyncingHealthConnectRef.current = true;
     setIsSyncingHealthConnect(true);
     try {
       const healthResult = await syncHealthConnectDaily(date);
       if (healthResult) {
-        const includeResting = currentSettings.includeRestingCalories !== false;
-        const profileBmr = calculateBMR(currentSettings.profile);
+        const includeResting = activeSettings.includeRestingCalories !== false;
+        const profileBmr = calculateBMR(activeSettings.profile);
         const baseBmr = includeResting ? profileBmr : 0;
-        const currentMeals = await getMealsForDate(date, currentSettings);
+        const currentMeals = await getMealsForDate(date, activeSettings);
         const tef = calculateDailyTEF(currentMeals);
 
         // Health Connect daily burn (wearable totalCalories if available, otherwise baseBmr + activeCalories)
@@ -447,7 +462,7 @@ export function App() {
           ? healthResult.totalCalories 
           : (baseBmr + healthResult.activeCalories);
 
-        const currentActivity = await getActivityForDate(date, currentSettings);
+        const currentActivity = await getActivityForDate(date, activeSettings);
         const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
 
         const updatedActivity: DailyActivity = {
@@ -463,11 +478,11 @@ export function App() {
           lastUpdated: new Date().toISOString()
         };
 
-        await saveActivityForDate(updatedActivity, currentSettings);
+        await saveActivityForDate(updatedActivity, activeSettings);
         setActivity(updatedActivity);
 
         const updatedSettings: AppSettings = {
-          ...currentSettings,
+          ...activeSettings,
           healthConnectLastSync: healthResult.lastSyncedAt
         };
         await saveAppSettings(updatedSettings);
@@ -479,9 +494,10 @@ export function App() {
         alert('Failed to sync Health Connect: ' + (err?.message || 'Unknown error'));
       }
     } finally {
+      isSyncingHealthConnectRef.current = false;
       setIsSyncingHealthConnect(false);
     }
-  }, [selectedDate, settings]);
+  }, [selectedDate]);
 
   // Listen for window focus / visibility change / pageshow to automatically advance date and auto-sync Fit / Health Connect
   useEffect(() => {
@@ -501,10 +517,10 @@ export function App() {
           setSelectedDate(todayStr);
         }
 
-        if (settings.healthConnectConnected) {
-          handleSyncHealthConnect(targetDate, settings, false);
-        } else if (settings.googleFitConnected) {
-          handleSyncGoogleFit(targetDate, settings, false, true);
+        if (settingsRef.current.healthConnectConnected) {
+          handleSyncHealthConnect(targetDate, settingsRef.current, false);
+        } else if (settingsRef.current.googleFitConnected) {
+          handleSyncGoogleFit(targetDate, settingsRef.current, false, true);
         }
       }
     };
@@ -525,7 +541,7 @@ export function App() {
       window.removeEventListener('pageshow', handleActiveState);
       window.removeEventListener('online', handleOnline);
     };
-  }, [selectedDate, settings, handleSyncGoogleFit, handleSyncHealthConnect]);
+  }, [selectedDate, handleSyncGoogleFit, handleSyncHealthConnect]);
 
   // Periodic background sync every 5 minutes while app is open and visible
   useEffect(() => {
@@ -538,26 +554,26 @@ export function App() {
           return;
         }
 
-        if (settings.healthConnectConnected) {
-          handleSyncHealthConnect(selectedDate, settings, false);
-        } else if (settings.googleFitConnected) {
+        if (settingsRef.current.healthConnectConnected) {
+          handleSyncHealthConnect(selectedDate, settingsRef.current, false);
+        } else if (settingsRef.current.googleFitConnected) {
           // Run silent check (only if token is currently active)
-          handleSyncGoogleFit(selectedDate, settings, false, false);
+          handleSyncGoogleFit(selectedDate, settingsRef.current, false, false);
         }
       }
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedDate, settings, handleSyncGoogleFit, handleSyncHealthConnect]);
+  }, [selectedDate, handleSyncGoogleFit, handleSyncHealthConnect]);
 
   // Auto-sync Health Connect or Google Fit when date changes if connected
   useEffect(() => {
     if (settings.healthConnectConnected) {
-      handleSyncHealthConnect(selectedDate, settings, false);
+      handleSyncHealthConnect(selectedDate, settingsRef.current, false);
     } else if (settings.googleFitConnected) {
-      handleSyncGoogleFit(selectedDate, settings, false, true);
+      handleSyncGoogleFit(selectedDate, settingsRef.current, false, true);
     }
-  }, [selectedDate, settings.healthConnectConnected, settings.googleFitConnected, handleSyncHealthConnect, handleSyncGoogleFit]);
+  }, [selectedDate, settings.healthConnectConnected, settings.googleFitConnected]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
