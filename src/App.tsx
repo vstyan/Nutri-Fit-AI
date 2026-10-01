@@ -464,9 +464,18 @@ export function App() {
           burnValue = healthResult.totalCalories;
           baseBmr = 0; // Already included inside wearable total
         } else {
-          // Wearable only logged active calories (e.g. 317 kcal) without totalCalories records.
+          // Wearable / Google Fit only logged active calories (e.g. 317 kcal) without totalCalories records.
           // Add resting BMR so user's daily burn includes basal expenditure!
-          baseBmr = restingBmr;
+          // For 'today', prorate resting BMR to current elapsed time so it matches Google Fit in real-time.
+          const isToday = (date === getLocalDateString());
+          if (isToday) {
+            const now = new Date();
+            const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
+            const dayFraction = Math.min(1, Math.max(0, minutesElapsed / 1440));
+            baseBmr = Math.round(restingBmr * dayFraction);
+          } else {
+            baseBmr = restingBmr;
+          }
           burnValue = baseBmr + healthResult.activeCalories;
         }
 
@@ -673,6 +682,7 @@ export function App() {
         meals: mList,
         source: act.source,
         isGoogleFitConnected: currentSettings.googleFitConnected && dStr === date,
+        isHealthConnectConnected: currentSettings.healthConnectConnected && dStr === date,
         includeResting
       });
 
@@ -903,6 +913,7 @@ export function App() {
       meals,
       source: activity.source,
       isGoogleFitConnected: newSettings.googleFitConnected,
+      isHealthConnectConnected: newSettings.healthConnectConnected,
       includeResting
     });
 
@@ -917,6 +928,10 @@ export function App() {
     setActivity(updatedActivity);
     await saveActivityForDate(updatedActivity, newSettings);
     loadDayData(selectedDate, newSettings);
+
+    if (newSettings.healthConnectConnected) {
+      await handleSyncHealthConnect(selectedDate, newSettings, false);
+    }
   };
 
   // Select storage location from prompt

@@ -1,5 +1,5 @@
 {
-  "version": "1.8.20",
+  "version": "1.8.21",
   "releaseDate": "2026-09-30",
-  "notes": "Android Health Connect integration, SettingsModal form isolation, and native background sync optimization."
+  "notes": "Prorated real-time resting BMR sync matching Google Fit live energy expenditure."
 }

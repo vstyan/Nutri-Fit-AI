@@ -60,13 +60,13 @@ jobs:
 
       - name: Prepare APK Release Artifact
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.20.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NutriFit-AI-v1.8.20-APK
-          path: android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.20.apk
+          name: NutriFit-AI-v1.8.21-APK
+          path: android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -74,8 +74,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v1.8.20 \
-            android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.20.apk \
-            --title "NutriFit AI v1.8.20 (Health Connect & Settings Fixes)" \
-            --notes "Direct APK download for NutriFit AI v1.8.20. Includes Health Connect sync fix, persistent keystore, and form input isolation." \
+          gh release create v1.8.21 \
+            android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk \
+            --title "NutriFit AI v1.8.21 (Real-Time Live Burn Sync)" \
+            --notes "Direct APK download for NutriFit AI v1.8.21. Prorates resting BMR so Health Connect matches Google Fit live energy expenditure in real time." \
             --clobber || true

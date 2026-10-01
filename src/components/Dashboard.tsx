@@ -30,6 +30,7 @@ import {
   HistoryDayRecord
 } from '../types';
 import { calculateBMR, calculateTDEE, calculateTEFBreakdown } from '../utils/calorieEngine';
+import { getLocalDateString } from '../utils/dateUtils';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
 import { WeightTrackerCard } from './WeightTrackerCard';
@@ -543,7 +544,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="bg-slate-950/60 p-2.5 rounded-xl border border-emerald-500/20">
                 <span className="text-[10px] text-emerald-400 font-semibold block uppercase tracking-wider">1. {sensorName} Burn</span>
                 <span className="font-extrabold text-white text-base mt-0.5 block">{burnEat} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
-                <span className="text-[9px] text-slate-400">Rest + NEAT + Exercise</span>
+                <span className="text-[9px] text-slate-400">
+                  {summary.date === getLocalDateString() ? 'Burned so far today (Rest + Active)' : 'Rest + NEAT + Exercise'}
+                </span>
               </div>
 
               <div className="bg-slate-950/60 p-2.5 rounded-xl border border-orange-500/20">
