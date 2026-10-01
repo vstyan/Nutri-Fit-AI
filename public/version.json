@@ -1,5 +1,5 @@
 {
-  "version": "1.8.19",
+  "version": "1.8.20",
   "releaseDate": "2026-09-30",
-  "notes": "Refined Historical Trends & Charts metric selector with a responsive grid layout to eliminate text overlapping on mobile screens."
+  "notes": "Android Health Connect integration, SettingsModal form isolation, and native background sync optimization."
 }
