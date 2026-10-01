@@ -1,6 +1,6 @@
 {
   "version": "1.8.25",
   "releaseDate": "2026-10-01",
-  "checksum": "9deb6359eed6a2a2a63c758b57d2aed0aa054a1585bf88129991bad12320a827",
+  "checksum": "4dc0c8720ad17682103cc1765891398b3f65d8797edee66bcd9a03666a455495",
   "notes": "OTA in-app verification build v1.8.25. Verifies seamless over-the-air installation without APK download."
 }

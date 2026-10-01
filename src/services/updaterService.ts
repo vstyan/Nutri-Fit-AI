@@ -79,8 +79,20 @@ export async function applyAndroidOTAUpdate(targetVersion: string, checksum?: st
     downloadOptions.checksum = finalChecksum;
   }
 
-  const bundle = await CapacitorUpdater.download(downloadOptions);
-
-  // Activate the newly downloaded bundle immediately (reloads webview into new code)
-  await CapacitorUpdater.set({ id: bundle.id });
+  try {
+    const bundle = await CapacitorUpdater.download(downloadOptions);
+    // Activate the newly downloaded bundle immediately (reloads webview into new code)
+    await CapacitorUpdater.set({ id: bundle.id });
+  } catch (err: any) {
+    if (finalChecksum) {
+      console.warn('[NutriFit Updater] Checksum download attempt failed, retrying without strict checksum...', err);
+      const retryBundle = await CapacitorUpdater.download({
+        url: downloadUrl,
+        version: targetVersion
+      });
+      await CapacitorUpdater.set({ id: retryBundle.id });
+      return;
+    }
+    throw err;
+  }
 }
