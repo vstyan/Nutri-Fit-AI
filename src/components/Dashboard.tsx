@@ -32,7 +32,7 @@ import {
   BloodLipidRecord,
   HistoryDayRecord
 } from '../types';
-import { calculateBMR, calculateTDEE, calculateTEFBreakdown } from '../utils/calorieEngine';
+import { calculateBMR, calculateTDEE, calculateTEFBreakdown, getEffectiveTrackingMode } from '../utils/calorieEngine';
 import { getLocalDateString } from '../utils/dateUtils';
 import { MealHistory } from './MealHistory';
 import { HistoryCharts } from './HistoryCharts';
@@ -142,11 +142,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity.activeCaloriesBurned, summary.date]);
 
   const activeKcalValue = Number(inputActiveKcal) || 0;
+  const trackingMode = getEffectiveTrackingMode(settings);
+  const isTrackerMode = trackingMode === 'tracker';
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);
-  const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
-  const isSensorConnected = !!(settings.healthConnectConnected || settings.googleFitConnected);
+  const isSensorConnected = isTrackerMode && !!(settings.healthConnectConnected || settings.googleFitConnected);
   const sensorName = settings.healthConnectConnected ? 'Health Connect' : settings.googleFitConnected ? 'Google Fit' : 'Tracker';
+
+  const baseBmr = isTrackerMode
+    ? (activity.sensorRestingCalories !== undefined 
+        ? activity.sensorRestingCalories 
+        : (activity.baseBmrCalories !== undefined ? activity.baseBmrCalories : 0))
+    : (includeResting ? (activity.baseBmrCalories || profileBmr) : 0);
 
   // TDEE Engine: Total Burned = BMR + NEAT + EAT + TEF
   const tdeeBreakdown = calculateTDEE({
@@ -154,6 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     activeCalories: activeKcalValue,
     meals: summary.meals,
     source: activity.source,
+    trackingMode,
     isGoogleFitConnected: settings.googleFitConnected,
     isHealthConnectConnected: settings.healthConnectConnected,
     includeResting
@@ -168,10 +176,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Health Connect / Google Fit sensor breakdown values
   const sensorActiveKcal = activity.sensorActiveCalories !== undefined
     ? activity.sensorActiveCalories
-    : (isSensorConnected ? Math.max(0, burnEat - baseBmr) : burnEat);
+    : (isTrackerMode ? Math.max(0, burnEat - baseBmr) : burnEat);
   const sensorRestingKcal = activity.sensorRestingCalories !== undefined
     ? activity.sensorRestingCalories
-    : (isSensorConnected ? Math.min(burnEat, baseBmr) : baseBmr);
+    : (isTrackerMode ? Math.min(burnEat, baseBmr) : baseBmr);
 
   const tefBreakdown = calculateTEFBreakdown(totals.protein, totals.carbs, totals.fat, totals.calories);
 
@@ -209,7 +217,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <h2 className="text-base font-extrabold text-white">Daily Caloric Balance</h2>
               <p className="text-xs text-slate-400">
-                {includeResting && !isSensorConnected
+                {!isTrackerMode
                   ? 'Food Intake vs. Total Daily Burn (TDEE)' 
                   : isSensorConnected
                   ? `Food Intake vs. Total Daily Burn (${sensorName} + TEF)`
@@ -233,7 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div 
             className="bg-slate-950/60 border border-emerald-500/20 rounded-2xl p-3 sm:p-3.5 text-center"
             title={
-              includeResting && !isSensorConnected 
+              !isTrackerMode 
                 ? `${burnBmr} kcal Rest + ${burnNeat} kcal NEAT + ${burnTef} kcal TEF + ${burnEat} kcal Exercise` 
                 : `${burnEat} kcal ${sensorName} + ${burnTef} kcal TEF`
             }
@@ -245,7 +253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
             <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 font-medium truncate">
-              {includeResting && !isSensorConnected 
+              {!isTrackerMode 
                 ? 'Rest + Active' 
                 : `${sensorName} + TEF`}
             </div>
@@ -380,7 +388,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={onOpenSettings}
               className="text-[11px] text-cyan-400 hover:text-cyan-300 bg-slate-800/80 min-h-[36px] px-3 py-1.5 rounded-xl border border-slate-700 active:scale-95 transition"
             >
-              {includeResting && !isSensorConnected ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
+              {!isTrackerMode ? `Edit Profile (BMR: ${burnBmr} kcal)` : 'Settings (Fitness Tracker Mode)'}
             </button>
           </div>
         </div>
@@ -496,7 +504,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         ) : null}
 
         {/* Burn Display: 4-pillar breakdown (Rest + NEAT + TEF + Exercise) */}
-        {includeResting && !isSensorConnected ? (
+        {!isTrackerMode ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
               {/* 1. Rest (BMR) */}
@@ -613,8 +621,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {/* Input Field for Workout / Tracker Burn (Hidden when Sensor is connected) */}
-        {!isSensorConnected && (
+        {/* Input Field for Workout / Tracker Burn (Hidden when Tracker is active) */}
+        {!isTrackerMode && (
           <div className="space-y-2 pt-1">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">

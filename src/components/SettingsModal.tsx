@@ -50,6 +50,7 @@ import {
   cmToFeetInches, 
   feetInchesToCm 
 } from '../utils/bmrCalculator';
+import { getEffectiveTrackingMode } from '../utils/calorieEngine';
 import { getLocalDateString } from '../utils/dateUtils';
 import { 
   exportAllDataAsJson, 
@@ -216,6 +217,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const currentBMR = calculateBMR(formData.profile);
   const formulaBMR = calculateFormulaBMR(formData.profile);
+  const activeTrackingMode = getEffectiveTrackingMode(formData);
+  const isConfig1 = activeTrackingMode === 'standalone';
+  const isConfig2 = activeTrackingMode === 'tracker';
 
   const handleSetCustomBmr = (val: number) => {
     setFormData(prev => ({
@@ -709,28 +713,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>Daily Burn Tracking Mode</span>
               </label>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                settings.googleFitConnected || formData.includeRestingCalories === false
+                isConfig2
                   ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
                   : 'bg-amber-950/60 text-amber-300 border-amber-500/40'
               }`}>
-                {settings.googleFitConnected || formData.includeRestingCalories === false
-                  ? 'Configuration 2 Active'
-                  : 'Configuration 1 Active'}
+                {isConfig2 ? 'Configuration 2 Active' : 'Configuration 1 Active'}
               </span>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Google Fit.
+              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Google Fit / Health Connect.
             </p>
 
             <div className="grid grid-cols-1 gap-3 pt-1">
               {/* Configuration 1: No Fitness Tracker */}
               <div
                 onClick={() => {
-                  setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                  setFormData(prev => ({ ...prev, burnTrackingMode: 'standalone', includeRestingCalories: true }));
                 }}
                 className={`p-3.5 rounded-xl border text-left cursor-pointer transition ${
-                  formData.includeRestingCalories !== false && !settings.googleFitConnected
+                  isConfig1
                     ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50'
                     : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
                 }`}
@@ -738,23 +740,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center space-x-2.5">
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      formData.includeRestingCalories !== false && !settings.googleFitConnected
+                      isConfig1
                         ? 'border-amber-400 bg-amber-400'
                         : 'border-slate-600'
                     }`}>
-                      {formData.includeRestingCalories !== false && !settings.googleFitConnected && (
+                      {isConfig1 && (
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
                       )}
                     </div>
                     <span className={`text-xs font-bold ${
-                      formData.includeRestingCalories !== false && !settings.googleFitConnected
+                      isConfig1
                         ? 'text-amber-400'
                         : 'text-slate-300'
                     }`}>
                       Configuration 1 — No Fitness Tracker
                     </span>
                   </div>
-                  {formData.includeRestingCalories !== false && !settings.googleFitConnected && (
+                  {isConfig1 && (
                     <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                       Active
                     </span>
@@ -764,21 +766,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Standalone calculation using your body profile. The app automatically computes your full 24-hour burn from base metabolism (BMR: {currentBMR.toLocaleString()} kcal) + baseline daily movement (NEAT) + food thermics (TEF) + any workouts logged in the app. No external tracker required.
                 </p>
 
-                {settings.googleFitConnected && formData.includeRestingCalories !== false && (
+                {(settings.googleFitConnected || settings.healthConnectConnected) && isConfig1 && (
                   <div className="mt-2.5 ml-6.5 p-2 bg-amber-950/40 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
-                    <span>Google Fit is connected, but standalone calculation is selected.</span>
-                    {onDisconnectGoogleFit && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDisconnectGoogleFit();
-                        }}
-                        className="text-amber-200 underline font-semibold ml-2 hover:text-white"
-                      >
-                        Disconnect Fit
-                      </button>
-                    )}
+                    <span>Tracker is connected, but Standalone mode is selected. Tracker data will not be added to your daily burn.</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFormData(prev => ({ ...prev, burnTrackingMode: 'tracker' }));
+                      }}
+                      className="text-amber-200 underline font-semibold ml-2 hover:text-white"
+                    >
+                      Switch to Tracker
+                    </button>
                   </div>
                 )}
               </div>
@@ -786,10 +786,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Configuration 2: Fitness Tracker (Health Connect on Android, Google Fit on Web/iOS) */}
               <div
                 onClick={() => {
-                  setFormData(prev => ({ ...prev, includeRestingCalories: false }));
+                  setFormData(prev => ({ ...prev, burnTrackingMode: 'tracker' }));
                 }}
                 className={`p-3.5 rounded-xl border text-left cursor-pointer transition space-y-3 ${
-                  settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
+                  isConfig2
                     ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
                     : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
                 }`}
@@ -797,16 +797,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
+                      isConfig2
                         ? 'border-cyan-400 bg-cyan-400'
                         : 'border-slate-600'
                     }`}>
-                      {(settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false) && (
+                      {isConfig2 && (
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
                       )}
                     </div>
                     <span className={`text-xs font-bold ${
-                      settings.healthConnectConnected || settings.googleFitConnected || formData.includeRestingCalories === false
+                      isConfig2
                         ? 'text-cyan-400'
                         : 'text-slate-300'
                     }`}>
@@ -815,17 +815,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         : 'Configuration 2 — Google Fit Tracker'}
                     </span>
                   </div>
-                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                    settings.healthConnectConnected || settings.googleFitConnected
-                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}>
-                    {settings.healthConnectConnected
-                      ? '✓ Health Connect'
-                      : settings.googleFitConnected
-                      ? '✓ Google Fit'
-                      : 'Not Connected'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {isConfig2 && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        Active
+                      </span>
+                    )}
+                    <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                      settings.healthConnectConnected || settings.googleFitConnected
+                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {settings.healthConnectConnected
+                        ? '✓ Health Connect'
+                        : settings.googleFitConnected
+                        ? '✓ Google Fit'
+                        : 'Not Connected'}
+                    </span>
+                  </div>
                 </div>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed pl-6.5">
@@ -869,7 +876,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDisconnectHealthConnect();
-                                setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                                setFormData(prev => ({ ...prev, burnTrackingMode: 'standalone', includeRestingCalories: true }));
                               }}
                               className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
                             >
@@ -921,7 +928,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               onDisconnectGoogleFit();
-                              setFormData(prev => ({ ...prev, includeRestingCalories: true }));
+                              setFormData(prev => ({ ...prev, burnTrackingMode: 'standalone', includeRestingCalories: true }));
                             }}
                             className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
                           >

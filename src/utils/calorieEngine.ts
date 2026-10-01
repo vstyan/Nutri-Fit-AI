@@ -20,9 +20,30 @@
  *    - If individual macronutrients are missing but total calories is known, falls back to 10% baseline.
  */
 
-import { MealRecord, FoodItem, UserProfile } from '../types';
+import { MealRecord, FoodItem, UserProfile, BurnTrackingMode } from '../types';
 import { calculateBMR } from './bmrCalculator';
 export { calculateBMR } from './bmrCalculator';
+
+/**
+ * Determines whether the user is in Standalone Mode (Configuration 1)
+ * or Fitness Tracker Mode (Configuration 2 - Health Connect or Google Fit).
+ */
+export function getEffectiveTrackingMode(settings?: {
+  burnTrackingMode?: BurnTrackingMode;
+  healthConnectConnected?: boolean;
+  googleFitConnected?: boolean;
+  includeRestingCalories?: boolean;
+}): BurnTrackingMode {
+  if (!settings) return 'standalone';
+  if (settings.burnTrackingMode) {
+    return settings.burnTrackingMode;
+  }
+  // Backwards compatibility for existing stored settings
+  if (settings.healthConnectConnected || settings.googleFitConnected || settings.includeRestingCalories === false) {
+    return 'tracker';
+  }
+  return 'standalone';
+}
 
 export interface TEFBreakdown {
   proteinTef: number;
@@ -203,6 +224,7 @@ export function calculateDailyTEF(meals: MealRecord[]): number {
 export function calculateNEAT(params: {
   bmr: number;
   source?: 'manual' | 'google_fit' | 'health_connect';
+  trackingMode?: BurnTrackingMode;
   isGoogleFitConnected?: boolean;
   isHealthConnectConnected?: boolean;
   includeResting?: boolean;
@@ -210,13 +232,14 @@ export function calculateNEAT(params: {
   const {
     bmr,
     source,
+    trackingMode,
     isGoogleFitConnected = false,
     isHealthConnectConnected = false,
     includeResting = true
   } = params;
 
-  // External sensors (Google Fit, Health Connect) already measure NEAT in tracked data
-  if (source === 'google_fit' || source === 'health_connect' || isGoogleFitConnected || isHealthConnectConnected) {
+  // External sensors (Google Fit, Health Connect) or tracker mode already measure NEAT in tracked data
+  if (trackingMode === 'tracker' || source === 'google_fit' || source === 'health_connect' || isGoogleFitConnected || isHealthConnectConnected) {
     return 0;
   }
 
@@ -238,6 +261,7 @@ export function calculateTDEE(params: {
   activeCalories: number; // manual workout calories (EAT) or Google Fit / Health Connect tracked calories
   meals: MealRecord[];
   source?: 'manual' | 'google_fit' | 'health_connect';
+  trackingMode?: BurnTrackingMode;
   isGoogleFitConnected?: boolean;
   isHealthConnectConnected?: boolean;
   includeResting?: boolean;
@@ -247,14 +271,21 @@ export function calculateTDEE(params: {
     activeCalories,
     meals,
     source,
+    trackingMode,
     isGoogleFitConnected = false,
     isHealthConnectConnected = false,
     includeResting = true
   } = params;
 
+  const effectiveMode = trackingMode || getEffectiveTrackingMode({
+    healthConnectConnected: isHealthConnectConnected,
+    googleFitConnected: isGoogleFitConnected,
+    includeRestingCalories: includeResting
+  });
+
   const isGoogleFit = source === 'google_fit' || isGoogleFitConnected;
   const isHealthConnect = source === 'health_connect' || isHealthConnectConnected;
-  const isSensorSource = isGoogleFit || isHealthConnect;
+  const isSensorSource = effectiveMode === 'tracker' || isGoogleFit || isHealthConnect;
   const tef = calculateDailyTEF(meals);
 
   if (isSensorSource) {

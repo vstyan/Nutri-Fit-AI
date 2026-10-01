@@ -43,7 +43,7 @@ import {
   saveTermsAccepted,
   saveStorageLocationChoice
 } from './services/storageService';
-import { calculateBMR, calculateDailyTEF, calculateTDEE } from './utils/calorieEngine';
+import { calculateBMR, calculateDailyTEF, calculateTDEE, getEffectiveTrackingMode } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
 import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesResult } from './services/googleFitService';
 import { 
@@ -202,8 +202,10 @@ export function App() {
       const now = Date.now();
       const updatedSettings: AppSettings = {
         ...settings,
+        burnTrackingMode: 'tracker',
         includeRestingCalories: false,
         googleFitConnected: true,
+        healthSyncProvider: 'google_fit',
         googleFitAccessToken: accessToken,
         googleFitTokenExpiry: now + (expiresIn * 1000),
         googleFitLastSync: new Date().toISOString(),
@@ -226,12 +228,14 @@ export function App() {
   const handleDisconnectGoogleFit = async () => {
     const updatedSettings: AppSettings = {
       ...settings,
+      burnTrackingMode: 'standalone',
       includeRestingCalories: true,
       googleFitConnected: false,
       googleFitAccessToken: undefined,
       googleFitTokenExpiry: undefined,
       googleFitLastSync: undefined,
-      googleFitUserEmail: undefined
+      googleFitUserEmail: undefined,
+      healthSyncProvider: 'manual'
     };
     await saveAppSettings(updatedSettings);
     setSettings(updatedSettings);
@@ -328,7 +332,7 @@ export function App() {
         const baseBmr = includeResting ? profileBmr : 0;
         const currentMeals = await getMealsForDate(date, activeSettings);
         const tef = calculateDailyTEF(currentMeals);
-        const fitTotal = includeResting ? (baseBmr + fitResult.totalCalories) : fitResult.totalCalories;
+        const fitTotal = fitResult.totalCalories;
 
         const currentActivity = await getActivityForDate(date, activeSettings);
         const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
@@ -397,6 +401,7 @@ export function App() {
         const now = new Date().toISOString();
         const updatedSettings: AppSettings = {
           ...settings,
+          burnTrackingMode: 'tracker',
           includeRestingCalories: true,
           healthConnectConnected: true,
           healthSyncProvider: 'health_connect',
@@ -425,6 +430,7 @@ export function App() {
   const handleDisconnectHealthConnect = async () => {
     const updatedSettings: AppSettings = {
       ...settings,
+      burnTrackingMode: 'standalone',
       includeRestingCalories: true,
       healthConnectConnected: false,
       healthConnectLastSync: undefined,
@@ -628,17 +634,26 @@ export function App() {
     const dayTef = calculateDailyTEF(dayMeals);
 
     // Calculate TDEE breakdown: Total Burned = BMR + NEAT + EAT + TEF
+    const trackingMode = getEffectiveTrackingMode(currentSettings);
+    const isTracker = trackingMode === 'tracker';
     const includeResting = currentSettings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(currentSettings.profile);
-    const baseBmr = includeResting ? (dayActivity.baseBmrCalories || profileBmr) : 0;
     const isFit = dayActivity.source === 'google_fit' || !!currentSettings.googleFitConnected;
     const isHC = dayActivity.source === 'health_connect' || !!currentSettings.healthConnectConnected;
+    const isSensor = isTracker || isFit || isHC;
+
+    const baseBmr = isSensor
+      ? (dayActivity.sensorRestingCalories !== undefined 
+          ? dayActivity.sensorRestingCalories 
+          : (dayActivity.baseBmrCalories !== undefined ? dayActivity.baseBmrCalories : 0))
+      : (includeResting ? profileBmr : 0);
 
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: dayActivity.activeCaloriesBurned || 0,
       meals: dayMeals,
       source: dayActivity.source,
+      trackingMode,
       isGoogleFitConnected: currentSettings.googleFitConnected,
       isHealthConnectConnected: currentSettings.healthConnectConnected,
       includeResting
@@ -653,10 +668,10 @@ export function App() {
       source: isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual')),
       sensorActiveCalories: dayActivity.sensorActiveCalories !== undefined
         ? dayActivity.sensorActiveCalories
-        : ((isHC || isFit) ? Math.max(0, (dayActivity.activeCaloriesBurned || 0) - baseBmr) : undefined),
+        : (isSensor ? Math.max(0, (dayActivity.activeCaloriesBurned || 0) - baseBmr) : undefined),
       sensorRestingCalories: dayActivity.sensorRestingCalories !== undefined
         ? dayActivity.sensorRestingCalories
-        : ((isHC || isFit) ? baseBmr : undefined)
+        : (isSensor ? baseBmr : undefined)
     };
 
     // Save updated activity
@@ -916,13 +931,20 @@ export function App() {
   const handleSaveSettings = async (newSettings: AppSettings, explicitKeyUpdate = true) => {
     setSettings(newSettings);
     await saveAppSettings(newSettings, explicitKeyUpdate);
+    const newTrackingMode = getEffectiveTrackingMode(newSettings);
+    const isTracker = newTrackingMode === 'tracker';
     const includeResting = newSettings.includeRestingCalories !== false;
-    const baseBmr = includeResting ? calculateBMR(newSettings.profile) : 0;
+    const profileBmr = calculateBMR(newSettings.profile);
+    const baseBmr = isTracker 
+      ? (activity.sensorRestingCalories !== undefined ? activity.sensorRestingCalories : (activity.baseBmrCalories || 0))
+      : (includeResting ? profileBmr : 0);
+
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: activity.activeCaloriesBurned || 0,
       meals,
       source: activity.source,
+      trackingMode: newTrackingMode,
       isGoogleFitConnected: newSettings.googleFitConnected,
       isHealthConnectConnected: newSettings.healthConnectConnected,
       includeResting
@@ -938,9 +960,9 @@ export function App() {
     };
     setActivity(updatedActivity);
     await saveActivityForDate(updatedActivity, newSettings);
-    loadDayData(selectedDate, newSettings);
+    await loadDayData(selectedDate, newSettings);
 
-    if (newSettings.healthConnectConnected) {
+    if (newSettings.healthConnectConnected && newTrackingMode === 'tracker') {
       await handleSyncHealthConnect(selectedDate, newSettings, false);
     }
   };

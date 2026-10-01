@@ -1,5 +1,5 @@
 {
-  "version": "1.8.26",
+  "version": "1.8.27",
   "releaseDate": "2026-10-01",
-  "notes": "Fix persistent startup storage location prompt (memorizes choice across app restarts), smooth OTA delivery."
+  "notes": "Fix calorie mismatch in tracker mode: strictly isolate Configuration 1 (Standalone) and Configuration 2 (Fitness Tracker/Health Connect), prevent double-counting 24h profile BMR on top of synced tracker active burn."
 }

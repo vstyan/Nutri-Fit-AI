@@ -1,5 +1,5 @@
 declare const __APP_VERSION__: string;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.26';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.27';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -135,6 +135,7 @@ export interface UserGoals {
 
 export type StorageLocation = 'google_drive' | 'local_indexeddb';
 export type ThemeMode = 'pure_black' | 'midnight_slate' | 'teal_breeze' | 'apple_dark';
+export type BurnTrackingMode = 'standalone' | 'tracker';
 
 export interface AppSettings {
   geminiApiKey: string;
@@ -150,6 +151,7 @@ export interface AppSettings {
   healthConnectConnected?: boolean;
   healthConnectLastSync?: string;
   healthSyncProvider?: 'manual' | 'google_fit' | 'health_connect';
+  burnTrackingMode?: BurnTrackingMode;
   includeRestingCalories?: boolean;
   themeMode?: ThemeMode;
   termsAcceptedVersion?: string;

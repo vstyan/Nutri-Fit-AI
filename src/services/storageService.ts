@@ -11,6 +11,7 @@ import {
   StorageLocation
 } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
+import { getEffectiveTrackingMode } from '../utils/calorieEngine';
 import { getPastNDaysDateStrings } from '../utils/dateUtils';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
 
@@ -574,58 +575,69 @@ export async function getAllFavoriteMeals(): Promise<MealRecord[]> {
 
 export async function getActivityForDate(date: string, settings: AppSettings): Promise<DailyActivity> {
   const localKey = `${ACTIVITY_PREFIX}${date}`;
+  const trackingMode = getEffectiveTrackingMode(settings);
+  const isTrackerMode = trackingMode === 'tracker';
   const includeResting = settings.includeRestingCalories !== false;
-  const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
+  const profileBmr = calculateBMR(settings.profile);
+
+  const parseActivityRecord = (parsed: any): DailyActivity => {
+    const active = Number(parsed.activeCaloriesBurned ?? parsed.caloriesBurned) || 0;
+    const isSensorSource = isTrackerMode ||
+      parsed.source === 'google_fit' ||
+      parsed.source === 'health_connect' ||
+      settings.googleFitConnected ||
+      settings.healthConnectConnected;
+
+    const tef = Number(parsed.tefCalories) || 0;
+
+    let baseBmr: number;
+    let neat: number;
+    let totalBurned: number;
+    let source: 'manual' | 'google_fit' | 'health_connect';
+
+    if (isSensorSource) {
+      source = parsed.source || (settings.healthConnectConnected ? 'health_connect' : (settings.googleFitConnected ? 'google_fit' : 'health_connect'));
+      // In tracker mode: sensors/wearables account for daily movement (NEAT is 0 to prevent double counting).
+      // Base BMR is preserved from sensorRestingCalories or parsed.baseBmrCalories if available, otherwise 0.
+      neat = 0;
+      baseBmr = parsed.sensorRestingCalories !== undefined 
+        ? Number(parsed.sensorRestingCalories) 
+        : (parsed.baseBmrCalories !== undefined ? Number(parsed.baseBmrCalories) : 0);
+      totalBurned = parsed.totalCaloriesBurned !== undefined 
+        ? Number(parsed.totalCaloriesBurned) 
+        : active + tef;
+    } else {
+      source = 'manual';
+      baseBmr = includeResting ? profileBmr : 0;
+      neat = includeResting ? (parsed.neatCalories !== undefined ? Number(parsed.neatCalories) : Math.round(baseBmr * 0.15)) : 0;
+      totalBurned = baseBmr + neat + active + tef;
+    }
+
+    return {
+      date,
+      activeCaloriesBurned: active,
+      baseBmrCalories: baseBmr,
+      neatCalories: neat,
+      tefCalories: tef,
+      totalCaloriesBurned: totalBurned,
+      workouts: Array.isArray(parsed.workouts) ? parsed.workouts : [],
+      notes: parsed.notes,
+      source,
+      lastSyncedAt: parsed.lastSyncedAt,
+      lastUpdated: parsed.lastUpdated || new Date().toISOString(),
+      sensorActiveCalories: parsed.sensorActiveCalories !== undefined ? Number(parsed.sensorActiveCalories) : undefined,
+      sensorRestingCalories: parsed.sensorRestingCalories !== undefined ? Number(parsed.sensorRestingCalories) : undefined
+    };
+  };
 
   try {
     const localStr = localStorage.getItem(localKey);
     if (localStr) {
-      const parsed = JSON.parse(localStr);
-      const active = Number(parsed.activeCaloriesBurned ?? parsed.caloriesBurned) || 0;
-      const isFit = parsed.source === 'google_fit' || (settings.googleFitConnected && (!parsed.source || parsed.source === 'google_fit'));
-      const neat = (isFit || !includeResting) ? 0 : (parsed.neatCalories !== undefined ? Number(parsed.neatCalories) : Math.round(baseBmr * 0.15));
-      const tef = Number(parsed.tefCalories) || 0;
-      const totalBurned = isFit 
-        ? active + tef 
-        : (!includeResting ? active + tef : baseBmr + neat + active + tef);
-
-      return {
-        date,
-        activeCaloriesBurned: active,
-        baseBmrCalories: baseBmr,
-        neatCalories: neat,
-        tefCalories: tef,
-        totalCaloriesBurned: totalBurned,
-        workouts: Array.isArray(parsed.workouts) ? parsed.workouts : [],
-        notes: parsed.notes,
-        source: parsed.source || (isFit ? 'google_fit' : 'manual'),
-        lastSyncedAt: parsed.lastSyncedAt,
-        lastUpdated: parsed.lastUpdated || new Date().toISOString()
-      };
+      return parseActivityRecord(JSON.parse(localStr));
     }
     const saved = await get<any>(localKey);
     if (saved) {
-      const active = Number(saved.activeCaloriesBurned ?? saved.caloriesBurned) || 0;
-      const isFit = saved.source === 'google_fit' || (settings.googleFitConnected && (!saved.source || saved.source === 'google_fit'));
-      const neat = (isFit || !includeResting) ? 0 : (saved.neatCalories !== undefined ? Number(saved.neatCalories) : Math.round(baseBmr * 0.15));
-      const tef = Number(saved.tefCalories) || 0;
-      const totalBurned = isFit 
-        ? active + tef 
-        : (!includeResting ? active + tef : baseBmr + neat + active + tef);
-
-      const act: DailyActivity = {
-        date,
-        activeCaloriesBurned: active,
-        baseBmrCalories: baseBmr,
-        neatCalories: neat,
-        tefCalories: tef,
-        totalCaloriesBurned: totalBurned,
-        workouts: Array.isArray(saved.workouts) ? saved.workouts : [],
-        notes: saved.notes,
-        source: saved.source || (isFit ? 'google_fit' : 'manual'),
-        lastSyncedAt: saved.lastSyncedAt,
-        lastUpdated: saved.lastUpdated || new Date().toISOString()
-      };
+      const act = parseActivityRecord(saved);
       localStorage.setItem(localKey, JSON.stringify(act));
       return act;
     }
@@ -633,16 +645,32 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     console.error('Error fetching activity:', e);
   }
 
-  const defaultNeat = includeResting ? Math.round(baseBmr * 0.15) : 0;
+  // Fallback defaults
+  if (isTrackerMode) {
+    return {
+      date,
+      activeCaloriesBurned: 0,
+      baseBmrCalories: 0,
+      neatCalories: 0,
+      tefCalories: 0,
+      totalCaloriesBurned: 0,
+      workouts: [],
+      source: settings.healthConnectConnected ? 'health_connect' : (settings.googleFitConnected ? 'google_fit' : 'health_connect'),
+      lastUpdated: new Date().toISOString()
+    };
+  }
+
+  const defaultBmr = includeResting ? profileBmr : 0;
+  const defaultNeat = includeResting ? Math.round(defaultBmr * 0.15) : 0;
   return {
     date,
     activeCaloriesBurned: 0,
-    baseBmrCalories: baseBmr,
+    baseBmrCalories: defaultBmr,
     neatCalories: defaultNeat,
     tefCalories: 0,
-    totalCaloriesBurned: baseBmr + defaultNeat,
+    totalCaloriesBurned: defaultBmr + defaultNeat,
     workouts: [],
-    source: settings.googleFitConnected ? 'google_fit' : 'manual',
+    source: 'manual',
     lastUpdated: new Date().toISOString()
   };
 }
