@@ -1,5 +1,6 @@
 {
-  "version": "1.8.23",
-  "releaseDate": "2026-09-30",
-  "notes": "Health Connect calorie breakdown & BMR calibration to match Google Fit, persistent profile & API key fixes with header Save."
+  "version": "1.8.24",
+  "releaseDate": "2026-10-01",
+  "checksum": "701c41bb5047d6fff0c8decef8e3816e72fdab85fc11b766b3074cd63c8d4847",
+  "notes": "Seamless in-app OTA update fixes, Capgo checksum validation, Health Connect calorie breakdown & BMR calibration."
 }

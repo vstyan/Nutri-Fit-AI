@@ -9,6 +9,7 @@ interface VersionInfo {
   version: string;
   releaseDate?: string;
   notes?: string;
+  checksum?: string;
 }
 
 const PWAUpdatePromptContent: React.FC = () => {
@@ -214,7 +215,7 @@ const NativeAndroidUpdatePromptContent: React.FC = () => {
     localStorage.removeItem('nutrifit_deferred_version');
 
     try {
-      await applyAndroidOTAUpdate(remoteVersionInfo.version);
+      await applyAndroidOTAUpdate(remoteVersionInfo.version, remoteVersionInfo.checksum);
     } catch (err: any) {
       console.error('[NutriFit Updater] Failed to apply OTA update:', err);
       setUpdateError(err?.message || 'Failed to download update bundle. Please try again.');

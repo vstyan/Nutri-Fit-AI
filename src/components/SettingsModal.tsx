@@ -58,7 +58,7 @@ import {
   persistStickyGeminiKey,
   clearStickyGeminiKey
 } from '../services/storageService';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, RemoteVersionInfo } from '../services/updaterService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -110,7 +110,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // App update checking states
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle');
-  const [availableVersionInfo, setAvailableVersionInfo] = useState<{ version: string; notes?: string } | null>(null);
+  const [availableVersionInfo, setAvailableVersionInfo] = useState<RemoteVersionInfo | null>(null);
 
   // Goal customization state
   const [customGoalInput, setCustomGoalInput] = useState('');
@@ -181,7 +181,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isNativeAndroid && availableVersionInfo?.version) {
       setIsCheckingUpdate(true);
       try {
-        await applyAndroidOTAUpdate(availableVersionInfo.version);
+        await applyAndroidOTAUpdate(availableVersionInfo.version, availableVersionInfo.checksum);
       } catch (e: any) {
         console.error('Failed to apply Android OTA update:', e);
         alert(e?.message || 'Failed to download update bundle. Please try again.');

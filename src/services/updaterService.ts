@@ -6,6 +6,7 @@ export interface RemoteVersionInfo {
   version: string;
   releaseDate?: string;
   notes?: string;
+  checksum?: string;
 }
 
 const GITHUB_RAW_VERSION_URL = 'https://raw.githubusercontent.com/vstyan/Nutri-Fit-AI/main/public/version.json';
@@ -51,15 +52,34 @@ export async function checkForRemoteUpdate(): Promise<RemoteVersionInfo | null> 
 
 /**
  * Downloads and applies an OTA update on native Android via CapacitorUpdater.
+ * Passes the bundle checksum when available to satisfy Capgo's integrity verification.
  */
-export async function applyAndroidOTAUpdate(targetVersion: string): Promise<void> {
+export async function applyAndroidOTAUpdate(targetVersion: string, checksum?: string): Promise<void> {
   if (!isNativeAndroid()) return;
   const downloadUrl = `https://github.com/vstyan/Nutri-Fit-AI/releases/download/v${targetVersion}/dist.zip`;
   
-  const bundle = await CapacitorUpdater.download({
+  let finalChecksum = checksum;
+  if (!finalChecksum) {
+    try {
+      const info = await checkForRemoteUpdate();
+      if (info?.checksum) {
+        finalChecksum = info.checksum;
+      }
+    } catch (err) {
+      console.warn('[NutriFit Updater] Could not fetch checksum from version.json:', err);
+    }
+  }
+
+  const downloadOptions: { url: string; version: string; checksum?: string } = {
     url: downloadUrl,
     version: targetVersion
-  });
+  };
+
+  if (finalChecksum) {
+    downloadOptions.checksum = finalChecksum;
+  }
+
+  const bundle = await CapacitorUpdater.download(downloadOptions);
 
   // Activate the newly downloaded bundle immediately (reloads webview into new code)
   await CapacitorUpdater.set({ id: bundle.id });

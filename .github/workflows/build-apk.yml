@@ -55,7 +55,9 @@ jobs:
       - name: Sync Capacitor Android assets and plugins
         env:
           CAPACITOR_TELEMETRY: '0'
-        run: npx cap sync android
+        run: |
+          node scripts/patch-capgo.cjs
+          npx cap sync android
 
       - name: Build Android Debug APK
         working-directory: android
