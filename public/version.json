@@ -1,5 +1,5 @@
 {
-  "version": "1.8.27",
+  "version": "1.8.28",
   "releaseDate": "2026-10-01",
-  "notes": "Fix calorie mismatch in tracker mode: strictly isolate Configuration 1 (Standalone) and Configuration 2 (Fitness Tracker/Health Connect), prevent double-counting 24h profile BMR on top of synced tracker active burn."
+  "notes": "Fix Health Connect calorie parity with Google Fit: eliminate multi-source double counting (Samsung Health + Google Fit), enable native TotalCalories aggregation, decompose active and resting BMR cleanly, and prevent projected full-day burn inflation."
 }

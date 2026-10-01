@@ -8,6 +8,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Health } from '@capgo/capacitor-health';
+import { getLocalDateString } from '../utils/dateUtils';
 
 export interface HealthDailySummary {
   date: string; // YYYY-MM-DD
@@ -240,25 +241,138 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
     }
 
     // 2. Query Total Calories (TotalCaloriesBurnedRecord)
-    // NOTE: In @capgo/capacitor-health, aggregateMetrics only supports STEPS, DISTANCE, CALORIES, HYDRATION, DIETARY_ENERGY.
-    // Querying queryAggregated for totalCalories throws IllegalArgumentException.
-    // We query TotalCaloriesBurnedRecord directly via readSamples, which correctly retrieves all recorded energy samples for the day.
+    // Attempt aggregated query first (supported on builds where TOTAL_CALORIES is registered)
     try {
-      const totalRes = await withTimeout(
-        Health.readSamples({
+      const aggRes = await withTimeout(
+        Health.queryAggregated({
           dataType: 'totalCalories',
           startDate,
           endDate,
-          limit: 5000
+          bucket: 'day',
+          aggregation: 'sum'
         }),
-        4000,
-        { samples: [] }
+        3000,
+        null
       );
-      if (totalRes?.samples && totalRes.samples.length > 0) {
-        totalCalories = Math.round(totalRes.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+      if (aggRes?.samples && aggRes.samples.length > 0) {
+        const val = Number(aggRes.samples[0]?.value) || 0;
+        if (val > 0) {
+          totalCalories = Math.round(val);
+        }
       }
-    } catch (e) {
-      console.warn('[HealthBridge] readSamples totalCalories notice:', e);
+    } catch {
+      // queryAggregated totalCalories not available natively on this APK; use smart sample deduplication
+    }
+
+    // Fallback: Query raw TotalCaloriesBurnedRecord samples and deduplicate
+    if (totalCalories <= 0) {
+      try {
+        const totalRes = await withTimeout(
+          Health.readSamples({
+            dataType: 'totalCalories',
+            startDate,
+            endDate,
+            limit: 5000
+          }),
+          4000,
+          { samples: [] }
+        );
+
+        if (totalRes?.samples && totalRes.samples.length > 0) {
+          const nowMs = Date.now();
+          const isToday = (dateStr === getLocalDateString());
+
+          // Group samples by data origin (source package name)
+          const samplesBySource = new Map<string, any[]>();
+          for (const sample of totalRes.samples) {
+            const val = Number(sample.value) || 0;
+            if (val <= 0) continue;
+            const src = (sample.sourceId || sample.sourceName || 'unknown').toLowerCase();
+            if (!samplesBySource.has(src)) {
+              samplesBySource.set(src, []);
+            }
+            samplesBySource.get(src)!.push(sample);
+          }
+
+          // Prioritize source: Google Fit first if present, otherwise the source with the most data
+          let selectedSourceKey: string | null = null;
+          for (const key of samplesBySource.keys()) {
+            if (key.includes('fitness') || key.includes('google')) {
+              selectedSourceKey = key;
+              break;
+            }
+          }
+          if (!selectedSourceKey) {
+            let maxCount = 0;
+            for (const [k, v] of samplesBySource.entries()) {
+              if (v.length > maxCount) {
+                maxCount = v.length;
+                selectedSourceKey = k;
+              }
+            }
+          }
+
+          if (selectedSourceKey) {
+            const sourceSamples = samplesBySource.get(selectedSourceKey) || [];
+
+            let allDayRecord: any = null;
+            const intervalRecords: any[] = [];
+
+            for (const s of sourceSamples) {
+              const start = new Date(s.startDate).getTime();
+              const end = new Date(s.endDate).getTime();
+              const durationHours = (!isNaN(start) && !isNaN(end) && end > start)
+                ? (end - start) / (1000 * 60 * 60)
+                : 0;
+
+              if (durationHours >= 18) {
+                if (!allDayRecord || Number(s.value) > Number(allDayRecord.value)) {
+                  allDayRecord = s;
+                }
+              } else {
+                // Ignore intervals that start in the future for today
+                if (!isToday || start <= nowMs) {
+                  intervalRecords.push({ ...s, start, end });
+                }
+              }
+            }
+
+            if (intervalRecords.length > 0) {
+              // Deduplicate overlapping intervals within this single source
+              intervalRecords.sort((a, b) => a.start - b.start);
+              let nonOverlappingSum = 0;
+              let currentEnd = 0;
+
+              for (const s of intervalRecords) {
+                if (s.start >= currentEnd) {
+                  nonOverlappingSum += Number(s.value) || 0;
+                  currentEnd = s.end;
+                } else if (s.end > currentEnd) {
+                  const totalDur = s.end - s.start;
+                  const newDur = s.end - currentEnd;
+                  const fraction = totalDur > 0 ? (newDur / totalDur) : 0;
+                  nonOverlappingSum += (Number(s.value) || 0) * fraction;
+                  currentEnd = s.end;
+                }
+              }
+              totalCalories = Math.round(nonOverlappingSum);
+            } else if (allDayRecord) {
+              const allDayVal = Number(allDayRecord.value) || 0;
+              if (isToday) {
+                // Prorate all-day projection to current elapsed minutes of today
+                const now = new Date();
+                const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
+                const dayFraction = Math.min(1, Math.max(0, minutesElapsed / 1440));
+                totalCalories = Math.round(allDayVal * dayFraction);
+              } else {
+                totalCalories = Math.round(allDayVal);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[HealthBridge] readSamples totalCalories notice:', e);
+      }
     }
 
     // 3. Query Basal Metabolic Rate (BasalMetabolicRateRecord)

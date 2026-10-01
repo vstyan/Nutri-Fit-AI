@@ -188,5 +188,26 @@ describe('Calorie Engine & TDEE Calculations (Baseline)', () => {
       expect(tdee.tef).toBe(81);
       expect(tdee.totalBurned).toBe(2531); // 2450 + 81
     });
+
+    it('calculates exact real-time Google Fit / Health Connect active and prorated rest burn parity', () => {
+      // User with 813 active calories and 773 prorated resting calories (1586 total in Google Fit)
+      const activeKcal = 813;
+      const proratedRestKcal = 773;
+      const combinedTrackerBurn = activeKcal + proratedRestKcal; // 1586
+
+      const tdee = calculateTDEE({
+        bmr: proratedRestKcal,
+        activeCalories: combinedTrackerBurn,
+        meals: [],
+        trackingMode: 'tracker',
+        isHealthConnectConnected: true,
+        source: 'health_connect'
+      });
+
+      expect(tdee.eat).toBe(1586);
+      expect(tdee.neat).toBe(0);
+      expect(tdee.tef).toBe(0);
+      expect(tdee.totalBurned).toBe(1586);
+    });
   });
 });

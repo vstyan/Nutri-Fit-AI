@@ -461,31 +461,36 @@ export function App() {
       const healthResult = await syncHealthConnectDaily(date);
       if (healthResult) {
         const profileBmr = calculateBMR(activeSettings.profile);
-        const restingBmr = (healthResult.basalCalories && healthResult.basalCalories > 0)
-          ? healthResult.basalCalories
-          : profileBmr;
+        const isToday = (date === getLocalDateString());
+        const now = new Date();
+        const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
+        const dayFraction = isToday ? Math.min(1, Math.max(0, minutesElapsed / 1440)) : 1.0;
+
+        // Effective daily BMR: calibrated customBmr takes precedence, then profile BMR
+        const effectiveDailyBmr = activeSettings.profile.customBmr || profileBmr;
+        const elapsedBmr = Math.round(effectiveDailyBmr * dayFraction);
 
         let burnValue: number;
-        let baseBmr: number;
+        let sensorActive: number = healthResult.activeCalories || 0;
+        let sensorResting: number;
 
-        if (healthResult.totalCalories > 0) {
-          // Wearable reported exact cumulative or 24-hr total burn (e.g. 1237 kcal)
+        // Plausibility check for reported total calories:
+        // 1) Must be at least equal to active calories
+        // 2) For today, cannot exceed active calories + full 24h BMR + 300 kcal buffer
+        const maxPlausibleToday = sensorActive + effectiveDailyBmr + 300;
+        const isTotalPlausible = (healthResult.totalCalories > 0) &&
+          (healthResult.totalCalories >= sensorActive) &&
+          (!isToday || healthResult.totalCalories <= maxPlausibleToday);
+
+        if (isTotalPlausible) {
           burnValue = healthResult.totalCalories;
-          baseBmr = 0; // Already included inside wearable total
+          // Decompose wearable total into active vs resting portions for the UI breakdown
+          sensorResting = Math.max(0, burnValue - sensorActive);
         } else {
-          // Wearable / Google Fit only logged active calories (e.g. 317 kcal) without totalCalories records.
-          // Add resting BMR so user's daily burn includes basal expenditure!
-          // For 'today', prorate resting BMR to current elapsed time so it matches Google Fit in real-time.
-          const isToday = (date === getLocalDateString());
-          if (isToday) {
-            const now = new Date();
-            const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
-            const dayFraction = Math.min(1, Math.max(0, minutesElapsed / 1440));
-            baseBmr = Math.round(restingBmr * dayFraction);
-          } else {
-            baseBmr = restingBmr;
-          }
-          burnValue = baseBmr + healthResult.activeCalories;
+          // Wearable only logged active calories (or reported total was un-deduplicated/future projection).
+          // Real-time burn so far = Active Movement + Elapsed Resting BMR!
+          sensorResting = elapsedBmr;
+          burnValue = sensorActive + sensorResting;
         }
 
         const currentMeals = await getMealsForDate(date, activeSettings);
@@ -497,7 +502,7 @@ export function App() {
         const updatedActivity: DailyActivity = {
           date,
           activeCaloriesBurned: burnValue,
-          baseBmrCalories: baseBmr,
+          baseBmrCalories: sensorResting,
           neatCalories: 0, // Health Connect / wearable already accounts for NEAT; 0 added to prevent double counting
           tefCalories: tef,
           totalCaloriesBurned: burnValue + tef,
@@ -505,8 +510,8 @@ export function App() {
           source: 'health_connect',
           lastSyncedAt: healthResult.lastSyncedAt,
           lastUpdated: new Date().toISOString(),
-          sensorActiveCalories: healthResult.activeCalories,
-          sensorRestingCalories: baseBmr
+          sensorActiveCalories: sensorActive,
+          sensorRestingCalories: sensorResting
         };
 
         await saveActivityForDate(updatedActivity, activeSettings);

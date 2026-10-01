@@ -117,3 +117,40 @@ patchFile(
             logger.warn("No checksum provided in DownloadService, proceeding with download");
         }`
 );
+
+// 5. Patch HealthManager.kt in @capgo/capacitor-health to support TOTAL_CALORIES in queryAggregated
+const healthManagerFile = path.resolve(projectRoot, 'node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthManager.kt');
+patchFile(
+  healthManagerFile,
+  `        val supportedAggregations = when (dataType) {
+            HealthDataType.STEPS,
+            HealthDataType.DISTANCE,
+            HealthDataType.CALORIES,
+            HealthDataType.HYDRATION,
+            HealthDataType.DIETARY_ENERGY -> setOf("sum")`,
+  `        val supportedAggregations = when (dataType) {
+            HealthDataType.STEPS,
+            HealthDataType.DISTANCE,
+            HealthDataType.CALORIES,
+            HealthDataType.TOTAL_CALORIES,
+            HealthDataType.HYDRATION,
+            HealthDataType.DIETARY_ENERGY -> setOf("sum")`
+);
+
+patchFile(
+  healthManagerFile,
+  `        HealthDataType.CALORIES -> setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL)
+        HealthDataType.HEART_RATE -> setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MAX, HeartRateRecord.BPM_MIN)`,
+  `        HealthDataType.CALORIES -> setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL)
+        HealthDataType.TOTAL_CALORIES -> setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
+        HealthDataType.HEART_RATE -> setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MAX, HeartRateRecord.BPM_MIN)`
+);
+
+patchFile(
+  healthManagerFile,
+  `            HealthDataType.CALORIES -> result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+            HealthDataType.HEART_RATE -> when (aggregation) {`,
+  `            HealthDataType.CALORIES -> result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+            HealthDataType.TOTAL_CALORIES -> result[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories
+            HealthDataType.HEART_RATE -> when (aggregation) {`
+);
