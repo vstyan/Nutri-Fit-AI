@@ -46,6 +46,9 @@ jobs:
       - name: Build production web bundle
         run: npm run build
 
+      - name: Package OTA Web Bundle
+        run: (cd dist && zip -r ../dist.zip .)
+
       - name: Ensure Android assets directory exists
         run: mkdir -p android/app/src/main/assets
 
@@ -60,13 +63,21 @@ jobs:
 
       - name: Prepare APK Release Artifact
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NutriFit-AI-v1.8.21-APK
-          path: android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk
+          name: NutriFit-AI-v1.8.22-APK
+          path: android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload OTA Web Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NutriFit-AI-v1.8.22-OTA-Bundle
+          path: dist.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -74,8 +85,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create v1.8.21 \
-            android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.21.apk \
-            --title "NutriFit AI v1.8.21 (Real-Time Live Burn Sync)" \
-            --notes "Direct APK download for NutriFit AI v1.8.21. Prorates resting BMR so Health Connect matches Google Fit live energy expenditure in real time." \
+          gh release create v1.8.22 \
+            android/app/build/outputs/apk/debug/NutriFit-AI-v1.8.22.apk \
+            dist.zip \
+            --title "NutriFit AI v1.8.22 (In-App Auto-Update Support)" \
+            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v1.8.22. Includes in-app OTA automatic update engine for native Android." \
             --clobber || true

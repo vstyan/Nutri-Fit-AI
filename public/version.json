@@ -1,5 +1,5 @@
 {
-  "version": "1.8.21",
+  "version": "1.8.22",
   "releaseDate": "2026-09-30",
-  "notes": "Prorated real-time resting BMR sync matching Google Fit live energy expenditure."
+  "notes": "Added In-App Over-The-Air (OTA) automatic updates for native Android build."
 }

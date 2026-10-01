@@ -1,7 +1,7 @@
 {
   "name": "diet-exercise-pwa",
   "private": true,
-  "version": "1.8.21",
+  "version": "1.8.22",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -14,6 +14,7 @@
     "@capacitor/android": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@capgo/capacitor-health": "^8.11.4",
+    "@capgo/capacitor-updater": "^8.52.1",
     "chart.js": "^4.4.8",
     "clsx": "^2.1.1",
     "idb-keyval": "^6.2.1",

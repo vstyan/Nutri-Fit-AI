@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { isNativeAndroid } from './services/healthBridge';
+import { initAppUpdater } from './services/updaterService';
 
-// On native Android (Capacitor APK), unregister any service workers and purge CacheStorage
-// so the WebView always serves freshly bundled local assets from the APK without stale caching.
+// On native Android (Capacitor APK), notify Capgo updater that bundle initialized,
+// unregister any service workers, and purge CacheStorage so fresh assets are served.
 if (isNativeAndroid()) {
+  initAppUpdater();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {
       for (const reg of registrations) {

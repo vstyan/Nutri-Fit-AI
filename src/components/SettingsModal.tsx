@@ -50,6 +50,7 @@ import {
   importBackupJson, 
   clearAllAppData 
 } from '../services/storageService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate } from '../services/updaterService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -132,40 +133,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setUpdateStatus('checking');
 
     try {
-      let isNewAvailable = false;
-      let remoteInfo: { version: string; notes?: string } | null = null;
-
-      try {
-        const res = await fetch('./version.json?t=' + Date.now(), { 
-          cache: 'no-store',
-          headers: { 'Accept': 'application/json' }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.version && data.version !== APP_VERSION) {
-            isNewAvailable = true;
-            remoteInfo = data;
-          }
-        }
-      } catch (e) {
-        console.warn('version.json fetch error:', e);
-      }
-
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.ready;
-        if (isNewAvailable) {
-          await registration.update().catch(() => {});
-        }
-        if (registration.waiting || isNewAvailable) {
-          setAvailableVersionInfo(remoteInfo);
-          setUpdateStatus('available');
-        } else {
-          setUpdateStatus('latest');
-        }
-      } else if (isNewAvailable) {
+      const remoteInfo = await checkForRemoteUpdate();
+      if (remoteInfo) {
         setAvailableVersionInfo(remoteInfo);
         setUpdateStatus('available');
       } else {
+        if (!isNativeAndroid && 'serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.update().catch(() => {});
+          if (registration.waiting) {
+            setAvailableVersionInfo(null);
+            setUpdateStatus('available');
+            return;
+          }
+        }
         setUpdateStatus('latest');
       }
     } catch (err) {
@@ -178,6 +159,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleApplyUpdateNow = async () => {
     localStorage.removeItem('nutrifit_deferred_version');
+
+    if (isNativeAndroid && availableVersionInfo?.version) {
+      setIsCheckingUpdate(true);
+      try {
+        await applyAndroidOTAUpdate(availableVersionInfo.version);
+      } catch (e: any) {
+        console.error('Failed to apply Android OTA update:', e);
+        alert(e?.message || 'Failed to download update bundle. Please try again.');
+        setIsCheckingUpdate(false);
+      }
+      return;
+    }
+
     if ('serviceWorker' in navigator) {
       try {
         navigator.serviceWorker.addEventListener('controllerchange', () => {
