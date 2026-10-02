@@ -205,13 +205,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           }
         })
         .catch(err => {
-          console.log('Live WebRTC stream not active (will use native camera fallback):', err);
+          console.log('Live WebRTC stream not active (using native camera capture):', err);
           if (!isCancelled) {
             setStreamActive(false);
             setIsStartingCamera(false);
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-              setCameraPermissionDenied(true);
-            }
           }
         });
       } else {
@@ -322,7 +319,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     }
     // Stop live stream before invoking native camera to avoid hardware lock/deadlock
     stopMediaTracks();
-    cameraInputRef.current?.click();
+    try {
+      cameraInputRef.current?.click();
+    } catch (inputErr: any) {
+      console.error('Camera input trigger error:', inputErr);
+      setCameraPermissionDenied(true);
+      setErrorMessage('Could not open camera. Please check device permissions.');
+    }
   };
 
   const handleOpenGallery = () => {
@@ -430,7 +433,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 pt-[max(14px,calc(env(safe-area-inset-top,0px)+14px))] pb-[max(14px,calc(env(safe-area-inset-bottom,0px)+14px))] bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[95vh] relative">
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 shrink-0">
@@ -539,24 +542,24 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                         </div>
                       ) : (
                         <>
-                          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-cyan-400 border border-slate-700">
+                          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center mx-auto text-cyan-400 border border-cyan-500/30 shadow-inner">
                             <Camera className="w-8 h-8" />
                           </div>
                           <div>
                             <p className="text-sm font-bold text-white">
-                              {cameraPermissionDenied ? 'Camera Permission Blocked' : 'Camera Ready'}
+                              {cameraPermissionDenied ? 'Camera Access Needed' : 'Camera Ready'}
                             </p>
                             <p className="text-xs text-slate-400 mt-1">
                               {cameraPermissionDenied
-                                ? 'Please allow camera access in browser settings or choose a photo from gallery'
-                                : 'Take a photo or pick from your phone gallery'}
+                                ? 'Please grant camera permission in your device settings or choose a photo from gallery'
+                                : 'Snap a photo of your meal or choose an existing photo from your gallery'}
                             </p>
                           </div>
                           <div className="flex justify-center gap-2 pt-1">
                             <button
                               type="button"
                               onClick={handleCaptureFrame}
-                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition shadow"
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition shadow active:scale-95"
                             >
                               <Camera className="w-4 h-4" />
                               <span>Take Photo</span>
@@ -564,7 +567,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                             <button
                               type="button"
                               onClick={handleOpenGallery}
-                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition border border-slate-700"
+                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition border border-slate-700 active:scale-95"
                             >
                               <ImageIcon className="w-4 h-4 text-emerald-400" />
                               <span>Gallery</span>
