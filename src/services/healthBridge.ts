@@ -376,7 +376,7 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
     }
 
     // 3. Query Basal Metabolic Rate (BasalMetabolicRateRecord)
-    // If wearable or Health Connect reports a basal rate in kcal/day, read the latest sample
+    // If wearable or Health Connect reports a basal rate in kcal/day, read the sample
     try {
       const basalRes = await withTimeout(
         Health.readSamples({
@@ -389,8 +389,19 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
         { samples: [] }
       );
       if (basalRes?.samples && basalRes.samples.length > 0) {
-        const lastSample = basalRes.samples[basalRes.samples.length - 1];
-        const rate = Number(lastSample?.value) || 0;
+        // Prioritize sample from Google Fit if available, otherwise most recent sample
+        let chosenSample: any = null;
+        for (const s of basalRes.samples) {
+          const src = (s.sourceId || s.sourceName || '').toLowerCase();
+          if (src.includes('fitness') || src.includes('google')) {
+            chosenSample = s;
+            break;
+          }
+        }
+        if (!chosenSample) {
+          chosenSample = basalRes.samples[basalRes.samples.length - 1];
+        }
+        const rate = Number(chosenSample?.value) || 0;
         if (rate > 0) {
           basalCalories = Math.round(rate);
         }

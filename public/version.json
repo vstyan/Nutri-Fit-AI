@@ -1,5 +1,5 @@
 {
-  "version": "1.8.28",
+  "version": "1.8.29",
   "releaseDate": "2026-10-01",
-  "notes": "Fix Health Connect calorie parity with Google Fit: eliminate multi-source double counting (Samsung Health + Google Fit), enable native TotalCalories aggregation, decompose active and resting BMR cleanly, and prevent projected full-day burn inflation."
+  "notes": "Prioritize Google Fit BasalMetabolicRateRecord in Health Connect and integrate synced basal metabolic rate directly into daily burn calculations."
 }

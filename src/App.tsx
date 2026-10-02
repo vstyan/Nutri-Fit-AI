@@ -466,8 +466,14 @@ export function App() {
         const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
         const dayFraction = isToday ? Math.min(1, Math.max(0, minutesElapsed / 1440)) : 1.0;
 
-        // Effective daily BMR: calibrated customBmr takes precedence, then profile BMR
-        const effectiveDailyBmr = activeSettings.profile.customBmr || profileBmr;
+        // Effective daily BMR priority:
+        // 1. User calibrated customBmr (if manually set)
+        // 2. Health Connect reported basalCalories (e.g. from Google Fit or wearable)
+        // 3. User profile formula BMR (Mifflin-St Jeor)
+        const effectiveDailyBmr = activeSettings.profile.customBmr ||
+          (healthResult.basalCalories && healthResult.basalCalories > 500 && healthResult.basalCalories < 3500
+            ? healthResult.basalCalories
+            : profileBmr);
         const elapsedBmr = Math.round(effectiveDailyBmr * dayFraction);
 
         let burnValue: number;
