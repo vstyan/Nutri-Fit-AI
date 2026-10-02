@@ -1,5 +1,5 @@
 {
-  "version": "1.8.30",
+  "version": "1.8.31",
   "releaseDate": "2026-10-01",
-  "notes": "Configuration 2 tracker mode pure sync, enhanced Health Connect TotalCaloriesBurnedRecord reader, and live Health Connect Data Inspector."
+  "notes": "Fix non-overlapping timeline interval summation for multi-hour Health Connect records and preserve live data inspector."
 }

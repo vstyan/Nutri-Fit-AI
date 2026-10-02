@@ -341,60 +341,59 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
           if (selectedSourceKey) {
             const sourceSamples = samplesBySource.get(selectedSourceKey) || [];
 
-            // Separate into long/cumulative records vs interval records
-            const longRecords: any[] = [];
-            const intervalRecords: any[] = [];
-
+            // Filter valid samples for today
+            const parsedRecords: any[] = [];
             for (const s of sourceSamples) {
               const start = new Date(s.startDate).getTime();
               const end = new Date(s.endDate).getTime();
-              const durationHours = (!isNaN(start) && !isNaN(end) && end > start)
-                ? (end - start) / (1000 * 60 * 60)
-                : 0;
+              const val = Number(s.value) || 0;
+              if (isNaN(start) || isNaN(end) || end <= start || val <= 0) continue;
+              // Ignore intervals starting in the future
+              if (isToday && start > nowMs) continue;
+              parsedRecords.push({ ...s, start, end, val });
+            }
 
-              if (durationHours >= 4) {
-                longRecords.push({ ...s, start, end, durationHours });
-              } else {
-                if (!isToday || start <= nowMs) {
-                  intervalRecords.push({ ...s, start, end, durationHours });
+            // Check if there is an all-day / 24-hour summary record (>= 18h)
+            let fullDayRecord: any = null;
+            for (const r of parsedRecords) {
+              const durHours = (r.end - r.start) / (1000 * 60 * 60);
+              if (durHours >= 18) {
+                if (!fullDayRecord || r.val > fullDayRecord.val) {
+                  fullDayRecord = r;
                 }
               }
             }
 
-            // A) Check for long/cumulative records
-            let bestLongRecordVal = 0;
-            if (longRecords.length > 0) {
-              longRecords.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
-              bestLongRecordVal = Number(longRecords[0]?.value) || 0;
-            }
+            // Compute non-overlapping interval sum across ALL intervals
+            // Sort by start time ascending; if same start time, longer interval first
+            parsedRecords.sort((a, b) => a.start !== b.start ? a.start - b.start : (b.end - b.start) - (a.end - a.start));
 
-            // B) Check non-overlapping sum for interval records
-            let intervalSum = 0;
-            if (intervalRecords.length > 0) {
-              intervalRecords.sort((a, b) => a.start - b.start);
-              let nonOverlappingSum = 0;
-              let currentEnd = 0;
+            let nonOverlappingSum = 0;
+            let currentEnd = 0;
 
-              for (const s of intervalRecords) {
-                if (s.start >= currentEnd) {
-                  nonOverlappingSum += Number(s.value) || 0;
-                  currentEnd = s.end;
-                } else if (s.end > currentEnd) {
-                  const totalDur = s.end - s.start;
-                  const newDur = s.end - currentEnd;
-                  const fraction = totalDur > 0 ? (newDur / totalDur) : 0;
-                  nonOverlappingSum += (Number(s.value) || 0) * fraction;
-                  currentEnd = s.end;
-                }
+            for (const s of parsedRecords) {
+              // If there are multiple records, skip the 24-hour full-day summary from interval summation to avoid double-counting
+              const durHours = (s.end - s.start) / (1000 * 60 * 60);
+              if (durHours >= 18 && parsedRecords.length > 1) continue;
+
+              if (s.start >= currentEnd) {
+                nonOverlappingSum += s.val;
+                currentEnd = s.end;
+              } else if (s.end > currentEnd) {
+                const totalDur = s.end - s.start;
+                const newDur = s.end - currentEnd;
+                const fraction = totalDur > 0 ? (newDur / totalDur) : 0;
+                nonOverlappingSum += s.val * fraction;
+                currentEnd = s.end;
               }
-              intervalSum = Math.round(nonOverlappingSum);
             }
 
-            const chosenTotal = Math.max(bestLongRecordVal, intervalSum);
-            if (chosenTotal > 0) {
-              totalCalories = Math.round(chosenTotal);
-            } else if (sourceSamples.length > 0) {
-              totalCalories = Math.round(Math.max(...sourceSamples.map(s => Number(s.value) || 0)));
+            const intervalTotal = Math.round(nonOverlappingSum);
+            const fullDayTotal = fullDayRecord ? Math.round(fullDayRecord.val) : 0;
+
+            totalCalories = Math.max(intervalTotal, fullDayTotal);
+            if (totalCalories <= 0 && parsedRecords.length > 0) {
+              totalCalories = Math.round(Math.max(...parsedRecords.map(r => r.val)));
             }
           }
         }
