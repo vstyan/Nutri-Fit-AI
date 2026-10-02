@@ -59,7 +59,11 @@ import {
   persistStickyGeminiKey,
   clearStickyGeminiKey
 } from '../services/storageService';
-import { exportBackupFile } from '../services/backupExportService';
+import { 
+  exportBackupFile,
+  copyBackupToClipboard,
+  restoreBackupFromClipboard
+} from '../services/backupExportService';
 import { checkForRemoteUpdate, applyAndroidOTAUpdate, RemoteVersionInfo } from '../services/updaterService';
 
 interface SettingsModalProps {
@@ -104,6 +108,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
+  const [showManualPaste, setShowManualPaste] = useState(false);
+  const [manualPasteText, setManualPasteText] = useState('');
 
   // App update checking states
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -132,6 +138,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setBackupStatus(null);
       setIsExporting(false);
       setIsImporting(false);
+      setShowManualPaste(false);
+      setManualPasteText('');
       setShowClearConfirm(false);
       setClearSuccessMessage(false);
       setUpdateStatus('idle');
@@ -398,6 +406,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleCopyBackupToClipboard = async () => {
+    setIsExporting(true);
+    setBackupStatus(null);
+    try {
+      const res = await copyBackupToClipboard();
+      setBackupStatus({
+        type: 'success',
+        message: res.message
+      });
+    } catch (err: any) {
+      setBackupStatus({
+        type: 'error',
+        message: err?.message || 'Failed to copy backup to clipboard.'
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleRestoreFromClipboard = async () => {
+    setIsImporting(true);
+    setBackupStatus(null);
+    try {
+      const res = await restoreBackupFromClipboard();
+      if (res.success) {
+        setBackupStatus({
+          type: 'success',
+          message: res.message
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else if (res.requiresManualPaste) {
+        setShowManualPaste(true);
+      } else {
+        setBackupStatus({
+          type: 'error',
+          message: res.message
+        });
+      }
+    } catch (err: any) {
+      setBackupStatus({
+        type: 'error',
+        message: err?.message || 'Failed to restore from clipboard.'
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleExecuteManualPaste = async () => {
+    if (!manualPasteText.trim()) return;
+    setIsImporting(true);
+    setBackupStatus(null);
+    try {
+      const res = await importBackupJson(manualPasteText);
+      setShowManualPaste(false);
+      setManualPasteText('');
+      setBackupStatus({
+        type: 'success',
+        message: res.message
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setBackupStatus({
+        type: 'error',
+        message: err?.message || 'Invalid backup JSON data.'
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleExecuteClearAll = async () => {
@@ -1268,7 +1351,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
 
             <div className="grid grid-cols-2 gap-2.5">
-              {/* Export Backup */}
+              {/* Export File */}
               <button
                 type="button"
                 onClick={handleExportBackup}
@@ -1281,12 +1364,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Download className="w-4 h-4 text-cyan-400 shrink-0" />
                 )}
                 <div>
-                  <div className="text-xs font-bold">{isExporting ? 'Exporting...' : 'Export Backup'}</div>
-                  <div className="text-[10px] text-slate-400">Save full JSON file</div>
+                  <div className="text-xs font-bold">{isExporting ? 'Exporting...' : 'Export File'}</div>
+                  <div className="text-[10px] text-slate-400">Share or save .json file</div>
                 </div>
               </button>
 
-              {/* Import Restore */}
+              {/* Restore File */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -1299,8 +1382,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
                 )}
                 <div>
-                  <div className="text-xs font-bold">{isImporting ? 'Restoring...' : 'Restore Backup'}</div>
-                  <div className="text-[10px] text-slate-400">Upload .json backup</div>
+                  <div className="text-xs font-bold">{isImporting ? 'Restoring...' : 'Restore File'}</div>
+                  <div className="text-[10px] text-slate-400">Pick .json from device</div>
                 </div>
               </button>
               <input
@@ -1311,6 +1394,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onChange={handleImportFileSelected}
               />
             </div>
+
+            {/* Instant Clipboard Migration Option */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={handleCopyBackupToClipboard}
+                disabled={isExporting}
+                className="p-2.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-xl border border-slate-700/80 text-left transition flex items-center space-x-2 cursor-pointer"
+              >
+                <Clipboard className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <div>
+                  <div className="text-[11px] font-bold">Copy to Clipboard</div>
+                  <div className="text-[9px] text-slate-400">Copy backup JSON text</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRestoreFromClipboard}
+                disabled={isImporting}
+                className="p-2.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-xl border border-slate-700/80 text-left transition flex items-center space-x-2 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-[11px] font-bold">Paste from Clipboard</div>
+                  <div className="text-[9px] text-slate-400">Restore copied data</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Manual JSON Paste Box */}
+            {showManualPaste && (
+              <div className="p-3 bg-slate-900 border border-emerald-500/40 rounded-xl space-y-2">
+                <label className="text-xs font-semibold text-emerald-300 block">
+                  Paste Backup JSON Text Below:
+                </label>
+                <textarea
+                  value={manualPasteText}
+                  onChange={(e) => setManualPasteText(e.target.value)}
+                  placeholder='Paste your backup JSON starting with {"version": ...}'
+                  rows={4}
+                  className="w-full p-2 text-[11px] bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <div className="flex justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowManualPaste(false); setManualPasteText(''); }}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteManualPaste}
+                    disabled={!manualPasteText.trim() || isImporting}
+                    className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg"
+                  >
+                    {isImporting ? 'Restoring...' : 'Restore Data'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Backup Status Alert */}
             {backupStatus && (
@@ -1326,7 +1471,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Location Guidance */}
             <p className="text-[11px] text-slate-400 leading-relaxed px-1">
-              💡 <span className="font-semibold text-slate-300">Where are backups stored?</span> On Android, backups are saved to your device's <strong className="text-cyan-300">Downloads</strong> folder (or whichever location you choose in the Share dialog). When tapping <em>Restore Backup</em>, simply pick the file from <strong>Downloads</strong> or <strong>Recent</strong>.
+              💡 <span className="font-semibold text-slate-300">Tip:</span> You can either save/share a file, or tap <strong className="text-cyan-300">Copy to Clipboard</strong> on the old app and <strong className="text-emerald-300">Paste from Clipboard</strong> on the new app for instant, zero-hassle migration without files!
             </p>
 
             {/* Clear All App Data Trigger */}

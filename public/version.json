@@ -1,5 +1,5 @@
 {
-  "version": "1.8.38",
+  "version": "1.8.39",
   "releaseDate": "2026-10-02",
-  "notes": "Added Web Share API and File System Access picker with clear Downloads folder location guidance for backup export and restore."
+  "notes": "Added one-tap clipboard backup copy and paste migration plus text/plain Web Share file support for seamless PWA to APK transitions."
 }

@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { exportAllDataAsJson } from './storageService';
+import { exportAllDataAsJson, importBackupJson } from './storageService';
 import { getLocalDateString } from '../utils/dateUtils';
 
 export interface ExportResult {
@@ -23,12 +23,14 @@ export interface ExportResult {
  *    - Allows the user to select "Save to Files / Downloads" or "Save to Google Drive"
  * 
  * 2. On Mobile Web / PWA (e.g. Chrome on Android):
- *    - If Web Share API (navigator.share with files) is supported, triggers the native share sheet
- *    - If window.showSaveFilePicker is supported (desktop Chromium), opens a "Save As..." dialog
+ *    - Uses Web Share API with text/plain File type (which Chrome Android reliably accepts)
+ *    - Triggers Android's native system share sheet
  * 
- * 3. Fallback:
- *    - Downloads the file directly to the device's Downloads folder
- *    - Informs the user exactly where the file was saved and how to pick it during restore
+ * 3. File System Access API (Desktop Chrome / Edge):
+ *    - Opens native "Save As..." dialog allowing user to pick exact folder
+ * 
+ * 4. Fallback:
+ *    - Standard browser download with clear location guidance
  */
 export async function exportBackupFile(): Promise<ExportResult> {
   const jsonStr = await exportAllDataAsJson();
@@ -71,6 +73,7 @@ export async function exportBackupFile(): Promise<ExportResult> {
   }
 
   // 2. Web Share API with Files (Mobile Chrome, Android PWA, Safari iOS)
+  // Note: Chrome on Android rejects 'application/json' in canShare(), but fully accepts 'text/plain'
   if (
     typeof navigator !== 'undefined' &&
     typeof navigator.share === 'function' &&
@@ -79,7 +82,8 @@ export async function exportBackupFile(): Promise<ExportResult> {
   ) {
     try {
       const blob = new Blob([jsonStr], { type: 'application/json' });
-      const file = new File([blob], filename, { type: 'application/json' });
+      // Use text/plain for the File object so Chrome on Android allows sharing
+      const file = new File([blob], filename, { type: 'text/plain' });
       if ((navigator as any).canShare({ files: [file] })) {
         await navigator.share({
           title: 'NutriFit AI Backup',
@@ -162,4 +166,62 @@ export async function exportBackupFile(): Promise<ExportResult> {
     console.error('[BackupService] Web download failed:', webErr);
     throw new Error(webErr?.message || 'Failed to trigger file download.');
   }
+}
+
+/**
+ * Copies the raw backup JSON to the clipboard for zero-friction copy/paste migration.
+ */
+export async function copyBackupToClipboard(): Promise<{ success: boolean; message: string }> {
+  const jsonStr = await exportAllDataAsJson();
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(jsonStr);
+    return {
+      success: true,
+      message: 'Backup JSON copied to clipboard! In your APK, tap "Paste from Clipboard" to restore.'
+    };
+  }
+
+  // Fallback for older environments
+  if (typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea');
+    textarea.value = jsonStr;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return {
+      success: true,
+      message: 'Backup JSON copied to clipboard! In your APK, tap "Paste from Clipboard" to restore.'
+    };
+  }
+
+  throw new Error('Clipboard copy not supported in this browser.');
+}
+
+/**
+ * Reads backup JSON from the clipboard and imports it.
+ */
+export async function restoreBackupFromClipboard(): Promise<{ success: boolean; message: string; requiresManualPaste?: boolean }> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim().startsWith('{')) {
+        const res = await importBackupJson(text);
+        return {
+          success: true,
+          message: res.message
+        };
+      }
+    }
+  } catch (err: any) {
+    console.warn('[BackupService] Clipboard readText failed:', err);
+  }
+
+  return {
+    success: false,
+    message: 'Could not automatically read clipboard. Please paste the JSON manually.',
+    requiresManualPaste: true
+  };
 }
