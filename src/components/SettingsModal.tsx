@@ -65,14 +65,11 @@ import { checkForRemoteUpdate, applyAndroidOTAUpdate, RemoteVersionInfo } from '
 interface SettingsModalProps {
   isOpen: boolean;
   settings: AppSettings;
-  isConnectingGoogleFit?: boolean;
   isConnectingHealthConnect?: boolean;
   isNativeAndroid?: boolean;
   onSaveSettings: (settings: AppSettings, explicitKeyUpdate?: boolean) => void;
   onClose: () => void;
   onOpenDocumentation?: (section?: string) => void;
-  onConnectGoogleFit?: () => void;
-  onDisconnectGoogleFit?: () => void;
   onConnectHealthConnect?: () => void;
   onDisconnectHealthConnect?: () => void;
   onOpenHealthConnectSettings?: () => void;
@@ -82,14 +79,11 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   settings,
-  isConnectingGoogleFit = false,
   isConnectingHealthConnect = false,
   isNativeAndroid = false,
   onSaveSettings,
   onClose,
   onOpenDocumentation,
-  onConnectGoogleFit,
-  onDisconnectGoogleFit,
   onConnectHealthConnect,
   onDisconnectHealthConnect,
   onOpenHealthConnectSettings,
@@ -741,7 +735,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Standalone calculation using your body profile. The app automatically computes your full 24-hour burn from base metabolism (BMR: {currentBMR.toLocaleString()} kcal) + baseline daily movement (NEAT) + food thermics (TEF) + any workouts logged in the app. No external tracker required.
                 </p>
 
-                {(settings.googleFitConnected || settings.healthConnectConnected) && isConfig1 && (
+                {(settings.healthConnectConnected) && isConfig1 && (
                   <div className="mt-2.5 ml-6.5 p-2 bg-amber-950/40 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
                     <span>Tracker is connected, but Standalone mode is selected. Tracker data will not be added to your daily burn.</span>
                     <button
@@ -758,7 +752,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
               </div>
 
-              {/* Configuration 2: Fitness Tracker (Health Connect on Android, Google Fit on Web/iOS) */}
+              {/* Configuration 2: Fitness Tracker (Health Connect) */}
               <div
                 onClick={() => {
                   setFormData(prev => ({ ...prev, burnTrackingMode: 'tracker' }));
@@ -785,9 +779,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         ? 'text-cyan-400'
                         : 'text-slate-300'
                     }`}>
-                      {isNativeAndroid
-                        ? 'Configuration 2 — Android Health Connect'
-                        : 'Configuration 2 — Google Fit Tracker'}
+                      Configuration 2 — Fitness Tracker (Health Connect)
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -797,23 +789,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                     )}
                     <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                      settings.healthConnectConnected || settings.googleFitConnected
+                      settings.healthConnectConnected
                         ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
                         : 'bg-slate-800 text-slate-400 border-slate-700'
                     }`}>
                       {settings.healthConnectConnected
                         ? '✓ Health Connect'
-                        : settings.googleFitConnected
-                        ? '✓ Google Fit'
                         : 'Not Connected'}
                     </span>
                   </div>
                 </div>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed pl-6.5">
-                  {isNativeAndroid
-                    ? 'Syncs burned calories, steps, and workouts directly from Android Health Connect (Samsung Health, Google Pixel, Withings, Garmin, or Wear OS).'
-                    : 'Live auto-sync directly from Google Fit, Wear OS, Pixel Watch, or Galaxy Watch. Google Fit tracks both resting calories and daily activity together in its daily burned total.'}
+                  Syncs burned calories, steps, and workouts directly on-device from Health Connect (compatible with Google Fit, Samsung Health, Pixel Watch, Galaxy Watch, Garmin, Withings, and Wear OS). Fast, private, and local with zero cloud delays.
                 </p>
 
                 {/* Android Native Health Connect Controls */}
@@ -881,68 +869,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )}
 
-                {/* Google Fit Controls (Always on web/iOS, or secondary on Android) */}
-                {(!isNativeAndroid || !settings.healthConnectConnected) && (
-                  <div className="pl-6.5 space-y-2.5">
-                    {settings.googleFitConnected ? (
-                      <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
-                        <div>
-                          <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
-                            <Activity className="w-3.5 h-3.5" />
-                            <span>Google Fit Active</span>
-                          </div>
-                          <span className="text-[11px] text-slate-400">
-                            {settings.googleFitLastSync 
-                              ? `Last synced: ${new Date(settings.googleFitLastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                              : 'Syncs automatically on app open'}
-                          </span>
-                        </div>
-                        {onDisconnectGoogleFit && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDisconnectGoogleFit();
-                              setFormData(prev => ({ ...prev, burnTrackingMode: 'standalone', includeRestingCalories: true }));
-                            }}
-                            className="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-950/30 transition font-medium"
-                          >
-                            Disconnect
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        {onConnectGoogleFit && !isNativeAndroid && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onConnectGoogleFit();
-                            }}
-                            disabled={isConnectingGoogleFit}
-                            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md shadow-emerald-900/20 disabled:opacity-50"
-                          >
-                            <Activity className="w-4 h-4" />
-                            <span>{isConnectingGoogleFit ? 'Connecting to Google...' : 'Connect with Google Fit'}</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
+                {/* Non-Android Information */}
+                {!isNativeAndroid && (
+                  <div className="pl-6.5">
+                    <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400">
+                      <p>Health Connect auto-sync is powered by Android on-device sensors. Install the NutriFit AI Android app to automatically sync with Google Fit, Pixel Watch, Galaxy Watch, or Samsung Health.</p>
+                    </div>
+                  </div>
+                )}
 
-                    {onOpenDocumentation && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenDocumentation('google-fit');
-                        }}
-                        className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition pt-1"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        <span>How fitness tracker sync works &amp; tips &rarr;</span>
-                      </button>
-                    )}
+                {onOpenDocumentation && (
+                  <div className="pl-6.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDocumentation('fitness-tracker');
+                      }}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-semibold transition"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>How fitness tracker sync works &amp; tips &rarr;</span>
+                    </button>
                   </div>
                 )}
               </div>

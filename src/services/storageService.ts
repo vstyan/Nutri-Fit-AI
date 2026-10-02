@@ -585,7 +585,6 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     const isSensorSource = isTrackerMode ||
       parsed.source === 'google_fit' ||
       parsed.source === 'health_connect' ||
-      settings.googleFitConnected ||
       settings.healthConnectConnected;
 
     const tef = Number(parsed.tefCalories) || 0;
@@ -596,7 +595,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
     let source: 'manual' | 'google_fit' | 'health_connect';
 
     if (isSensorSource) {
-      source = parsed.source || (settings.healthConnectConnected ? 'health_connect' : (settings.googleFitConnected ? 'google_fit' : 'health_connect'));
+      source = parsed.source || 'health_connect';
       // In tracker mode: sensors/wearables account for daily movement (NEAT is 0 to prevent double counting).
       // Base BMR is preserved from sensorRestingCalories or parsed.baseBmrCalories if available, otherwise 0.
       neat = 0;
@@ -657,7 +656,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
       tefCalories: 0,
       totalCaloriesBurned: 0,
       workouts: [],
-      source: settings.healthConnectConnected ? 'health_connect' : (settings.googleFitConnected ? 'google_fit' : 'health_connect'),
+      source: 'health_connect',
       lastUpdated: new Date().toISOString()
     };
   }

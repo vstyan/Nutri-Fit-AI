@@ -46,7 +46,6 @@ import {
 } from './services/storageService';
 import { calculateBMR, calculateDailyTEF, calculateTDEE, getEffectiveTrackingMode } from './utils/calorieEngine';
 import { getLocalDateString, addDaysToDateString, getPastNDaysDateStrings } from './utils/dateUtils';
-import { requestGoogleFitAccessToken, fetchGoogleFitCalories, GoogleFitCaloriesResult } from './services/googleFitService';
 import { 
   isNativeAndroid, 
   requestHealthConnectPermissions, 
@@ -71,10 +70,6 @@ export function App() {
   const [favoriteMeals, setFavoriteMeals] = useState<MealRecord[]>([]);
   const [yesterdayMeals, setYesterdayMeals] = useState<MealRecord[]>([]);
 
-  // Google Fit state
-  const [isConnectingGoogleFit, setIsConnectingGoogleFit] = useState(false);
-  const [isSyncingGoogleFit, setIsSyncingGoogleFit] = useState(false);
-
   // Health Connect state (Android APK)
   const isAndroidApp = isNativeAndroid();
   const [isConnectingHealthConnect, setIsConnectingHealthConnect] = useState(false);
@@ -86,7 +81,6 @@ export function App() {
     settingsRef.current = settings;
   }, [settings]);
 
-  const isSyncingGoogleFitRef = useRef(false);
   const isSyncingHealthConnectRef = useRef(false);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -173,212 +167,9 @@ export function App() {
       }
       if (loaded.healthConnectConnected) {
         handleSyncHealthConnect(selectedDate, loaded, false);
-      } else if (loaded.googleFitConnected) {
-        handleSyncGoogleFit(selectedDate, loaded, false, true);
       }
     });
   }, []);
-
-  // Google Fit Connect Handler
-  const handleConnectGoogleFit = async () => {
-    setIsConnectingGoogleFit(true);
-    try {
-      const { accessToken, expiresIn, email } = await requestGoogleFitAccessToken(
-        settings.googleClientId,
-        settings.googleFitUserEmail
-      );
-      const now = Date.now();
-      const updatedSettings: AppSettings = {
-        ...settings,
-        burnTrackingMode: 'tracker',
-        includeRestingCalories: false,
-        googleFitConnected: true,
-        healthSyncProvider: 'google_fit',
-        googleFitAccessToken: accessToken,
-        googleFitTokenExpiry: now + (expiresIn * 1000),
-        googleFitLastSync: new Date().toISOString(),
-        googleFitUserEmail: email || settings.googleFitUserEmail
-      };
-      await saveAppSettings(updatedSettings);
-      setSettings(updatedSettings);
-
-      // Immediately sync calories from Google Fit for selected date
-      await handleSyncGoogleFit(selectedDate, updatedSettings, true, true);
-    } catch (err: any) {
-      console.error('Google Fit connection failed:', err);
-      alert(err.message || 'Failed to connect Google Fit. Please allow the popup and try again.');
-    } finally {
-      setIsConnectingGoogleFit(false);
-    }
-  };
-
-  // Google Fit Disconnect Handler
-  const handleDisconnectGoogleFit = async () => {
-    const updatedSettings: AppSettings = {
-      ...settings,
-      burnTrackingMode: 'standalone',
-      includeRestingCalories: true,
-      googleFitConnected: false,
-      googleFitAccessToken: undefined,
-      googleFitTokenExpiry: undefined,
-      googleFitLastSync: undefined,
-      googleFitUserEmail: undefined,
-      healthSyncProvider: 'manual'
-    };
-    await saveAppSettings(updatedSettings);
-    setSettings(updatedSettings);
-  };
-
-  // Google Fit Sync Calories for a Date (Supports automatic launch & active state re-auth)
-  const handleSyncGoogleFit = useCallback(async (
-    date: string = selectedDate, 
-    currentSettings?: AppSettings,
-    isManual: boolean = false,
-    allowInteractiveRefresh: boolean = true
-  ) => {
-    let activeSettings = currentSettings || settingsRef.current;
-    if (!activeSettings.googleFitConnected) {
-      if (isManual) {
-        alert('Google Fit is not connected. Please click Connect Google Fit first.');
-      }
-      return;
-    }
-
-    if (isSyncingGoogleFitRef.current) return;
-    isSyncingGoogleFitRef.current = true;
-    setIsSyncingGoogleFit(true);
-    try {
-      if (!navigator.onLine) {
-        if (isManual) {
-          showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
-        }
-        return;
-      }
-
-      let activeToken = activeSettings.googleFitAccessToken;
-      const isExpired = !activeToken || (activeSettings.googleFitTokenExpiry && Date.now() >= (activeSettings.googleFitTokenExpiry - 60000));
-
-      // If token is missing or expired, automatically renew using saved user hint
-      if (isExpired && (isManual || allowInteractiveRefresh)) {
-        try {
-          const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-            activeSettings.googleClientId,
-            activeSettings.googleFitUserEmail
-          );
-          activeToken = newToken;
-          activeSettings = {
-            ...activeSettings,
-            googleFitAccessToken: newToken,
-            googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-            googleFitUserEmail: email || activeSettings.googleFitUserEmail
-          };
-          await saveAppSettings(activeSettings);
-          setSettings(activeSettings);
-        } catch (tokenErr) {
-          console.warn('Google Fit automatic renewal paused:', tokenErr);
-          if (isManual) {
-            if (!navigator.onLine) {
-              showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
-            } else {
-              showOfflineNotice('Google Fit authorization expired. Please connect Google Fit again.');
-            }
-          }
-          return;
-        }
-      }
-
-      if (!activeToken) return;
-
-      let fitResult: GoogleFitCaloriesResult;
-      const profileBmr = calculateBMR(activeSettings.profile);
-      try {
-        fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
-      } catch (fetchErr: any) {
-        if (fetchErr.message === 'UNAUTHORIZED' && (isManual || allowInteractiveRefresh)) {
-          // Token expired mid-call; refresh token using saved user hint
-          const { accessToken: newToken, expiresIn, email } = await requestGoogleFitAccessToken(
-            activeSettings.googleClientId,
-            activeSettings.googleFitUserEmail
-          );
-          activeToken = newToken;
-          activeSettings = {
-            ...activeSettings,
-            googleFitAccessToken: newToken,
-            googleFitTokenExpiry: Date.now() + (expiresIn * 1000),
-            googleFitUserEmail: email || activeSettings.googleFitUserEmail
-          };
-          await saveAppSettings(activeSettings);
-          setSettings(activeSettings);
-          fitResult = await fetchGoogleFitCalories(date, activeToken, profileBmr);
-        } else {
-          throw fetchErr;
-        }
-      }
-
-      if (fitResult) {
-        const includeResting = activeSettings.includeRestingCalories !== false;
-        const baseBmr = includeResting ? profileBmr : 0;
-        const currentMeals = await getMealsForDate(date, activeSettings);
-        const tef = calculateDailyTEF(currentMeals);
-        const fitTotal = fitResult.totalCalories;
-
-        const currentActivity = await getActivityForDate(date, activeSettings);
-        const existingWorkouts = Array.isArray(currentActivity?.workouts) ? currentActivity.workouts : [];
-        const detectedWorkouts = Array.isArray(fitResult.detectedWorkouts) ? fitResult.detectedWorkouts : [];
-
-        // Preserve non-Google Fit manual workouts entered by user
-        const manualWorkouts = existingWorkouts.filter(w => !w.id.startsWith('gfit-'));
-
-        // Deduplicate detected workouts against user's manual workouts (e.g. within 45 min)
-        const nonDuplicateDetected = detectedWorkouts.filter(dw => {
-          const dwTime = new Date(dw.timestamp).getTime();
-          return !manualWorkouts.some(mw => {
-            const mwTime = new Date(mw.timestamp).getTime();
-            return !isNaN(mwTime) && !isNaN(dwTime) && Math.abs(mwTime - dwTime) < 45 * 60 * 1000;
-          });
-        });
-
-        const mergedWorkouts = [...manualWorkouts, ...nonDuplicateDetected];
-
-        const updatedActivity: DailyActivity = {
-          date,
-          activeCaloriesBurned: fitTotal,
-          baseBmrCalories: baseBmr,
-          neatCalories: 0, // Google Fit already accounts for NEAT; 0 added to prevent double counting
-          tefCalories: tef,
-          totalCaloriesBurned: fitTotal + tef,
-          workouts: mergedWorkouts,
-          source: 'google_fit',
-          lastSyncedAt: fitResult.lastSyncedAt,
-          lastUpdated: new Date().toISOString(),
-          sensorActiveCalories: fitResult.totalCalories,
-          sensorRestingCalories: baseBmr
-        };
-
-        await saveActivityForDate(updatedActivity, activeSettings);
-        setActivity(updatedActivity);
-
-        const updatedSettings: AppSettings = {
-          ...activeSettings,
-          googleFitLastSync: fitResult.lastSyncedAt
-        };
-        await saveAppSettings(updatedSettings);
-        setSettings(updatedSettings);
-      }
-    } catch (err: any) {
-      console.warn('Google Fit sync notice:', err);
-      if (isManual) {
-        if (!navigator.onLine) {
-          showOfflineNotice('You appear to be offline. Displaying your last synced Google Fit data until your connection returns.');
-        } else {
-          showOfflineNotice('Unable to reach Google Fit right now. Displaying your last synced data until your connection returns.');
-        }
-      }
-    } finally {
-      isSyncingGoogleFitRef.current = false;
-      setIsSyncingGoogleFit(false);
-    }
-  }, [selectedDate, showOfflineNotice]);
 
   // Health Connect Connect Handler (Native Android APK)
   const handleConnectHealthConnect = async () => {
@@ -393,8 +184,7 @@ export function App() {
           includeRestingCalories: true,
           healthConnectConnected: true,
           healthSyncProvider: 'health_connect',
-          healthConnectLastSync: now,
-          googleFitConnected: false // Avoid conflicting background syncs
+          healthConnectLastSync: now
         };
         await saveAppSettings(updatedSettings);
         setSettings(updatedSettings);
@@ -528,13 +318,9 @@ export function App() {
         }
 
         // Avoid hammering background sync on transient view changes: require at least 5 minutes since last sync
-        const lastHealthSync = settingsRef.current.healthConnectLastSync
+        const lastSync = settingsRef.current.healthConnectLastSync
           ? new Date(settingsRef.current.healthConnectLastSync).getTime()
           : 0;
-        const lastFitSync = settingsRef.current.googleFitLastSync
-          ? new Date(settingsRef.current.googleFitLastSync).getTime()
-          : 0;
-        const lastSync = Math.max(lastHealthSync, lastFitSync);
 
         if (Date.now() - lastSync < 5 * 60 * 1000) {
           return;
@@ -542,8 +328,6 @@ export function App() {
 
         if (settingsRef.current.healthConnectConnected) {
           handleSyncHealthConnect(targetDate, settingsRef.current, false);
-        } else if (settingsRef.current.googleFitConnected) {
-          handleSyncGoogleFit(targetDate, settingsRef.current, false, true);
         }
       }
     };
@@ -562,7 +346,7 @@ export function App() {
       window.removeEventListener('pageshow', handleActiveState);
       window.removeEventListener('online', handleOnline);
     };
-  }, [selectedDate, handleSyncGoogleFit, handleSyncHealthConnect]);
+  }, [selectedDate, handleSyncHealthConnect]);
 
   // Periodic background sync every 5 minutes while app is open and visible
   useEffect(() => {
@@ -577,24 +361,19 @@ export function App() {
 
         if (settingsRef.current.healthConnectConnected) {
           handleSyncHealthConnect(selectedDate, settingsRef.current, false);
-        } else if (settingsRef.current.googleFitConnected) {
-          // Run silent check (only if token is currently active)
-          handleSyncGoogleFit(selectedDate, settingsRef.current, false, false);
         }
       }
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedDate, handleSyncGoogleFit, handleSyncHealthConnect]);
+  }, [selectedDate, handleSyncHealthConnect]);
 
-  // Auto-sync Health Connect or Google Fit when date changes if connected
+  // Auto-sync Health Connect when date changes if connected
   useEffect(() => {
     if (settings.healthConnectConnected) {
       handleSyncHealthConnect(selectedDate, settingsRef.current, false);
-    } else if (settings.googleFitConnected) {
-      handleSyncGoogleFit(selectedDate, settingsRef.current, false, true);
     }
-  }, [selectedDate, settings.healthConnectConnected, settings.googleFitConnected]);
+  }, [selectedDate, settings.healthConnectConnected, handleSyncHealthConnect]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
@@ -617,7 +396,7 @@ export function App() {
     const isTracker = trackingMode === 'tracker';
     const includeResting = currentSettings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(currentSettings.profile);
-    const isFit = dayActivity.source === 'google_fit' || !!currentSettings.googleFitConnected;
+    const isFit = dayActivity.source === 'google_fit';
     const isHC = dayActivity.source === 'health_connect' || !!currentSettings.healthConnectConnected;
     const isSensor = isTracker || isFit || isHC;
 
@@ -633,7 +412,6 @@ export function App() {
       meals: dayMeals,
       source: dayActivity.source,
       trackingMode,
-      isGoogleFitConnected: currentSettings.googleFitConnected,
       isHealthConnectConnected: currentSettings.healthConnectConnected,
       includeResting
     });
@@ -687,7 +465,6 @@ export function App() {
         activeCalories: act.activeCaloriesBurned || 0,
         meals: mList,
         source: act.source,
-        isGoogleFitConnected: currentSettings.googleFitConnected && dStr === date,
         isHealthConnectConnected: currentSettings.healthConnectConnected && dStr === date,
         includeResting
       });
@@ -815,7 +592,6 @@ export function App() {
       activeCalories: activeKcal,
       meals,
       source: activity.source,
-      isGoogleFitConnected: settings.googleFitConnected,
       isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
@@ -848,7 +624,6 @@ export function App() {
       activeCalories: newActiveKcal,
       meals,
       source: activity.source,
-      isGoogleFitConnected: settings.googleFitConnected,
       isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
@@ -886,7 +661,6 @@ export function App() {
       activeCalories: newActiveKcal,
       meals,
       source: activity.source,
-      isGoogleFitConnected: settings.googleFitConnected,
       isHealthConnectConnected: settings.healthConnectConnected,
       includeResting
     });
@@ -925,7 +699,6 @@ export function App() {
       meals,
       source: activity.source,
       trackingMode: newTrackingMode,
-      isGoogleFitConnected: newSettings.googleFitConnected,
       isHealthConnectConnected: newSettings.healthConnectConnected,
       includeResting
     });
@@ -1001,7 +774,6 @@ export function App() {
     activeCalories: activity.activeCaloriesBurned || 0,
     meals,
     source: activity.source,
-    isGoogleFitConnected: settings.googleFitConnected,
     isHealthConnectConnected: settings.healthConnectConnected,
     includeResting
   });
@@ -1075,7 +847,6 @@ export function App() {
           lipidHistory={lipidHistory}
           favoriteMeals={favoriteMeals}
           yesterdayMeals={yesterdayMeals}
-          isSyncingGoogleFit={isSyncingGoogleFit}
           isSyncingHealthConnect={isSyncingHealthConnect}
           isNativeAndroid={isAndroidApp}
           onOpenCapture={() => setIsCaptureOpen(true)}
@@ -1091,8 +862,6 @@ export function App() {
           onDeleteLipidRecord={handleDeleteLipidRecord}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenDocumentation={handleOpenDocumentation}
-          onConnectGoogleFit={handleConnectGoogleFit}
-          onSyncGoogleFit={() => handleSyncGoogleFit(selectedDate, settings, true)}
           onConnectHealthConnect={handleConnectHealthConnect}
           onSyncHealthConnect={() => handleSyncHealthConnect(selectedDate, settings, true)}
         />
@@ -1129,14 +898,11 @@ export function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         settings={settings}
-        isConnectingGoogleFit={isConnectingGoogleFit}
         isConnectingHealthConnect={isConnectingHealthConnect}
         isNativeAndroid={isAndroidApp}
         onSaveSettings={handleSaveSettings}
         onClose={() => setIsSettingsOpen(false)}
         onOpenDocumentation={handleOpenDocumentation}
-        onConnectGoogleFit={handleConnectGoogleFit}
-        onDisconnectGoogleFit={handleDisconnectGoogleFit}
         onConnectHealthConnect={handleConnectHealthConnect}
         onDisconnectHealthConnect={handleDisconnectHealthConnect}
         onOpenHealthConnectSettings={openHealthConnectSettings}

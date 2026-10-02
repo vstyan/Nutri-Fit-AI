@@ -39,11 +39,12 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
   onClose,
   initialSection = 'gemini-key'
 }) => {
-  const [activeSection, setActiveSection] = useState<string>(initialSection);
+  const normalizeSection = (sec: string) => (sec === 'google-fit' ? 'fitness-tracker' : sec);
+  const [activeSection, setActiveSection] = useState<string>(() => normalizeSection(initialSection));
 
   useEffect(() => {
     if (isOpen && initialSection) {
-      setActiveSection(initialSection);
+      setActiveSection(normalizeSection(initialSection));
     }
   }, [isOpen, initialSection]);
 
@@ -214,33 +215,32 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
       )
     },
     {
-      id: 'google-fit',
-      title: 'Google Fit & Wearable Sync',
+      id: 'fitness-tracker',
+      title: 'Health Connect & Wearables',
       icon: Activity,
-      badge: 'Fitness Tracker',
+      badge: 'Zero Cloud Delay',
       badgeColor: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
       content: (
         <div className="space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
           <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 space-y-2.5">
             <div className="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
               <Lightbulb className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>Pro Tip: Instant Syncing from Phone or Watch</span>
+              <span>Instant On-Device Sync (No Cloud Lag)</span>
             </div>
             <p className="text-slate-300">
-              NutriFit queries the <strong>Google Fit Cloud REST API</strong>, not your smartwatch or phone sensors directly over Bluetooth.
+              NutriFit queries the <strong>Android Health Connect on-device repository</strong> directly on your phone instead of querying delayed cloud servers.
             </p>
             <p className="text-slate-300">
-              Phones and smartwatches (Wear OS, Pixel Watch, Samsung Galaxy Watch) batch and upload sensor data periodically to conserve battery.
-              If you just finished a workout or walk and want to see the latest calories right away:
+              Whether you use <strong>Google Fit, Samsung Health, Pixel Watch, Galaxy Watch, Garmin, Withings, or Wear OS</strong>, your companion apps write continuous sensor data directly to Health Connect.
             </p>
             <div className="bg-slate-900/90 border border-emerald-500/20 rounded-xl p-3 space-y-1.5 font-medium text-emerald-200">
               <div className="flex items-center space-x-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                <span>Open the <strong>Google Fit app</strong> on your phone for a couple of seconds (this forces your phone to upload its latest steps to Google Cloud).</span>
+                <span>Ensure your smartwatch or fitness band has synced to its companion app (e.g. Google Fit, Samsung Health, or Garmin Connect).</span>
               </div>
               <div className="flex items-center space-x-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">2</span>
-                <span>Return to NutriFit AI and tap <strong>Sync Google Fit</strong>. Your updated burn will load immediately!</span>
+                <span>Open NutriFit AI or tap <strong>Sync Health Connect</strong>. Your updated active calories, basal burn, and workouts appear immediately!</span>
               </div>
             </div>
           </div>
@@ -256,7 +256,7 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
             <ul className="list-disc list-inside space-y-1 text-slate-300 text-xs pl-1">
               <li><strong>App Focus / Unlock:</strong> Every time you switch back to NutriFit or unlock your phone, the app automatically syncs.</li>
               <li><strong>5-Minute Periodic Check:</strong> While you keep the app open, it automatically checks for new calorie data every 5 minutes.</li>
-              <li><strong>Date Switching:</strong> Navigating to any past day will automatically sync that day&apos;s Google Fit history.</li>
+              <li><strong>Date Switching:</strong> Navigating to any past day will automatically sync that day&apos;s Health Connect activity and workouts.</li>
             </ul>
           </div>
 
@@ -266,13 +266,13 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
               NEAT Double-Counting Protection Explained
             </h4>
             <p>
-              In <strong>Configuration 2 (Google Fit Tracker)</strong>, Google Fit continuously captures all movement sensors (steps, baseline pacing, walking, and everyday movement), which directly measures your <em>Non-Exercise Activity Thermogenesis (NEAT)</em>.
+              In <strong>Configuration 2 (Fitness Tracker)</strong>, Health Connect continuously captures all movement sensors (steps, baseline pacing, walking, and everyday movement), which directly measures your <em>Non-Exercise Activity Thermogenesis (NEAT)</em>.
             </p>
             <p>
-              To guarantee scientific accuracy, NutriFit AI detects your active Google Fit tracker connection and <strong>automatically zeros out the static manual NEAT baseline allowance</strong>. This ensures your daily steps and movement are never counted twice (once by Google Fit sensors and once by an estimated static multiplier).
+              To guarantee scientific accuracy, NutriFit AI detects your active Health Connect tracker connection and <strong>automatically zeros out the static manual NEAT baseline allowance</strong>. This ensures your daily steps and movement are never counted twice (once by wearable sensors and once by an estimated static multiplier).
             </p>
             <p>
-              The engine then dynamically calculates and layers the <strong>Thermic Effect of Food (TEF)</strong> from each meal you log directly onto your Google Fit burn, producing a comprehensive, 100% accurate Total Daily Energy Expenditure (TDEE).
+              The engine then dynamically calculates and layers the <strong>Thermic Effect of Food (TEF)</strong> from each meal you log directly onto your tracked burn, producing a comprehensive, 100% accurate Total Daily Energy Expenditure (TDEE).
             </p>
           </div>
         </div>

@@ -377,8 +377,8 @@ export function buildDailyCoachPayload(
     description: w.description
   }));
 
-  const activeBurnSource = summary.activity.source || (settings.googleFitConnected ? 'google_fit' : 'manual');
-  const isTrackerMode = activeBurnSource === 'google_fit' || settings.includeRestingCalories === false;
+  const activeBurnSource = summary.activity.source || (settings.healthConnectConnected ? 'health_connect' : 'manual');
+  const isTrackerMode = activeBurnSource === 'health_connect' || activeBurnSource === 'google_fit' || settings.burnTrackingMode === 'tracker' || settings.includeRestingCalories === false;
   const rawActiveField = summary.activity.activeCaloriesBurned || 0;
 
   let dedicatedWorkoutCalories = 0;
