@@ -1,5 +1,5 @@
 {
-  "version": "1.8.43",
+  "version": "1.8.44",
   "releaseDate": "2026-10-02",
-  "notes": "Ensured AI Coach strictly isolates true active calories from resting BMR, preventing cumulative day burn from being cited as exercise or workouts."
+  "notes": "Removed floating save toast notification from settings; button inline feedback retained."
 }
