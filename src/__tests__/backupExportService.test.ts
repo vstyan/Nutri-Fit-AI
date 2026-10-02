@@ -46,7 +46,7 @@ describe('backupExportService', () => {
 
     expect(result.success).toBe(true);
     expect(result.canceled).toBeUndefined();
-    expect(result.message).toContain('Choose "Save to device" or Google Drive');
+    expect(result.message).toContain('Choose where to save your file');
     expect(Filesystem.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         data: '{"test":"data"}',
@@ -56,7 +56,7 @@ describe('backupExportService', () => {
     expect(Share.share).toHaveBeenCalledWith(
       expect.objectContaining({
         files: ['file:///cache/nutrifit-backup.json'],
-        dialogTitle: 'Save or Share Backup'
+        dialogTitle: 'Select Where to Save Backup'
       })
     );
   });
@@ -70,7 +70,7 @@ describe('backupExportService', () => {
 
     expect(result.success).toBe(true);
     expect(result.canceled).toBe(true);
-    expect(result.message).toBe('Export share dismissed.');
+    expect(result.message).toBe('Export canceled.');
   });
 
   it('supports Web Share API with files in mobile PWA', async () => {
@@ -92,10 +92,10 @@ describe('backupExportService', () => {
 
     expect(result.success).toBe(true);
     expect(shareSpy).toHaveBeenCalled();
-    expect(result.message).toContain('Choose "Save to device" or Google Drive');
+    expect(result.message).toContain('Choose where to save your file');
   });
 
-  it('falls back to browser download and guides user to Downloads folder', async () => {
+  it('falls back to browser download', async () => {
     vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
 
     const clickSpy = vi.fn();
@@ -129,6 +129,6 @@ describe('backupExportService', () => {
     expect(clickSpy).toHaveBeenCalled();
     expect(appendSpy).toHaveBeenCalledWith(mockAnchor);
     expect(removeSpy).toHaveBeenCalledWith(mockAnchor);
-    expect(result.message).toContain("Downloads folder");
+    expect(result.message).toContain('downloaded successfully');
   });
 });

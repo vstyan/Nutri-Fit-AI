@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { exportAllDataAsJson, importBackupJson } from './storageService';
+import { exportAllDataAsJson } from './storageService';
 import { getLocalDateString } from '../utils/dateUtils';
 
 export interface ExportResult {
@@ -9,34 +9,26 @@ export interface ExportResult {
   canceled?: boolean;
   filename: string;
   message?: string;
-  pathDescription?: string;
 }
 
 /**
  * Exports all local NutriFit data (settings, profile, meals, activities, weight, lipid logs)
  * to a standardized .json backup file.
  * 
- * Flow:
- * 1. On Native Android (APK):
- *    - Writes the JSON file to app cache via @capacitor/filesystem
- *    - Triggers Android's native system Share sheet via @capacitor/share
- *    - Allows the user to select "Save to Files / Downloads" or "Save to Google Drive"
+ * - On Native Android (APK):
+ *   Writes the file to app cache and triggers the native Android System Share / Save sheet,
+ *   allowing the user to select "Save to device" (pick any folder) or "Save to Google Drive".
  * 
- * 2. On Mobile Web / PWA (e.g. Chrome on Android):
- *    - Uses Web Share API with text/plain File type (which Chrome Android reliably accepts)
- *    - Triggers Android's native system share sheet
- * 
- * 3. File System Access API (Desktop Chrome / Edge):
- *    - Opens native "Save As..." dialog allowing user to pick exact folder
- * 
- * 4. Fallback:
- *    - Standard browser download with clear location guidance
+ * - On Web / PWA (Browser):
+ *   Uses File System Access API (showSaveFilePicker) or Web Share where available to let the
+ *   user pick where to save, falling back to standard browser download (which prompts if
+ *   "Ask where to save files" is enabled in browser settings).
  */
 export async function exportBackupFile(): Promise<ExportResult> {
   const jsonStr = await exportAllDataAsJson();
   const filename = `nutrifit-backup-${getLocalDateString()}.json`;
 
-  // 1. Native Capacitor Android / iOS
+  // 1. Native Capacitor Android / iOS (APK)
   if (Capacitor.isNativePlatform()) {
     try {
       const writeResult = await Filesystem.writeFile({
@@ -48,15 +40,15 @@ export async function exportBackupFile(): Promise<ExportResult> {
 
       await Share.share({
         title: 'NutriFit AI Backup',
-        text: `NutriFit AI backup exported on ${getLocalDateString()}`,
+        text: `NutriFit AI backup: ${filename}`,
         files: [writeResult.uri],
-        dialogTitle: 'Save or Share Backup'
+        dialogTitle: 'Select Where to Save Backup'
       });
 
       return {
         success: true,
         filename,
-        message: 'Backup exported! Choose "Save to device" or Google Drive to store it.'
+        message: 'Backup exported! Choose where to save your file.'
       };
     } catch (err: any) {
       const errStr = String(err?.message || err || '').toLowerCase();
@@ -65,58 +57,20 @@ export async function exportBackupFile(): Promise<ExportResult> {
           success: true,
           canceled: true,
           filename,
-          message: 'Export share dismissed.'
+          message: 'Export canceled.'
         };
       }
-      console.warn('[BackupService] Native file export failed, attempting web share/download fallback:', err);
+      console.warn('[BackupService] Native file export failed, falling back to web download:', err);
     }
   }
 
-  // 2. Web Share API with Files (Mobile Chrome, Android PWA, Safari iOS)
-  // Note: Chrome on Android rejects 'application/json' in canShare(), but fully accepts 'text/plain'
-  if (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof (navigator as any).canShare === 'function' &&
-    typeof File !== 'undefined'
-  ) {
-    try {
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      // Use text/plain for the File object so Chrome on Android allows sharing
-      const file = new File([blob], filename, { type: 'text/plain' });
-      if ((navigator as any).canShare({ files: [file] })) {
-        await navigator.share({
-          title: 'NutriFit AI Backup',
-          text: `NutriFit AI backup file: ${filename}`,
-          files: [file]
-        });
-        return {
-          success: true,
-          filename,
-          message: 'Backup exported! Choose "Save to device" or Google Drive to store it.'
-        };
-      }
-    } catch (shareErr: any) {
-      const errStr = String(shareErr?.message || shareErr || '').toLowerCase();
-      if (errStr.includes('cancel') || errStr.includes('abort') || errStr.includes('dismiss')) {
-        return {
-          success: true,
-          canceled: true,
-          filename,
-          message: 'Export share dismissed.'
-        };
-      }
-      console.warn('[BackupService] Web share failed, trying file picker or download:', shareErr);
-    }
-  }
-
-  // 3. File System Access API (Desktop Chrome / Edge "Save As..." dialog)
+  // 2. Desktop Chrome / Edge: Native "Save As..." folder picker
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
     try {
       const handle = await (window as any).showSaveFilePicker({
         suggestedName: filename,
         types: [{
-          description: 'NutriFit Backup JSON',
+          description: 'NutriFit JSON Backup',
           accept: { 'application/json': ['.json'] }
         }]
       });
@@ -126,7 +80,7 @@ export async function exportBackupFile(): Promise<ExportResult> {
       return {
         success: true,
         filename,
-        message: `Backup saved successfully as "${filename}" in your selected folder!`
+        message: `Saved backup as "${filename}" in your selected folder.`
       };
     } catch (pickerErr: any) {
       if (pickerErr?.name === 'AbortError') {
@@ -137,11 +91,47 @@ export async function exportBackupFile(): Promise<ExportResult> {
           message: 'Export canceled.'
         };
       }
-      console.warn('[BackupService] showSaveFilePicker failed, falling back to anchor download:', pickerErr);
+      console.warn('[BackupService] showSaveFilePicker failed, trying share/download:', pickerErr);
     }
   }
 
-  // 4. Standard Browser Download Fallback
+  // 3. Mobile Web / PWA: Android Share Sheet (Save to Drive / Files)
+  if (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function' &&
+    typeof (navigator as any).canShare === 'function' &&
+    typeof File !== 'undefined'
+  ) {
+    try {
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const file = new File([blob], filename, { type: 'text/plain' });
+      if ((navigator as any).canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'NutriFit AI Backup',
+          text: `NutriFit AI backup: ${filename}`,
+          files: [file]
+        });
+        return {
+          success: true,
+          filename,
+          message: 'Backup exported! Choose where to save your file.'
+        };
+      }
+    } catch (shareErr: any) {
+      const errStr = String(shareErr?.message || shareErr || '').toLowerCase();
+      if (errStr.includes('cancel') || errStr.includes('abort') || errStr.includes('dismiss')) {
+        return {
+          success: true,
+          canceled: true,
+          filename,
+          message: 'Export canceled.'
+        };
+      }
+      console.warn('[BackupService] Web share failed, falling back to download link:', shareErr);
+    }
+  }
+
+  // 4. Standard Browser Download (The original PWA behavior)
   try {
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -160,68 +150,10 @@ export async function exportBackupFile(): Promise<ExportResult> {
     return {
       success: true,
       filename,
-      message: `Saved "${filename}" to your device's Downloads folder. When restoring, look in Downloads or Recent.`
+      message: `Backup "${filename}" downloaded successfully.`
     };
   } catch (webErr: any) {
-    console.error('[BackupService] Web download failed:', webErr);
+    console.error('[BackupService] Browser download failed:', webErr);
     throw new Error(webErr?.message || 'Failed to trigger file download.');
   }
-}
-
-/**
- * Copies the raw backup JSON to the clipboard for zero-friction copy/paste migration.
- */
-export async function copyBackupToClipboard(): Promise<{ success: boolean; message: string }> {
-  const jsonStr = await exportAllDataAsJson();
-  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(jsonStr);
-    return {
-      success: true,
-      message: 'Backup JSON copied to clipboard! In your APK, tap "Paste from Clipboard" to restore.'
-    };
-  }
-
-  // Fallback for older environments
-  if (typeof document !== 'undefined') {
-    const textarea = document.createElement('textarea');
-    textarea.value = jsonStr;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return {
-      success: true,
-      message: 'Backup JSON copied to clipboard! In your APK, tap "Paste from Clipboard" to restore.'
-    };
-  }
-
-  throw new Error('Clipboard copy not supported in this browser.');
-}
-
-/**
- * Reads backup JSON from the clipboard and imports it.
- */
-export async function restoreBackupFromClipboard(): Promise<{ success: boolean; message: string; requiresManualPaste?: boolean }> {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
-      const text = await navigator.clipboard.readText();
-      if (text && text.trim().startsWith('{')) {
-        const res = await importBackupJson(text);
-        return {
-          success: true,
-          message: res.message
-        };
-      }
-    }
-  } catch (err: any) {
-    console.warn('[BackupService] Clipboard readText failed:', err);
-  }
-
-  return {
-    success: false,
-    message: 'Could not automatically read clipboard. Please paste the JSON manually.',
-    requiresManualPaste: true
-  };
 }

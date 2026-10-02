@@ -1,5 +1,5 @@
 {
-  "version": "1.8.39",
+  "version": "1.8.40",
   "releaseDate": "2026-10-02",
-  "notes": "Added one-tap clipboard backup copy and paste migration plus text/plain Web Share file support for seamless PWA to APK transitions."
+  "notes": "Streamlined backup export and restore with native Android folder selection and restored clean two-button backup interface."
 }
