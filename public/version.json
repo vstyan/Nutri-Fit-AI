@@ -1,5 +1,5 @@
 {
-  "version": "1.8.33",
+  "version": "1.8.34",
   "releaseDate": "2026-10-02",
-  "notes": "Fix camera permission reporting, enable Android camera/audio permissions, and unblock Android status bar with white system icons."
+  "notes": "Native Android speech recognition, package visibility query for SpeechRecognizer, runtime mic permission, and editable voice transcript."
 }

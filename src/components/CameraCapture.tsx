@@ -17,6 +17,7 @@ import {
 import { analyzeFoodImage, analyzeFoodText } from '../services/geminiService';
 import { getStickyGeminiKeySynchronous } from '../services/storageService';
 import { GeminiAnalysisResult } from '../types';
+import { startListening, stopListening } from '../services/speechService';
 
 declare const window: any;
 
@@ -56,10 +57,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   // Voice recording states & refs
   const [isListening, setIsListening] = useState(false);
   const isListeningRef = useRef(false);
-  const recognitionRef = useRef<any>(null);
   const baselineTextRef = useRef<string>('');
-  const textDescriptionRef = useRef<string>('');
-  textDescriptionRef.current = textDescription;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -81,60 +79,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
     setIsStartingCamera(false);
   }, []);
 
-  // Initialize Web Speech API with non-duplicating discrete utterance looping
+  // Cleanup speech recognition on unmount
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false; // Prevents Android Chrome accumulating duplicate results
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let currentUtterance = '';
-        for (let i = 0; i < event.results.length; i++) {
-          currentUtterance += event.results[i][0]?.transcript || '';
-        }
-        currentUtterance = currentUtterance.replace(/\s+/g, ' ').trim();
-        const base = baselineTextRef.current ? baselineTextRef.current + ' ' : '';
-        const combined = (base + currentUtterance).replace(/\s+/g, ' ').trim();
-        setTextDescription(combined);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          setErrorMessage(`Microphone status: ${event.error}. You can also type your meal.`);
-          isListeningRef.current = false;
-          setIsListening(false);
-        }
-      };
-
-      recognition.onend = () => {
-        if (isListeningRef.current) {
-          // Commit current transcribed sentence as baseline and resume listening for next sentence
-          baselineTextRef.current = textDescriptionRef.current ? textDescriptionRef.current.trim() : '';
-          try {
-            recognition.start();
-          } catch {
-            isListeningRef.current = false;
-            setIsListening(false);
-          }
-        } else {
-          setIsListening(false);
-        }
-      };
-
-      recognitionRef.current = recognition;
-    }
-
     return () => {
-      if (recognitionRef.current) {
-        isListeningRef.current = false;
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
+      stopListening();
     };
   }, []);
 
@@ -154,12 +102,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
       if (galleryInputRef.current) galleryInputRef.current.value = '';
     } else {
       isListeningRef.current = false;
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
       setIsListening(false);
+      stopListening();
       setCapturedImage(null);
       setUserNotes('');
       setTextDescription('');
@@ -227,28 +171,40 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
 
   if (!isOpen) return null;
 
-  const toggleVoiceRecording = () => {
-    if (!recognitionRef.current) {
-      setErrorMessage('Speech recognition is not supported in this browser. Please type your meal description.');
-      return;
-    }
-
+  const toggleVoiceRecording = async () => {
     if (isListening) {
       isListeningRef.current = false;
       setIsListening(false);
-      try {
-        recognitionRef.current.stop();
-      } catch {}
+      await stopListening();
     } else {
       setErrorMessage(null);
       // Preserve existing text as initial baseline
       baselineTextRef.current = textDescription ? textDescription.trim() : '';
       isListeningRef.current = true;
       setIsListening(true);
+
       try {
-        recognitionRef.current.start();
+        await startListening({
+          onTranscript: (spokenText) => {
+            const base = baselineTextRef.current ? baselineTextRef.current + ' ' : '';
+            const combined = (base + spokenText).replace(/\s+/g, ' ').trim();
+            setTextDescription(combined);
+          },
+          onError: (errMsg) => {
+            setErrorMessage(errMsg);
+            isListeningRef.current = false;
+            setIsListening(false);
+          },
+          onStateChange: (listening) => {
+            isListeningRef.current = listening;
+            setIsListening(listening);
+          },
+        });
       } catch (err: any) {
-        console.warn('Recognition start error:', err);
+        console.warn('Voice recording failed to start:', err);
+        isListeningRef.current = false;
+        setIsListening(false);
+        setErrorMessage(err.message || 'Could not start voice recognition. You can type your meal.');
       }
     }
   };
@@ -391,11 +347,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   };
 
   const handleAnalyzeTextOrVoice = async () => {
-    if (isListening && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
+    if (isListening) {
+      stopListening();
       setIsListening(false);
+      isListeningRef.current = false;
     }
 
     if (!textDescription.trim()) {
@@ -445,8 +400,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           </div>
           <button
             onClick={() => {
-              if (isListening && recognitionRef.current) {
-                try { recognitionRef.current.stop(); } catch {}
+              if (isListening) {
+                stopListening();
+                setIsListening(false);
+                isListeningRef.current = false;
               }
               setCapturedImage(null);
               setUserNotes('');
@@ -465,7 +422,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           <button
             type="button"
             onClick={() => { 
-              if (isListening) toggleVoiceRecording();
+              if (isListening) {
+                setIsListening(false);
+                isListeningRef.current = false;
+                stopListening();
+              }
               setActiveTab('photo'); 
               setErrorMessage(null); 
             }}
@@ -498,7 +459,11 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
           <button
             type="button"
             onClick={() => { 
-              if (isListening) toggleVoiceRecording();
+              if (isListening) {
+                setIsListening(false);
+                isListeningRef.current = false;
+                stopListening();
+              }
               setActiveTab('text'); 
               setErrorMessage(null); 
             }}
@@ -722,8 +687,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
               </div>
 
               {/* Real-time Voice Transcript Box */}
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 min-h-[100px] flex flex-col justify-between">
-                <div className="text-xs text-slate-400 font-semibold mb-1 flex items-center justify-between">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 min-h-[110px] flex flex-col justify-between">
+                <div className="text-xs text-slate-400 font-semibold mb-1.5 flex items-center justify-between">
                   <span>Speech Transcript:</span>
                   {textDescription && (
                     <button
@@ -732,26 +697,41 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
                         baselineTextRef.current = '';
                         setTextDescription('');
                       }}
-                      className="text-[10px] text-slate-500 hover:text-slate-300"
+                      className="text-[10px] text-slate-500 hover:text-slate-300 font-medium px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800"
                     >
                       Clear
                     </button>
                   )}
                 </div>
-                <div className="text-sm font-medium text-white min-h-[50px]">
-                  {textDescription ? (
-                    textDescription
-                  ) : (
-                    <span className="text-slate-600 italic">Your spoken meal will appear here...</span>
-                  )}
-                </div>
+                <textarea
+                  value={textDescription}
+                  onChange={(e) => {
+                    setTextDescription(e.target.value);
+                    baselineTextRef.current = e.target.value;
+                  }}
+                  placeholder="Your spoken meal will appear here... (You can also edit or type directly)"
+                  rows={3}
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-slate-600 focus:outline-none resize-none leading-relaxed"
+                />
               </div>
 
-              {/* Error Message */}
+              {/* Error Message with Quick Action */}
               {errorMessage && (
-                <div className="p-3 bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs rounded-xl flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span className="flex-1">{errorMessage}</span>
+                <div className="p-3 bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{errorMessage}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage(null);
+                      setActiveTab('text');
+                    }}
+                    className="px-3 py-1.5 bg-rose-900/70 hover:bg-rose-800 text-rose-100 rounded-lg text-xs font-semibold border border-rose-700/60 shrink-0 transition active:scale-95 shadow"
+                  >
+                    Type Meal Instead
+                  </button>
                 </div>
               )}
             </div>
