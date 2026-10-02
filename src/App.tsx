@@ -496,6 +496,7 @@ export function App() {
           lastUpdated: new Date().toISOString(),
           sensorActiveCalories: sensorActive,
           sensorRestingCalories: sensorResting,
+          sensorProjectedTotal: healthResult.projectedTotalCalories,
           healthDiagnostics: healthResult.diagnostics
         };
 
@@ -661,7 +662,8 @@ export function App() {
         : (isSensor ? Math.max(0, (dayActivity.activeCaloriesBurned || 0) - baseBmr) : undefined),
       sensorRestingCalories: dayActivity.sensorRestingCalories !== undefined
         ? dayActivity.sensorRestingCalories
-        : (isSensor ? baseBmr : undefined)
+        : (isSensor ? baseBmr : undefined),
+      sensorProjectedTotal: dayActivity.sensorProjectedTotal
     };
 
     // Save updated activity

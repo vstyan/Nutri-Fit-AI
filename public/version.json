@@ -1,5 +1,5 @@
 {
-  "version": "1.8.31",
+  "version": "1.8.32",
   "releaseDate": "2026-10-01",
-  "notes": "Fix non-overlapping timeline interval summation for multi-hour Health Connect records and preserve live data inspector."
+  "notes": "Intra-day elapsed burn synchronization matching Google Fit real-time screen, with 24-hour end-of-day projection display."
 }

@@ -13,7 +13,8 @@ import { getLocalDateString } from '../utils/dateUtils';
 export interface HealthDailySummary {
   date: string; // YYYY-MM-DD
   activeCalories: number; // Active energy burned (EAT/active calories)
-  totalCalories: number; // Total energy burned including resting (if provided by wearable)
+  totalCalories: number; // Total energy burned so far today including resting (if provided by wearable)
+  projectedTotalCalories?: number; // End-of-day 24h total burn projected by tracker (e.g. Google Fit EOD estimate)
   basalCalories?: number; // Basal metabolic rate if recorded by wearable
   steps: number;
   source: 'health_connect' | 'google_fit' | 'manual';
@@ -193,16 +194,22 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
   }
 
   try {
-    // Construct local midnight to end-of-day boundaries
+    // Construct local midnight boundaries
     const [year, month, day] = dateStr.split('-').map(Number);
+    const isToday = (dateStr === getLocalDateString());
+    const now = new Date();
+    const nowMs = now.getTime();
     const startObj = new Date(year, month - 1, day, 0, 0, 0, 0);
     const endObj = new Date(year, month - 1, day, 23, 59, 59, 999);
 
     const startDate = startObj.toISOString();
-    const endDate = endObj.toISOString();
+    // For today, query up to the current minute so health engines aggregate what has elapsed so far
+    const queryEndDate = isToday ? now.toISOString() : endObj.toISOString();
+    const endDate = queryEndDate;
 
     let activeCalories = 0;
     let totalCalories = 0;
+    let projectedTotalCalories: number | undefined;
     let basalCalories = 0;
     let steps = 0;
 
@@ -214,7 +221,7 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
         Health.queryAggregated({
           dataType: 'calories',
           startDate,
-          endDate,
+          endDate: queryEndDate,
           bucket: 'day',
           aggregation: 'sum'
         }),
@@ -236,7 +243,7 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
           Health.readSamples({
             dataType: 'calories',
             startDate,
-            endDate,
+            endDate: queryEndDate,
             limit: 2000
           }),
           5000,
@@ -257,125 +264,105 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
     const detectedSources: string[] = [];
     let queryMethodUsed = 'none';
 
-    // Attempt aggregated query first (supported on builds where TOTAL_CALORIES is registered)
+    // Query raw TotalCaloriesBurnedRecord samples to inspect intervals vs 24h summaries
     try {
-      const aggRes = await withTimeout(
-        Health.queryAggregated({
+      const totalRes = await withTimeout(
+        Health.readSamples({
           dataType: 'totalCalories',
           startDate,
-          endDate,
-          bucket: 'day',
-          aggregation: 'sum'
+          endDate: endObj.toISOString(), // read full set for today to detect both intervals and 24h projections
+          limit: 5000
         }),
-        3000,
-        null
+        7000,
+        { samples: [] }
       );
-      if (aggRes?.samples && aggRes.samples.length > 0) {
-        const val = Number(aggRes.samples[0]?.value) || 0;
-        if (val > 0) {
-          totalCalories = Math.round(val);
-          queryMethodUsed = 'aggregated';
-          rawTotalSamplesCount = aggRes.samples.length;
-          rawTotalSamplesSum = val;
+
+      if (totalRes?.samples && totalRes.samples.length > 0) {
+        queryMethodUsed = 'raw_samples';
+        rawTotalSamplesCount = totalRes.samples.length;
+
+        // Group samples by data origin (source package name / ID)
+        const samplesBySource = new Map<string, any[]>();
+        for (const sample of totalRes.samples) {
+          const val = Number(sample.value) || 0;
+          if (val <= 0) continue;
+          rawTotalSamplesSum += val;
+          const src = (sample.sourceId || sample.sourceName || 'unknown').toLowerCase();
+          if (!samplesBySource.has(src)) {
+            samplesBySource.set(src, []);
+          }
+          samplesBySource.get(src)!.push(sample);
         }
-      }
-    } catch {
-      // queryAggregated totalCalories not available natively on this APK; use raw samples
-    }
 
-    // Fallback: Query raw TotalCaloriesBurnedRecord samples
-    if (totalCalories <= 0) {
-      try {
-        const totalRes = await withTimeout(
-          Health.readSamples({
-            dataType: 'totalCalories',
-            startDate,
-            endDate,
-            limit: 5000
-          }),
-          7000,
-          { samples: [] }
-        );
+        for (const srcKey of samplesBySource.keys()) {
+          if (!detectedSources.includes(srcKey)) detectedSources.push(srcKey);
+        }
 
-        if (totalRes?.samples && totalRes.samples.length > 0) {
-          queryMethodUsed = 'raw_samples';
-          rawTotalSamplesCount = totalRes.samples.length;
-          const nowMs = Date.now();
-          const isToday = (dateStr === getLocalDateString());
-
-          // Group samples by data origin (source package name / ID)
-          const samplesBySource = new Map<string, any[]>();
-          for (const sample of totalRes.samples) {
-            const val = Number(sample.value) || 0;
-            if (val <= 0) continue;
-            rawTotalSamplesSum += val;
-            const src = (sample.sourceId || sample.sourceName || 'unknown').toLowerCase();
-            if (!samplesBySource.has(src)) {
-              samplesBySource.set(src, []);
-            }
-            samplesBySource.get(src)!.push(sample);
+        // Prioritize source: Google Fit first if present, otherwise the source with the most data
+        let selectedSourceKey: string | null = null;
+        for (const key of samplesBySource.keys()) {
+          if (key.includes('fit') || key.includes('google')) {
+            selectedSourceKey = key;
+            break;
           }
-
-          for (const srcKey of samplesBySource.keys()) {
-            if (!detectedSources.includes(srcKey)) detectedSources.push(srcKey);
-          }
-
-          // Prioritize source: Google Fit first if present, otherwise the source with the most data
-          let selectedSourceKey: string | null = null;
-          for (const key of samplesBySource.keys()) {
-            if (key.includes('fit') || key.includes('google')) {
-              selectedSourceKey = key;
-              break;
+        }
+        if (!selectedSourceKey && samplesBySource.size > 0) {
+          let maxCount = 0;
+          for (const [k, v] of samplesBySource.entries()) {
+            if (v.length > maxCount) {
+              maxCount = v.length;
+              selectedSourceKey = k;
             }
           }
-          if (!selectedSourceKey && samplesBySource.size > 0) {
-            let maxCount = 0;
-            for (const [k, v] of samplesBySource.entries()) {
-              if (v.length > maxCount) {
-                maxCount = v.length;
-                selectedSourceKey = k;
+        }
+
+        if (selectedSourceKey) {
+          const sourceSamples = samplesBySource.get(selectedSourceKey) || [];
+
+          // Separate into interval records (< 18h) vs full-day projected records (>= 18h)
+          const intervalRecords: any[] = [];
+          let fullDayRecord: any = null;
+
+          for (const s of sourceSamples) {
+            const start = new Date(s.startDate).getTime();
+            const end = new Date(s.endDate).getTime();
+            const val = Number(s.value) || 0;
+            if (isNaN(start) || isNaN(end) || end <= start || val <= 0) continue;
+            // Ignore future intervals starting after now
+            if (isToday && start > nowMs) continue;
+
+            const durHours = (end - start) / (1000 * 60 * 60);
+            if (durHours >= 18) {
+              if (!fullDayRecord || val > fullDayRecord.val) {
+                fullDayRecord = { ...s, start, end, val, durHours };
               }
+            } else {
+              // For intervals that overlap current time, clip to nowMs
+              let effectiveVal = val;
+              let effectiveEnd = end;
+              if (isToday && end > nowMs) {
+                const totalDur = end - start;
+                const elapsedDur = Math.max(0, nowMs - start);
+                const fraction = totalDur > 0 ? (elapsedDur / totalDur) : 0;
+                effectiveVal = val * fraction;
+                effectiveEnd = nowMs;
+              }
+              intervalRecords.push({ ...s, start, end: effectiveEnd, val: effectiveVal });
             }
           }
 
-          if (selectedSourceKey) {
-            const sourceSamples = samplesBySource.get(selectedSourceKey) || [];
+          if (fullDayRecord) {
+            projectedTotalCalories = Math.round(fullDayRecord.val);
+          }
 
-            // Filter valid samples for today
-            const parsedRecords: any[] = [];
-            for (const s of sourceSamples) {
-              const start = new Date(s.startDate).getTime();
-              const end = new Date(s.endDate).getTime();
-              const val = Number(s.value) || 0;
-              if (isNaN(start) || isNaN(end) || end <= start || val <= 0) continue;
-              // Ignore intervals starting in the future
-              if (isToday && start > nowMs) continue;
-              parsedRecords.push({ ...s, start, end, val });
-            }
-
-            // Check if there is an all-day / 24-hour summary record (>= 18h)
-            let fullDayRecord: any = null;
-            for (const r of parsedRecords) {
-              const durHours = (r.end - r.start) / (1000 * 60 * 60);
-              if (durHours >= 18) {
-                if (!fullDayRecord || r.val > fullDayRecord.val) {
-                  fullDayRecord = r;
-                }
-              }
-            }
-
-            // Compute non-overlapping interval sum across ALL intervals
-            // Sort by start time ascending; if same start time, longer interval first
-            parsedRecords.sort((a, b) => a.start !== b.start ? a.start - b.start : (b.end - b.start) - (a.end - a.start));
-
+          // Compute non-overlapping interval sum
+          let intervalTotal = 0;
+          if (intervalRecords.length > 0) {
+            intervalRecords.sort((a, b) => a.start !== b.start ? a.start - b.start : (b.end - b.start) - (a.end - a.start));
             let nonOverlappingSum = 0;
             let currentEnd = 0;
 
-            for (const s of parsedRecords) {
-              // If there are multiple records, skip the 24-hour full-day summary from interval summation to avoid double-counting
-              const durHours = (s.end - s.start) / (1000 * 60 * 60);
-              if (durHours >= 18 && parsedRecords.length > 1) continue;
-
+            for (const s of intervalRecords) {
               if (s.start >= currentEnd) {
                 nonOverlappingSum += s.val;
                 currentEnd = s.end;
@@ -387,18 +374,61 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
                 currentEnd = s.end;
               }
             }
+            intervalTotal = Math.round(nonOverlappingSum);
+          }
 
-            const intervalTotal = Math.round(nonOverlappingSum);
-            const fullDayTotal = fullDayRecord ? Math.round(fullDayRecord.val) : 0;
-
-            totalCalories = Math.max(intervalTotal, fullDayTotal);
-            if (totalCalories <= 0 && parsedRecords.length > 0) {
-              totalCalories = Math.round(Math.max(...parsedRecords.map(r => r.val)));
+          if (isToday) {
+            if (intervalTotal > 0) {
+              // Priority 1: Use true interval burn elapsed up to now (matches Google Fit intra-day progress)
+              totalCalories = intervalTotal;
+            } else if (fullDayRecord) {
+              // Priority 2: Only 24h projected record exists (e.g. 2,232 kcal).
+              // Prorate the resting portion by elapsed day fraction so unelapsed future hours are not counted!
+              const totalSpanMs = Math.max(1, fullDayRecord.end - fullDayRecord.start);
+              const elapsedSpanMs = Math.min(totalSpanMs, Math.max(0, nowMs - fullDayRecord.start));
+              const dayFraction = elapsedSpanMs / totalSpanMs;
+              const restingPart = Math.max(0, fullDayRecord.val - activeCalories);
+              totalCalories = Math.round(activeCalories + (restingPart * dayFraction));
+            } else if (sourceSamples.length > 0) {
+              totalCalories = Math.round(Math.max(...sourceSamples.map(s => Number(s.value) || 0)));
             }
+          } else {
+            // Historical past date: full 24 hours completed
+            const fullDayVal = fullDayRecord ? Math.round(fullDayRecord.val) : 0;
+            totalCalories = Math.max(intervalTotal, fullDayVal);
+            if (!projectedTotalCalories) projectedTotalCalories = totalCalories;
           }
         }
-      } catch (e) {
-        console.warn('[HealthBridge] readSamples totalCalories notice:', e);
+      }
+    } catch (e) {
+      console.warn('[HealthBridge] readSamples totalCalories notice:', e);
+    }
+
+    // Fallback: If readSamples returned 0, try queryAggregated
+    if (totalCalories <= 0) {
+      try {
+        const aggRes = await withTimeout(
+          Health.queryAggregated({
+            dataType: 'totalCalories',
+            startDate,
+            endDate: queryEndDate,
+            bucket: 'day',
+            aggregation: 'sum'
+          }),
+          3000,
+          null
+        );
+        if (aggRes?.samples && aggRes.samples.length > 0) {
+          const val = Number(aggRes.samples[0]?.value) || 0;
+          if (val > 0) {
+            totalCalories = Math.round(val);
+            queryMethodUsed = 'aggregated';
+            rawTotalSamplesCount = aggRes.samples.length;
+            rawTotalSamplesSum = val;
+          }
+        }
+      } catch {
+        // queryAggregated totalCalories not available
       }
     }
 
@@ -482,6 +512,7 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
       date: dateStr,
       activeCalories,
       totalCalories,
+      projectedTotalCalories,
       basalCalories: basalCalories > 0 ? basalCalories : undefined,
       steps,
       source: 'health_connect',

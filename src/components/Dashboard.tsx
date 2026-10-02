@@ -395,36 +395,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Sensor Live Sync Widget (Health Connect on Android / Google Fit on Web & Android) */}
         {settings.healthConnectConnected ? (
-          <div className="flex items-center justify-between bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 gap-2">
-            <div className="flex items-center space-x-1.5 min-w-0">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="text-xs font-semibold text-emerald-300 truncate">Health Connect Connected</span>
+          <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-1.5 min-w-0">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-xs font-semibold text-emerald-300 truncate">Health Connect Connected</span>
+              </div>
+              {onSyncHealthConnect && (
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2.5 shrink-0">
+                  {(activity.lastSyncedAt || settings.healthConnectLastSync) && (
+                    <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium whitespace-nowrap">
+                      Last sync: {(() => {
+                        const ts = activity.lastSyncedAt || settings.healthConnectLastSync;
+                        if (!ts) return '';
+                        const d = new Date(ts);
+                        if (isNaN(d.getTime())) return '';
+                        const isToday = d.toDateString() === new Date().toDateString();
+                        const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                        return isToday ? timeStr : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
+                      })()}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onSyncHealthConnect}
+                    disabled={isSyncingHealthConnect}
+                    className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50 shrink-0"
+                    title="Sync latest calories burned from Health Connect"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingHealthConnect ? 'animate-spin text-cyan-400' : ''}`} />
+                    <span>{isSyncingHealthConnect ? 'Syncing...' : 'Sync Health Connect'}</span>
+                  </button>
+                </div>
+              )}
             </div>
-            {onSyncHealthConnect && (
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2.5 shrink-0">
-                {(activity.lastSyncedAt || settings.healthConnectLastSync) && (
-                  <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium whitespace-nowrap">
-                    Last sync: {(() => {
-                      const ts = activity.lastSyncedAt || settings.healthConnectLastSync;
-                      if (!ts) return '';
-                      const d = new Date(ts);
-                      if (isNaN(d.getTime())) return '';
-                      const isToday = d.toDateString() === new Date().toDateString();
-                      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                      return isToday ? timeStr : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
-                    })()}
+
+            {isSensorConnected && (
+              <div className="flex flex-wrap items-center justify-between text-[10px] sm:text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80 gap-1">
+                <span className="flex items-center gap-1">
+                  <span>Burned so far:</span>
+                  <span className="text-emerald-300 font-bold">{burnEat} kcal</span>
+                  <span className="text-slate-500">({sensorActiveKcal} active + {sensorRestingKcal} rest)</span>
+                </span>
+                {activity.sensorProjectedTotal && activity.sensorProjectedTotal > burnEat && (
+                  <span className="text-slate-400 font-medium">
+                    24h est: <span className="text-amber-300/90 font-semibold">{activity.sensorProjectedTotal} kcal</span>
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={onSyncHealthConnect}
-                  disabled={isSyncingHealthConnect}
-                  className="text-xs text-cyan-300 hover:text-cyan-200 font-semibold flex items-center space-x-1.5 min-h-[38px] py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 active:scale-95 transition disabled:opacity-50 shrink-0"
-                  title="Sync latest calories burned from Health Connect"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingHealthConnect ? 'animate-spin text-cyan-400' : ''}`} />
-                  <span>{isSyncingHealthConnect ? 'Syncing...' : 'Sync Health Connect'}</span>
-                </button>
               </div>
             )}
           </div>
@@ -1127,9 +1144,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Subtotal */}
                 <div className="bg-slate-900 border border-slate-700/60 rounded-xl p-2.5 px-3 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-300">= {sensorName} Subtotal</span>
+                  <span className="text-xs font-semibold text-slate-300">= {sensorName} Burned So Far</span>
                   <span className="text-sm font-bold text-white">{burnEat} kcal</span>
                 </div>
+
+                {/* 24-Hour End-of-Day Estimate from Tracker */}
+                {activity.sensorProjectedTotal && activity.sensorProjectedTotal > burnEat && (
+                  <div className="bg-slate-950/40 border border-slate-800 rounded-xl p-2.5 px-3 flex items-center justify-between text-[11px]">
+                    <div>
+                      <span className="text-slate-300 font-medium block">24-Hour Projected Total (Midnight)</span>
+                      <span className="text-[10px] text-slate-500">Full-day estimate exported by {sensorName}</span>
+                    </div>
+                    <span className="text-xs font-bold text-amber-300 font-mono">{activity.sensorProjectedTotal} kcal</span>
+                  </div>
+                )}
 
                 {/* 3. Thermic Effect of Food (TEF) */}
                 <div className="bg-slate-950/60 border border-orange-500/20 rounded-xl p-3 flex items-center justify-between">

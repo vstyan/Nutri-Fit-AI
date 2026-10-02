@@ -627,6 +627,7 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
       lastUpdated: parsed.lastUpdated || new Date().toISOString(),
       sensorActiveCalories: parsed.sensorActiveCalories !== undefined ? Number(parsed.sensorActiveCalories) : undefined,
       sensorRestingCalories: parsed.sensorRestingCalories !== undefined ? Number(parsed.sensorRestingCalories) : undefined,
+      sensorProjectedTotal: parsed.sensorProjectedTotal !== undefined ? Number(parsed.sensorProjectedTotal) : undefined,
       healthDiagnostics: parsed.healthDiagnostics
     };
   };
