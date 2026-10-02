@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { exportAllDataAsJson } from './storageService';
-import { getLocalDateString } from '../utils/dateUtils';
+import { getLocalBackupTimestamp } from '../utils/dateUtils';
 
 export interface ExportResult {
   success: boolean;
@@ -26,7 +26,7 @@ export interface ExportResult {
  */
 export async function exportBackupFile(): Promise<ExportResult> {
   const jsonStr = await exportAllDataAsJson();
-  const filename = `nutrifit-backup-${getLocalDateString()}.json`;
+  const filename = `nutrifit-backup-${getLocalBackupTimestamp()}.json`;
 
   // 1. Native Capacitor Android / iOS (APK)
   if (Capacitor.isNativePlatform()) {
@@ -39,7 +39,7 @@ export async function exportBackupFile(): Promise<ExportResult> {
       });
 
       await Share.share({
-        title: 'NutriFit AI Backup',
+        title: filename,
         text: `NutriFit AI backup: ${filename}`,
         files: [writeResult.uri],
         dialogTitle: 'Select Where to Save Backup'
@@ -107,7 +107,7 @@ export async function exportBackupFile(): Promise<ExportResult> {
       const file = new File([blob], filename, { type: 'text/plain' });
       if ((navigator as any).canShare({ files: [file] })) {
         await navigator.share({
-          title: 'NutriFit AI Backup',
+          title: filename,
           text: `NutriFit AI backup: ${filename}`,
           files: [file]
         });

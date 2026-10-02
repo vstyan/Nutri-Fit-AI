@@ -1,5 +1,5 @@
 {
-  "version": "1.8.40",
+  "version": "1.8.41",
   "releaseDate": "2026-10-02",
-  "notes": "Streamlined backup export and restore with native Android folder selection and restored clean two-button backup interface."
+  "notes": "Added exact local timestamp (YYYY-MM-DD_HH-mm-ss) to backup filenames to ensure unique, chronological exports."
 }

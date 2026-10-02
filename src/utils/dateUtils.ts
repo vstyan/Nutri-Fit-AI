@@ -13,6 +13,18 @@ export function getLocalDateString(d: Date = new Date()): string {
 }
 
 /**
+ * Returns a timestamp formatted as YYYY-MM-DD_HH-mm-ss in the user's LOCAL timezone.
+ * Safe for use in file names across all operating systems (no colons).
+ */
+export function getLocalBackupTimestamp(d: Date = new Date()): string {
+  const dateStr = getLocalDateString(d);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${dateStr}_${hours}-${minutes}-${seconds}`;
+}
+
+/**
  * Safely adds or subtracts days from a YYYY-MM-DD string in local time.
  */
 export function addDaysToDateString(dateStr: string, days: number): string {

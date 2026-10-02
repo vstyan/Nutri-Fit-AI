@@ -45,6 +45,7 @@ describe('backupExportService', () => {
     const result = await exportBackupFile();
 
     expect(result.success).toBe(true);
+    expect(result.filename).toMatch(/^nutrifit-backup-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.json$/);
     expect(result.canceled).toBeUndefined();
     expect(result.message).toContain('Choose where to save your file');
     expect(Filesystem.writeFile).toHaveBeenCalledWith(
