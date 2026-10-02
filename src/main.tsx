@@ -4,17 +4,19 @@ import App from './App';
 import './index.css';
 import { isNativeAndroid } from './services/healthBridge';
 import { initAppUpdater } from './services/updaterService';
-import { StatusBar, Style } from '@capacitor/status-bar';
+import { StatusBar } from '@capacitor/status-bar';
+import { applyThemeToDOM } from './utils/themeUtils';
+import { getInitialSettingsSynchronous } from './services/storageService';
 
 // On native Android (Capacitor APK), notify Capgo updater that bundle initialized,
-// configure status bar so time & system icons are crisp white,
+// dynamically configure status bar matching user's selected theme (light vs dark),
 // unregister any service workers, and purge CacheStorage so fresh assets are served.
 if (isNativeAndroid()) {
   initAppUpdater();
   try {
-    StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-    StatusBar.setBackgroundColor({ color: '#020617' }).catch(() => {});
     StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+    const initialSettings = getInitialSettingsSynchronous();
+    applyThemeToDOM(initialSettings.themeMode || 'pure_black');
   } catch {}
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(registrations => {

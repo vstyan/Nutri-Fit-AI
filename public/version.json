@@ -1,5 +1,5 @@
 {
-  "version": "1.8.34",
+  "version": "1.8.35",
   "releaseDate": "2026-10-02",
-  "notes": "Native Android speech recognition, package visibility query for SpeechRecognizer, runtime mic permission, and editable voice transcript."
+  "notes": "Dynamic status bar light/dark icon and background styling for Teal Breeze, transparent root insets, and terms agreement management."
 }

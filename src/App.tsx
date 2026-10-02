@@ -10,6 +10,7 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 import { DocumentationModal } from './components/DocumentationModal';
 import { TermsModal } from './components/TermsModal';
 import { TERMS_VERSION } from './constants/termsContent';
+import { applyThemeToDOM } from './utils/themeUtils';
 import { 
   AppSettings, 
   MealRecord, 
@@ -155,21 +156,8 @@ export function App() {
   useEffect(() => {
     const rawTheme = (settings.themeMode as string) || 'pure_black';
     // Fallback any previously selected nordic_teal to teal_breeze
-    const theme = rawTheme === 'nordic_teal' ? 'teal_breeze' : rawTheme;
-    const root = document.documentElement;
-    const metaThemeColor = document.getElementById('app-theme-color');
-    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
-    
-    if (theme === 'teal_breeze') {
-      root.classList.add('theme-teal-breeze');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
-    } else if (theme === 'midnight_slate') {
-      root.classList.add('theme-midnight');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
-    } else {
-      root.classList.add('theme-pure-black');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
-    }
+    const theme = (rawTheme === 'nordic_teal' ? 'teal_breeze' : rawTheme) as any;
+    applyThemeToDOM(theme);
   }, [settings.themeMode]);
 
   // Initial load of settings & automatic Google Fit startup sync

@@ -30,6 +30,7 @@ import {
   Sliders
 } from 'lucide-react';
 import { TERMS_VERSION } from '../constants/termsContent';
+import { applyThemeToDOM } from '../utils/themeUtils';
 
 const POPULAR_GOAL_PRESETS = [
   'Lose body fat & lean down',
@@ -395,39 +396,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleThemeChange = (mode: ThemeMode) => {
     setFormData(prev => ({ ...prev, themeMode: mode }));
-    const root = document.documentElement;
-    const metaThemeColor = document.getElementById('app-theme-color');
-    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
-    
-    if (mode === 'teal_breeze') {
-      root.classList.add('theme-teal-breeze');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
-    } else if (mode === 'midnight_slate') {
-      root.classList.add('theme-midnight');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
-    } else {
-      root.classList.add('theme-pure-black');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
-    }
+    applyThemeToDOM(mode);
   };
 
   const handleModalClose = () => {
     // Revert live preview if closed without saving
     const activeTheme = settings.themeMode || 'pure_black';
-    const root = document.documentElement;
-    const metaThemeColor = document.getElementById('app-theme-color');
-    root.classList.remove('theme-pure-black', 'theme-midnight', 'theme-teal-breeze', 'theme-nordic-teal', 'theme-apple');
-    
-    if (activeTheme === 'teal_breeze' || (activeTheme as string) === 'nordic_teal') {
-      root.classList.add('theme-teal-breeze');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#F0FDFA');
-    } else if (activeTheme === 'midnight_slate') {
-      root.classList.add('theme-midnight');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#020617');
-    } else {
-      root.classList.add('theme-pure-black');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
-    }
+    applyThemeToDOM(activeTheme);
     onClose();
   };
 
