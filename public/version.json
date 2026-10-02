@@ -1,5 +1,5 @@
 {
-  "version": "1.8.44",
+  "version": "1.8.45",
   "releaseDate": "2026-10-02",
-  "notes": "Removed floating save toast notification from settings; button inline feedback retained."
+  "notes": "Removed redundant top header save button in settings; verified remote bundle asset availability before prompting OTA updates."
 }

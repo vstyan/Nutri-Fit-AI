@@ -41,6 +41,18 @@ export async function checkForRemoteUpdate(): Promise<RemoteVersionInfo | null> 
     if (!res.ok) return null;
     const data: RemoteVersionInfo = await res.json();
     if (data.version && data.version !== APP_VERSION) {
+      if (isNativeAndroid()) {
+        try {
+          const assetUrl = `https://github.com/vstyan/Nutri-Fit-AI/releases/download/v${data.version}/dist.zip`;
+          const headRes = await fetch(assetUrl, { method: 'HEAD', cache: 'no-store' });
+          if (!headRes.ok) {
+            // Release is still building / packaging on GitHub Actions
+            return null;
+          }
+        } catch {
+          return null;
+        }
+      }
       return data;
     }
     return null;

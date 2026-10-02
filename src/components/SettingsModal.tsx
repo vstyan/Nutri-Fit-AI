@@ -423,37 +423,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <h2 className="text-base sm:text-lg font-bold text-white leading-tight">App Settings &amp; Profile</h2>
             <p className="text-[11px] text-slate-400">Profile, BMR, API keys &amp; sync</p>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition shadow flex items-center space-x-1.5 ${
-                saveSuccess
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-cyan-600 hover:bg-cyan-500 text-white active:scale-95'
-              }`}
-            >
-              {saveSuccess ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Saved!</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save</span>
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleModalClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
-              title="Close Settings"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleModalClose}
+            className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+            title="Close Settings"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Scrollable Body */}
