@@ -460,43 +460,21 @@ export function App() {
     try {
       const healthResult = await syncHealthConnectDaily(date);
       if (healthResult) {
-        const profileBmr = calculateBMR(activeSettings.profile);
-        const isToday = (date === getLocalDateString());
-        const now = new Date();
-        const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
-        const dayFraction = isToday ? Math.min(1, Math.max(0, minutesElapsed / 1440)) : 1.0;
-
-        // Effective daily BMR priority:
-        // 1. User calibrated customBmr (if manually set)
-        // 2. Health Connect reported basalCalories (e.g. from Google Fit or wearable)
-        // 3. User profile formula BMR (Mifflin-St Jeor)
-        const effectiveDailyBmr = activeSettings.profile.customBmr ||
-          (healthResult.basalCalories && healthResult.basalCalories > 500 && healthResult.basalCalories < 3500
-            ? healthResult.basalCalories
-            : profileBmr);
-        const elapsedBmr = Math.round(effectiveDailyBmr * dayFraction);
-
         let burnValue: number;
-        let sensorActive: number = healthResult.activeCalories || 0;
-        let sensorResting: number;
+        const sensorActive: number = healthResult.activeCalories || 0;
+        let sensorResting: number = 0;
 
-        // Plausibility check for reported total calories:
-        // 1) Must be at least equal to active calories
-        // 2) For today, cannot exceed active calories + full 24h BMR + 300 kcal buffer
-        const maxPlausibleToday = sensorActive + effectiveDailyBmr + 300;
-        const isTotalPlausible = (healthResult.totalCalories > 0) &&
-          (healthResult.totalCalories >= sensorActive) &&
-          (!isToday || healthResult.totalCalories <= maxPlausibleToday);
-
-        if (isTotalPlausible) {
+        // In Configuration 2 (Fitness Tracker / Health Connect):
+        // 1. If Health Connect provides Total Calories (from TotalCaloriesBurnedRecord):
+        //    Use that total directly! Decompose into active vs resting for breakdown.
+        // 2. If Health Connect provides Active Calories only:
+        //    Use active calories directly! Strictly DO NOT add Mifflin-St Jeor resting BMR.
+        if (healthResult.totalCalories > 0) {
           burnValue = healthResult.totalCalories;
-          // Decompose wearable total into active vs resting portions for the UI breakdown
           sensorResting = Math.max(0, burnValue - sensorActive);
         } else {
-          // Wearable only logged active calories (or reported total was un-deduplicated/future projection).
-          // Real-time burn so far = Active Movement + Elapsed Resting BMR!
-          sensorResting = elapsedBmr;
-          burnValue = sensorActive + sensorResting;
+          burnValue = sensorActive;
+          sensorResting = 0;
         }
 
         const currentMeals = await getMealsForDate(date, activeSettings);
@@ -517,7 +495,8 @@ export function App() {
           lastSyncedAt: healthResult.lastSyncedAt,
           lastUpdated: new Date().toISOString(),
           sensorActiveCalories: sensorActive,
-          sensorRestingCalories: sensorResting
+          sensorRestingCalories: sensorResting,
+          healthDiagnostics: healthResult.diagnostics
         };
 
         await saveActivityForDate(updatedActivity, activeSettings);

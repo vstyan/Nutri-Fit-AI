@@ -1105,20 +1105,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
 
-                {/* 2. Prorated Resting BMR */}
+                {/* 2. Resting Metabolism */}
                 <div className="bg-slate-950/60 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-amber-400 block">2. Resting Metabolism (BMR)</span>
                     <span className="text-[11px] text-slate-400">
-                      {summary.date === getLocalDateString() ? 'Prorated burn so far today' : 'Full-day resting baseline'} ({profileBmr} kcal/day)
+                      {sensorRestingKcal > 0
+                        ? `Extracted from ${sensorName} total calories record`
+                        : `Mifflin-St Jeor formula disabled in Configuration 2`}
                     </span>
                   </div>
                   <div className="text-right">
                     <span className="text-base font-extrabold text-white block">+{sensorRestingKcal} <span className="text-[10px] font-normal text-slate-400">kcal</span></span>
-                    {settings.profile.customBmr ? (
-                      <span className="text-[9px] text-amber-400/90 font-medium">Calibrated BMR</span>
+                    {sensorRestingKcal > 0 ? (
+                      <span className="text-[9px] text-emerald-400 font-medium">{sensorName} Data</span>
                     ) : (
-                      <span className="text-[9px] text-slate-400">Mifflin-St Jeor</span>
+                      <span className="text-[9px] text-slate-400">Tracker Mode</span>
                     )}
                   </div>
                 </div>
@@ -1147,17 +1149,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
+              {/* Health Connect Live Data Inspector */}
+              {summary.activity?.healthDiagnostics && (
+                <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 text-[11px] text-slate-300 space-y-2">
+                  <div className="font-semibold text-slate-200 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Health Connect Live Data Inspector</span>
+                    </span>
+                    <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-mono">
+                      {summary.activity.healthDiagnostics.queryMethod}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                    <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                      <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Active Samples</span>
+                      <span className="text-emerald-400 font-bold text-xs">{summary.activity.healthDiagnostics.activeCount} records</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">{sensorActiveKcal} kcal</span>
+                    </div>
+                    <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                      <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Total Cal Samples</span>
+                      <span className="text-amber-400 font-bold text-xs">{summary.activity.healthDiagnostics.totalCount} records</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">Sum: {summary.activity.healthDiagnostics.totalSamplesSum} kcal</span>
+                    </div>
+                  </div>
+
+                  {summary.activity.healthDiagnostics.sources && summary.activity.healthDiagnostics.sources.length > 0 && (
+                    <div className="text-[10px] text-slate-400">
+                      <span className="font-medium text-slate-300">Sources:</span> {summary.activity.healthDiagnostics.sources.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Informative Explanation Box */}
               <div className="bg-slate-800/40 border border-slate-700/70 rounded-xl p-3 text-[11px] text-slate-300 leading-relaxed space-y-1.5">
                 <div className="font-semibold text-white flex items-center gap-1.5">
                   <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Why Google Fit Displays a Different Total</span>
+                  <span>Configuration 2 (Tracker Mode) Calorie Policy</span>
                 </div>
                 <p>
-                  Google Fit only syncs active workout calories ({sensorActiveKcal} kcal) to Health Connect, while calculating resting burn internally using your Google account profile.
+                  In Configuration 2, NutriFit AI strictly relies on your fitness tracker ({sensorName}) and <strong>never injects synthetic Mifflin-St Jeor resting calories</strong>.
                 </p>
                 <p>
-                  NutriFit calculates your resting burn from your profile settings ({profileBmr} kcal/day). If you want NutriFit to match Google Fit&apos;s daily calorie count exactly, you can fine-tune your age/weight or calibrate your BMR directly in Settings.
+                  {sensorRestingKcal > 0
+                    ? `Health Connect provided total calories from ${sensorName} (${burnEat} kcal), which decomposes into ${sensorActiveKcal} kcal active and ${sensorRestingKcal} kcal resting.`
+                    : `Health Connect provided active movement calories (${sensorActiveKcal} kcal). If ${sensorName} has not written total calories, only active burn is recorded.`}
                 </p>
               </div>
 

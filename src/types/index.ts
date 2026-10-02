@@ -1,5 +1,5 @@
 declare const __APP_VERSION__: string;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.29';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.8.30';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type Gender = 'male' | 'female';
@@ -100,6 +100,13 @@ export interface DailyActivity {
   lastUpdated: string;
   sensorActiveCalories?: number; // Active movement / workout burn from Health Connect or Google Fit
   sensorRestingCalories?: number; // Prorated resting BMR component for the day
+  healthDiagnostics?: {
+    activeCount: number;
+    totalCount: number;
+    totalSamplesSum: number;
+    sources: string[];
+    queryMethod: string;
+  };
 }
 
 export interface HistoryDayRecord {

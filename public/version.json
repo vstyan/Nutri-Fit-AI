@@ -1,5 +1,5 @@
 {
-  "version": "1.8.29",
+  "version": "1.8.30",
   "releaseDate": "2026-10-01",
-  "notes": "Prioritize Google Fit BasalMetabolicRateRecord in Health Connect and integrate synced basal metabolic rate directly into daily burn calculations."
+  "notes": "Configuration 2 tracker mode pure sync, enhanced Health Connect TotalCaloriesBurnedRecord reader, and live Health Connect Data Inspector."
 }

@@ -18,6 +18,13 @@ export interface HealthDailySummary {
   steps: number;
   source: 'health_connect' | 'google_fit' | 'manual';
   lastSyncedAt: string; // ISO string
+  diagnostics?: {
+    activeCount: number;
+    totalCount: number;
+    totalSamplesSum: number;
+    sources: string[];
+    queryMethod: string;
+  };
 }
 
 export interface HealthBridgeStatus {
@@ -199,6 +206,8 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
     let basalCalories = 0;
     let steps = 0;
 
+    let activeSamplesCount = 0;
+
     // 1. Query Active Calories (ActiveCaloriesBurnedRecord)
     try {
       const activeRes = await withTimeout(
@@ -214,6 +223,7 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
       );
       if (activeRes?.samples && activeRes.samples.length > 0) {
         activeCalories = Math.round(activeRes.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+        activeSamplesCount = activeRes.samples.length;
       }
     } catch (e) {
       console.warn('[HealthBridge] Query active calories aggregated notice:', e);
@@ -229,11 +239,12 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
             endDate,
             limit: 2000
           }),
-          4000,
+          5000,
           { samples: [] }
         );
         if (activeSamples?.samples && activeSamples.samples.length > 0) {
           activeCalories = Math.round(activeSamples.samples.reduce((s: number, item: any) => s + (Number(item.value) || 0), 0));
+          activeSamplesCount = activeSamples.samples.length;
         }
       } catch (e) {
         console.warn('[HealthBridge] readSamples active calories notice:', e);
@@ -241,6 +252,11 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
     }
 
     // 2. Query Total Calories (TotalCaloriesBurnedRecord)
+    let rawTotalSamplesCount = 0;
+    let rawTotalSamplesSum = 0;
+    const detectedSources: string[] = [];
+    let queryMethodUsed = 'none';
+
     // Attempt aggregated query first (supported on builds where TOTAL_CALORIES is registered)
     try {
       const aggRes = await withTimeout(
@@ -258,13 +274,16 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
         const val = Number(aggRes.samples[0]?.value) || 0;
         if (val > 0) {
           totalCalories = Math.round(val);
+          queryMethodUsed = 'aggregated';
+          rawTotalSamplesCount = aggRes.samples.length;
+          rawTotalSamplesSum = val;
         }
       }
     } catch {
-      // queryAggregated totalCalories not available natively on this APK; use smart sample deduplication
+      // queryAggregated totalCalories not available natively on this APK; use raw samples
     }
 
-    // Fallback: Query raw TotalCaloriesBurnedRecord samples and deduplicate
+    // Fallback: Query raw TotalCaloriesBurnedRecord samples
     if (totalCalories <= 0) {
       try {
         const totalRes = await withTimeout(
@@ -274,19 +293,22 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
             endDate,
             limit: 5000
           }),
-          4000,
+          7000,
           { samples: [] }
         );
 
         if (totalRes?.samples && totalRes.samples.length > 0) {
+          queryMethodUsed = 'raw_samples';
+          rawTotalSamplesCount = totalRes.samples.length;
           const nowMs = Date.now();
           const isToday = (dateStr === getLocalDateString());
 
-          // Group samples by data origin (source package name)
+          // Group samples by data origin (source package name / ID)
           const samplesBySource = new Map<string, any[]>();
           for (const sample of totalRes.samples) {
             const val = Number(sample.value) || 0;
             if (val <= 0) continue;
+            rawTotalSamplesSum += val;
             const src = (sample.sourceId || sample.sourceName || 'unknown').toLowerCase();
             if (!samplesBySource.has(src)) {
               samplesBySource.set(src, []);
@@ -294,15 +316,19 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
             samplesBySource.get(src)!.push(sample);
           }
 
+          for (const srcKey of samplesBySource.keys()) {
+            if (!detectedSources.includes(srcKey)) detectedSources.push(srcKey);
+          }
+
           // Prioritize source: Google Fit first if present, otherwise the source with the most data
           let selectedSourceKey: string | null = null;
           for (const key of samplesBySource.keys()) {
-            if (key.includes('fitness') || key.includes('google')) {
+            if (key.includes('fit') || key.includes('google')) {
               selectedSourceKey = key;
               break;
             }
           }
-          if (!selectedSourceKey) {
+          if (!selectedSourceKey && samplesBySource.size > 0) {
             let maxCount = 0;
             for (const [k, v] of samplesBySource.entries()) {
               if (v.length > maxCount) {
@@ -315,7 +341,8 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
           if (selectedSourceKey) {
             const sourceSamples = samplesBySource.get(selectedSourceKey) || [];
 
-            let allDayRecord: any = null;
+            // Separate into long/cumulative records vs interval records
+            const longRecords: any[] = [];
             const intervalRecords: any[] = [];
 
             for (const s of sourceSamples) {
@@ -325,20 +352,25 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
                 ? (end - start) / (1000 * 60 * 60)
                 : 0;
 
-              if (durationHours >= 18) {
-                if (!allDayRecord || Number(s.value) > Number(allDayRecord.value)) {
-                  allDayRecord = s;
-                }
+              if (durationHours >= 4) {
+                longRecords.push({ ...s, start, end, durationHours });
               } else {
-                // Ignore intervals that start in the future for today
                 if (!isToday || start <= nowMs) {
-                  intervalRecords.push({ ...s, start, end });
+                  intervalRecords.push({ ...s, start, end, durationHours });
                 }
               }
             }
 
+            // A) Check for long/cumulative records
+            let bestLongRecordVal = 0;
+            if (longRecords.length > 0) {
+              longRecords.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+              bestLongRecordVal = Number(longRecords[0]?.value) || 0;
+            }
+
+            // B) Check non-overlapping sum for interval records
+            let intervalSum = 0;
             if (intervalRecords.length > 0) {
-              // Deduplicate overlapping intervals within this single source
               intervalRecords.sort((a, b) => a.start - b.start);
               let nonOverlappingSum = 0;
               let currentEnd = 0;
@@ -355,18 +387,14 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
                   currentEnd = s.end;
                 }
               }
-              totalCalories = Math.round(nonOverlappingSum);
-            } else if (allDayRecord) {
-              const allDayVal = Number(allDayRecord.value) || 0;
-              if (isToday) {
-                // Prorate all-day projection to current elapsed minutes of today
-                const now = new Date();
-                const minutesElapsed = (now.getHours() * 60) + now.getMinutes();
-                const dayFraction = Math.min(1, Math.max(0, minutesElapsed / 1440));
-                totalCalories = Math.round(allDayVal * dayFraction);
-              } else {
-                totalCalories = Math.round(allDayVal);
-              }
+              intervalSum = Math.round(nonOverlappingSum);
+            }
+
+            const chosenTotal = Math.max(bestLongRecordVal, intervalSum);
+            if (chosenTotal > 0) {
+              totalCalories = Math.round(chosenTotal);
+            } else if (sourceSamples.length > 0) {
+              totalCalories = Math.round(Math.max(...sourceSamples.map(s => Number(s.value) || 0)));
             }
           }
         }
@@ -458,7 +486,14 @@ export async function syncHealthConnectDaily(dateStr: string): Promise<HealthDai
       basalCalories: basalCalories > 0 ? basalCalories : undefined,
       steps,
       source: 'health_connect',
-      lastSyncedAt: new Date().toISOString()
+      lastSyncedAt: new Date().toISOString(),
+      diagnostics: {
+        activeCount: activeSamplesCount,
+        totalCount: rawTotalSamplesCount,
+        totalSamplesSum: Math.round(rawTotalSamplesSum),
+        sources: detectedSources,
+        queryMethod: queryMethodUsed
+      }
     };
   } catch (err) {
     console.error('[HealthBridge] syncHealthConnectDaily failed for ' + dateStr, err);
