@@ -49,6 +49,30 @@ jobs:
       - name: Package OTA Web Bundle
         run: (cd dist && zip -r ../dist.zip .)
 
+      - name: Extract App Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release with OTA Web Bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          gh release create "v${VERSION}" \
+            --title "NutriFit AI v${VERSION}" \
+            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v${VERSION}. Delivered seamlessly via In-App Over-The-Air (OTA) update." || true
+          gh release upload "v${VERSION}" dist.zip --clobber
+
+      - name: Upload OTA Web Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NutriFit-AI-OTA-Bundle
+          path: dist.zip
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Ensure Android assets directory exists
         run: mkdir -p android/app/src/main/assets
 
@@ -63,12 +87,6 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Extract App Version
-        id: get_version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Prepare APK Release Artifact
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
@@ -82,21 +100,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload OTA Web Bundle Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NutriFit-AI-OTA-Bundle
-          path: dist.zip
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Create or Update GitHub Release
+      - name: Attach APK to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           APK="android/app/build/outputs/apk/debug/NutriFit-AI-v${VERSION}.apk"
-          gh release create "v${VERSION}" \
-            --title "NutriFit AI v${VERSION}" \
-            --notes "Direct APK download and OTA Web Bundle for NutriFit AI v${VERSION}. Delivered seamlessly via In-App Over-The-Air (OTA) update." || true
-          gh release upload "v${VERSION}" "$APK" dist.zip --clobber
+          gh release upload "v${VERSION}" "$APK" --clobber
