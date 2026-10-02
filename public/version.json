@@ -1,5 +1,5 @@
 {
-  "version": "1.8.36",
+  "version": "1.8.37",
   "releaseDate": "2026-10-02",
-  "notes": "Direct Health Connect on-device sync with zero cloud delay. Removed legacy Google Fit cloud REST API and external auth overhead."
+  "notes": "Native Android Backup Export and Restore integration via Capacitor Filesystem & Share sheet, with enhanced file picker compatibility."
 }

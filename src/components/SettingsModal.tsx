@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Key, 
@@ -54,12 +54,12 @@ import {
 import { getEffectiveTrackingMode } from '../utils/calorieEngine';
 import { getLocalDateString } from '../utils/dateUtils';
 import { 
-  exportAllDataAsJson, 
   importBackupJson, 
   clearAllAppData,
   persistStickyGeminiKey,
   clearStickyGeminiKey
 } from '../services/storageService';
+import { exportBackupFile } from '../services/backupExportService';
 import { checkForRemoteUpdate, applyAndroidOTAUpdate, RemoteVersionInfo } from '../services/updaterService';
 
 interface SettingsModalProps {
@@ -98,9 +98,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [heightIn, setHeightIn] = useState<number>(() => cmToFeetInches(settings.profile.heightCm || 175).inches);
 
   // Backup and clear modal states
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [clearSuccessMessage, setClearSuccessMessage] = useState(false);
 
   // App update checking states
@@ -127,7 +129,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const { feet, inches } = cmToFeetInches(settings.profile.heightCm || 175);
       setHeightFt(feet);
       setHeightIn(inches);
-      setImportStatus(null);
+      setBackupStatus(null);
+      setIsExporting(false);
+      setIsImporting(false);
       setShowClearConfirm(false);
       setClearSuccessMessage(false);
       setUpdateStatus('idle');
@@ -337,14 +341,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleExportBackup = async () => {
-    const jsonStr = await exportAllDataAsJson();
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nutrifit-backup-${getLocalDateString()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setIsExporting(true);
+    setBackupStatus(null);
+    try {
+      const res = await exportBackupFile();
+      if (!res.canceled) {
+        setBackupStatus({
+          type: 'success',
+          message: res.message || 'Backup exported successfully!'
+        });
+      }
+    } catch (err: any) {
+      setBackupStatus({
+        type: 'error',
+        message: err?.message || 'Failed to export backup.'
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleImportFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,14 +366,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!file) return;
 
     setIsImporting(true);
-    setImportStatus(null);
+    setBackupStatus(null);
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
         const text = event.target?.result as string;
         const res = await importBackupJson(text);
-        setImportStatus({
+        setBackupStatus({
           type: 'success',
           message: res.message
         });
@@ -367,13 +381,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           window.location.reload();
         }, 1500);
       } catch (err: any) {
-        setImportStatus({
+        setBackupStatus({
           type: 'error',
           message: err.message || 'Failed to import backup file. Please ensure it is a valid NutriFit JSON backup.'
         });
       } finally {
         setIsImporting(false);
       }
+    };
+    reader.onerror = () => {
+      setBackupStatus({
+        type: 'error',
+        message: 'Failed to read the selected file.'
+      });
+      setIsImporting(false);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -1251,40 +1272,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleExportBackup}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5"
+                disabled={isExporting}
+                className="p-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5 cursor-pointer disabled:cursor-not-allowed"
               >
-                <Download className="w-4 h-4 text-cyan-400 shrink-0" />
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+                ) : (
+                  <Download className="w-4 h-4 text-cyan-400 shrink-0" />
+                )}
                 <div>
-                  <div className="text-xs font-bold">Export Backup</div>
+                  <div className="text-xs font-bold">{isExporting ? 'Exporting...' : 'Export Backup'}</div>
                   <div className="text-[10px] text-slate-400">Save full JSON file</div>
                 </div>
               </button>
 
               {/* Import Restore */}
-              <label className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5 cursor-pointer">
-                <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="p-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl border border-slate-700 text-left transition flex items-center space-x-2.5 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
+                ) : (
+                  <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
+                )}
                 <div>
-                  <div className="text-xs font-bold">Restore Backup</div>
+                  <div className="text-xs font-bold">{isImporting ? 'Restoring...' : 'Restore Backup'}</div>
                   <div className="text-[10px] text-slate-400">Upload .json backup</div>
                 </div>
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  className="hidden"
-                  onChange={handleImportFileSelected}
-                />
-              </label>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json,text/plain,*/*"
+                className="hidden"
+                onChange={handleImportFileSelected}
+              />
             </div>
 
-            {/* Import Status Alert */}
-            {importStatus && (
+            {/* Backup Status Alert */}
+            {backupStatus && (
               <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
-                importStatus.type === 'success'
+                backupStatus.type === 'success'
                   ? 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-300'
                   : 'bg-rose-950/60 border border-rose-500/30 text-rose-300'
               }`}>
-                {importStatus.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                <span>{importStatus.message}</span>
+                {backupStatus.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                <span>{backupStatus.message}</span>
               </div>
             )}
 
