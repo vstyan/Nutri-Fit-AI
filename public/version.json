@@ -1,5 +1,5 @@
 {
-  "version": "1.8.35",
+  "version": "1.8.36",
   "releaseDate": "2026-10-02",
-  "notes": "Dynamic status bar light/dark icon and background styling for Teal Breeze, transparent root insets, and terms agreement management."
+  "notes": "Direct Health Connect on-device sync with zero cloud delay. Removed legacy Google Fit cloud REST API and external auth overhead."
 }
