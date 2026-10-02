@@ -1324,6 +1324,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
 
+            {/* Location Guidance */}
+            <p className="text-[11px] text-slate-400 leading-relaxed px-1">
+              💡 <span className="font-semibold text-slate-300">Where are backups stored?</span> On Android, backups are saved to your device's <strong className="text-cyan-300">Downloads</strong> folder (or whichever location you choose in the Share dialog). When tapping <em>Restore Backup</em>, simply pick the file from <strong>Downloads</strong> or <strong>Recent</strong>.
+            </p>
+
             {/* Clear All App Data Trigger */}
             <div className="pt-2">
               <button

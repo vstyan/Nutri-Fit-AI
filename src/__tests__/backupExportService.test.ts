@@ -33,6 +33,8 @@ describe('backupExportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(storageService, 'exportAllDataAsJson').mockResolvedValue('{"test":"data"}');
+    delete (globalThis as any).navigator;
+    delete (globalThis as any).window;
   });
 
   it('exports via native Filesystem and Share when running on Android native platform', async () => {
@@ -44,6 +46,7 @@ describe('backupExportService', () => {
 
     expect(result.success).toBe(true);
     expect(result.canceled).toBeUndefined();
+    expect(result.message).toContain('Choose "Save to device" or Google Drive');
     expect(Filesystem.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         data: '{"test":"data"}',
@@ -70,7 +73,29 @@ describe('backupExportService', () => {
     expect(result.message).toBe('Export share dismissed.');
   });
 
-  it('falls back to browser download on Web / PWA', async () => {
+  it('supports Web Share API with files in mobile PWA', async () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
+
+    const shareSpy = vi.fn().mockResolvedValue(undefined);
+    (globalThis as any).navigator = {
+      share: shareSpy,
+      canShare: vi.fn().mockReturnValue(true)
+    };
+    (globalThis as any).File = class MockFile {
+      constructor(public parts: any[], public name: string, public options: any) {}
+    };
+    (globalThis as any).Blob = class MockBlob {
+      constructor(public parts: any[], public options: any) {}
+    };
+
+    const result = await exportBackupFile();
+
+    expect(result.success).toBe(true);
+    expect(shareSpy).toHaveBeenCalled();
+    expect(result.message).toContain('Choose "Save to device" or Google Drive');
+  });
+
+  it('falls back to browser download and guides user to Downloads folder', async () => {
     vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
 
     const clickSpy = vi.fn();
@@ -104,5 +129,6 @@ describe('backupExportService', () => {
     expect(clickSpy).toHaveBeenCalled();
     expect(appendSpy).toHaveBeenCalledWith(mockAnchor);
     expect(removeSpy).toHaveBeenCalledWith(mockAnchor);
+    expect(result.message).toContain("Downloads folder");
   });
 });

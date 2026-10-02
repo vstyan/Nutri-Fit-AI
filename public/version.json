@@ -1,5 +1,5 @@
 {
-  "version": "1.8.37",
+  "version": "1.8.38",
   "releaseDate": "2026-10-02",
-  "notes": "Native Android Backup Export and Restore integration via Capacitor Filesystem & Share sheet, with enhanced file picker compatibility."
+  "notes": "Added Web Share API and File System Access picker with clear Downloads folder location guidance for backup export and restore."
 }
