@@ -26,8 +26,7 @@ import {
   Eye,
   EyeOff,
   Save,
-  Clipboard,
-  Sliders
+  Clipboard
 } from 'lucide-react';
 import { TERMS_VERSION } from '../constants/termsContent';
 import { applyThemeToDOM } from '../utils/themeUtils';
@@ -45,7 +44,6 @@ const POPULAR_GOAL_PRESETS = [
 import { AppSettings, Gender, UnitSystem, ThemeMode, APP_VERSION } from '../types';
 import { 
   calculateBMR, 
-  calculateFormulaBMR,
   kgToLbs, 
   lbsToKg, 
   cmToFeetInches, 
@@ -91,6 +89,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
 
   // Imperial unit helper states
   const [weightLbs, setWeightLbs] = useState<number>(() => kgToLbs(settings.profile.weightKg || 75));
@@ -117,9 +116,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyFeedback, setApiKeyFeedback] = useState<string>('');
 
-  // BMR calibration helper states
-  const [isCalibratingBmr, setIsCalibratingBmr] = useState(false);
-
   // Sync formData ONLY when modal transitions from closed to open
   useEffect(() => {
     if (isOpen) {
@@ -139,7 +135,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setIsCheckingUpdate(false);
       setShowApiKey(false);
       setApiKeyFeedback('');
-      setIsCalibratingBmr(Boolean(settings.profile.customBmr));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -215,20 +210,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const currentBMR = calculateBMR(formData.profile);
-  const formulaBMR = calculateFormulaBMR(formData.profile);
   const activeTrackingMode = getEffectiveTrackingMode(formData);
   const isConfig1 = activeTrackingMode === 'standalone';
   const isConfig2 = activeTrackingMode === 'tracker';
-
-  const handleSetCustomBmr = (val: number) => {
-    setFormData(prev => ({
-      ...prev,
-      profile: {
-        ...prev.profile,
-        customBmr: val > 0 ? val : undefined
-      }
-    }));
-  };
 
   const handlePasteApiKey = async () => {
     try {
@@ -425,20 +409,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     e.preventDefault();
     onSaveSettings({ ...formData, storagePromptDismissed: true }, true);
     setSaveSuccess(true);
+    setSaveToast('Settings saved successfully!');
     setTimeout(() => {
       setSaveSuccess(false);
-      onClose();
-    }, 800);
+    }, 2000);
+    setTimeout(() => {
+      setSaveToast(null);
+    }, 3000);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden relative">
+        {/* Floating Save Toast */}
+        {saveToast && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-emerald-600/95 text-white text-xs font-semibold rounded-xl shadow-2xl flex items-center space-x-2 animate-in fade-in slide-in-from-top-2 duration-200 border border-emerald-400/40">
+            <Check className="w-4 h-4 text-emerald-200" />
+            <span>{saveToast}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="p-3.5 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 shrink-0">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-white leading-tight">App Settings &amp; Profile</h2>
-            <p className="text-[11px] text-slate-400">Profile, BMR calibration, API keys &amp; sync</p>
+            <p className="text-[11px] text-slate-400">Profile, BMR, API keys &amp; sync</p>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -632,7 +627,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div>
                     <div className="text-xs font-bold text-white">Your Natural Base Burn (BMR)</div>
                     <div className="text-[11px] text-slate-400">
-                      {formData.profile.customBmr ? 'Custom / Calibrated Target' : 'Mifflin-St Jeor Scientific Baseline'}
+                      Mifflin-St Jeor Scientific Baseline
                     </div>
                   </div>
                 </div>
@@ -642,55 +637,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Calories burned at complete rest
                   </div>
                 </div>
-              </div>
-
-              {/* BMR Alignment / Calibration Controls */}
-              <div className="pt-2 border-t border-slate-800/80">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-300 font-medium">BMR Alignment / Calibration:</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsCalibratingBmr(prev => !prev)}
-                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center space-x-1"
-                  >
-                    <Sliders className="w-3 h-3" />
-                    <span>{isCalibratingBmr ? 'Hide Calibration' : formData.profile.customBmr ? 'Adjust Calibration' : 'Calibrate to Google Fit'}</span>
-                  </button>
-                </div>
-
-                {isCalibratingBmr && (
-                  <div className="mt-2.5 p-3 bg-slate-900 border border-slate-700/80 rounded-xl space-y-2.5 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <label className="text-[10px] text-slate-300 font-semibold block mb-1">
-                          Custom Daily BMR (kcal/day)
-                        </label>
-                        <input
-                          type="number"
-                          value={formData.profile.customBmr || ''}
-                          placeholder={String(formulaBMR)}
-                          onChange={e => {
-                            const val = e.target.value === '' ? undefined : parseInt(e.target.value);
-                            handleSetCustomBmr(val || 0);
-                          }}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-bold"
-                        />
-                      </div>
-                      {formData.profile.customBmr && (
-                        <button
-                          type="button"
-                          onClick={() => handleSetCustomBmr(0)}
-                          className="self-end px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold rounded-lg border border-slate-700 transition"
-                        >
-                          Reset to Formula ({formulaBMR})
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      💡 <strong>Matching Google Fit:</strong> Google Fit calculates resting burn using your Google Account profile. If Google Fit reported e.g. 1,656 Cal at 9:30 PM with ~310 active calories, its daily resting BMR is ~<strong>1,505 kcal/day</strong>. Setting 1,505 here makes NutriFit match Google Fit&apos;s live total to the single calorie.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -712,7 +658,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Google Fit / Health Connect.
+              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Health Connect.
             </p>
 
             <div className="grid grid-cols-1 gap-3 pt-1">

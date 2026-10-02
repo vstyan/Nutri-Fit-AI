@@ -1,5 +1,5 @@
 {
-  "version": "1.8.41",
+  "version": "1.8.42",
   "releaseDate": "2026-10-02",
-  "notes": "Added exact local timestamp (YYYY-MM-DD_HH-mm-ss) to backup filenames to ensure unique, chronological exports."
+  "notes": "Removed legacy Google Fit calibration and calorie debug window; settings now save with in-menu toast feedback without exiting."
 }
