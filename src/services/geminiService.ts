@@ -724,12 +724,14 @@ CRITICAL COACHING INSTRUCTIONS:
    - If their goal includes "Improve endurance": emphasize complex carbohydrate refueling and hydration.
 
 4. FACTOR IN WORKOUTS, CALORIES BURNED & ATHLETIC FUELING (CRITICAL):
-   - Inspect 'todayExpenditure.hasSignificantWorkout', 'todayExpenditure.workoutsLogged', 'todayExpenditure.activeCalories', and 'todayExpenditure.workoutSummary'.
-   - NEVER evaluate nutrition in isolation from physical activity! Dedicated workouts alter metabolic recovery demands.
+   - Inspect 'todayExpenditure.hasSignificantWorkout', 'todayExpenditure.workoutsLogged', 'todayExpenditure.activeCalories', 'todayExpenditure.bmrCalories', and 'todayExpenditure.workoutSummary'.
+   - CRITICAL ANTI-HALLUCINATION RULE FOR WORKOUTS & PHYSICAL ACTIVITY:
+     * When referencing workouts, exercise, or physical movement, ONLY cite the TRUE ACTIVE calories ('todayExpenditure.activeCalories', e.g. ${payload.todayExpenditure.activeCalories} active kcal) or specific itemized workouts ('todayExpenditure.workoutsLogged')!
+     * NEVER cite total daily expenditure (${payload.todayExpenditure.totalBurned} kcal) or resting BMR (${payload.todayExpenditure.bmrCalories} kcal) as workout or exercise calories! Resting BMR is energy burned at complete rest (sleeping, breathing), NOT physical exercise.
    - If a dedicated workout or substantial workout entry is detected ('todayExpenditure.hasSignificantWorkout' is true):
      * Set 'workoutAnalysis.workoutDetected' to true.
-     * In 'workoutAnalysis.activitySummary', provide a concise 1-sentence recap of the specific workout (e.g., "${payload.todayExpenditure.workoutSummary}").
-     * In 'workoutAnalysis.encouragement', provide genuine, enthusiastic athletic encouragement celebrating their dedication and sweat equity.
+     * In 'workoutAnalysis.activitySummary', provide a concise recap citing the specific workout and dedicated active burn (${payload.todayExpenditure.activeCalories} active kcal).
+     * In 'workoutAnalysis.encouragement', provide genuine, enthusiastic athletic encouragement celebrating their workout effort and dedicated active burn (${payload.todayExpenditure.activeCalories} active kcal). NEVER confuse this with total day burn.
      * In 'workoutAnalysis.fuelingAdvice', explain clearly how their nutrition should adjust to recover from this workout:
        - Post-workout protein synthesis: replenish amino acids for muscle tissue repair.
        - Glycogen restoration: smart complex carbohydrates to restock depleted muscle and liver glycogen.
@@ -737,10 +739,9 @@ CRITICAL COACHING INSTRUCTIONS:
        - If the workout occurred earlier in the day (e.g. morning/midday), assess whether subsequent meals provided adequate recovery or if upcoming meals today should supply extra recovery nutrients.
    - If NO dedicated workout was logged ('todayExpenditure.hasSignificantWorkout' is false):
      * Set 'workoutAnalysis.workoutDetected' to false.
-     * In 'workoutAnalysis.activitySummary', state: 'Total day burn so far: ~${payload.todayExpenditure.totalBurned} kcal (resting metabolism & daily movement)'.
-     * CRITICAL: Do NOT claim or hallucinate that the user burned ${payload.todayExpenditure.totalBurned} kcal in a single workout session! That number is their entire cumulative day burn (basal metabolic rate + incidental steps and activity).
-     * In 'workoutAnalysis.encouragement', provide positive reinforcement for their daily movement consistency and adherence to their goals.
-     * In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for steady daily energy, satiety, and goal support.
+     * In 'workoutAnalysis.activitySummary', state: 'Active movement: ~${payload.todayExpenditure.activeCalories} active kcal (routine daily steps & movement). Resting BMR: ~${payload.todayExpenditure.bmrCalories} kcal. Total day burn: ~${payload.todayExpenditure.totalBurned} kcal.'
+     * In 'workoutAnalysis.encouragement', provide positive reinforcement for their active movement consistency (~${payload.todayExpenditure.activeCalories} active kcal) and steady pacing on a rest/recovery day. NEVER claim they crushed a high-intensity workout session.
+     * In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for steady daily energy, satiety, and goal support without excessive athletic fueling.
 
 5. RELY ON TIMESTAMPS, NOT MEAL LABELS:
    - Examine actual 24h meal timestamps (e.g., 08:15, 10:05, 13:20). Do NOT deduce behavior from meal labels like 'breakfast' or 'dinner'—users frequently eat multiple morning fuelings or log items under default tags. Evaluate the spacing and nutritional composition of meals chronologically.
@@ -810,7 +811,7 @@ Respond strictly in valid JSON matching the requested schema.`;
       actionableAdjustment: raw.chronoNutrition?.actionableAdjustment || 'Maintain a regular eating cadence.'
     },
     workoutAnalysis: {
-      workoutDetected: Boolean(raw.workoutAnalysis?.workoutDetected ?? payload.todayExpenditure.hasSignificantWorkout),
+      workoutDetected: Boolean(payload.todayExpenditure.hasSignificantWorkout && raw.workoutAnalysis?.workoutDetected !== false),
       activitySummary: raw.workoutAnalysis?.activitySummary || payload.todayExpenditure.workoutSummary || 'Activity and expenditure tracked.',
       encouragement: raw.workoutAnalysis?.encouragement || (payload.todayExpenditure.hasSignificantWorkout ? 'Great workout effort today! Keep up the tremendous dedication!' : 'Good recovery pacing today.'),
       fuelingAdvice: raw.workoutAnalysis?.fuelingAdvice || 'Ensure adequate protein and hydration to support your metabolic activity.'

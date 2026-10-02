@@ -7,6 +7,7 @@ import {
   HistoryDayRecord
 } from '../types';
 import { getLocalDateString } from './dateUtils';
+import { getEffectiveTrackingMode } from './calorieEngine';
 
 export interface DailyCoachPayload {
   date: string;
@@ -377,35 +378,80 @@ export function buildDailyCoachPayload(
     description: w.description
   }));
 
-  const activeBurnSource = summary.activity.source || (settings.healthConnectConnected ? 'health_connect' : 'manual');
-  const isTrackerMode = activeBurnSource === 'health_connect' || activeBurnSource === 'google_fit' || settings.burnTrackingMode === 'tracker' || settings.includeRestingCalories === false;
+  const trackingMode = getEffectiveTrackingMode(settings);
+  const isTrackerMode = trackingMode === 'tracker'
+    || summary.activity.source === 'health_connect'
+    || summary.activity.source === 'google_fit'
+    || !!settings.healthConnectConnected
+    || !!settings.googleFitConnected
+    || summary.activity.sensorActiveCalories !== undefined
+    || summary.activity.sensorRestingCalories !== undefined;
+
+  const activeBurnSource = isTrackerMode
+    ? (summary.activity.source === 'google_fit' || settings.googleFitConnected ? 'google_fit' : 'health_connect')
+    : (summary.activity.source || 'manual');
+
+  const baseBmr = summary.activity.baseBmrCalories || 0;
   const rawActiveField = summary.activity.activeCaloriesBurned || 0;
+
+  // Compute the true ACTIVE calories burned today (movement, steps, and dedicated workouts - NEVER resting BMR!)
+  const itemizedWorkoutBurn = workoutsLogged.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
+  let trueActiveBurn = 0;
+
+  if (isTrackerMode) {
+    if (summary.activity.sensorActiveCalories !== undefined) {
+      trueActiveBurn = Math.max(0, Math.round(summary.activity.sensorActiveCalories));
+    } else {
+      // In tracker mode without explicit sensorActiveCalories field, active movement is total tracker burn minus resting BMR
+      trueActiveBurn = Math.max(0, Math.round(rawActiveField - baseBmr));
+    }
+    // If user logged itemized workouts on top, make sure trueActiveBurn reflects at least the workout burn
+    if (itemizedWorkoutBurn > trueActiveBurn) {
+      trueActiveBurn = itemizedWorkoutBurn;
+    }
+  } else if (settings.includeRestingCalories === false) {
+    // Standalone mode where user entered full-day burn into the activeCaloriesBurned field
+    trueActiveBurn = Math.max(0, Math.round(rawActiveField - baseBmr));
+    if (itemizedWorkoutBurn > trueActiveBurn) {
+      trueActiveBurn = itemizedWorkoutBurn;
+    }
+  } else {
+    // Standard standalone manual mode: rawActiveField is pure workout/exercise burn
+    trueActiveBurn = Math.max(itemizedWorkoutBurn, Math.round(rawActiveField));
+  }
 
   let dedicatedWorkoutCalories = 0;
   let hasSignificantWorkout = false;
   let workoutSummary = '';
 
   if (workoutsLogged.length > 0) {
-    dedicatedWorkoutCalories = workoutsLogged.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
+    dedicatedWorkoutCalories = itemizedWorkoutBurn;
     hasSignificantWorkout = true;
     const workoutParts = workoutsLogged.map(w => 
       `${w.title}${w.time ? ` at ${w.time}` : ''} (${w.caloriesBurned} kcal${w.durationMinutes ? `, ${w.durationMinutes} min` : ''})`
     );
-    workoutSummary = `Dedicated workouts logged: ${workoutParts.join('; ')} (Total dedicated workout burn: ${dedicatedWorkoutCalories} kcal). Total day expenditure so far: ${totalBurned} kcal.`;
+    if (isTrackerMode) {
+      workoutSummary = `Dedicated workouts logged: ${workoutParts.join('; ')} (Total workout burn: ${dedicatedWorkoutCalories} active kcal; Total daily active movement: ${trueActiveBurn} active kcal). Total day expenditure (including resting BMR): ${totalBurned} kcal.`;
+    } else {
+      workoutSummary = `Dedicated workouts logged: ${workoutParts.join('; ')} (Total dedicated workout burn: ${dedicatedWorkoutCalories} active kcal). Total day expenditure: ${totalBurned} kcal.`;
+    }
   } else if (isTrackerMode) {
-    // In tracker mode without itemized workouts, the value (e.g. 1537 kcal) is the FULL-DAY cumulative burn (BMR + incidental steps + general movement), NOT an isolated workout session!
+    // Fitness tracker mode without itemized workouts:
+    // The active calories (e.g. 229 kcal) are from incidental steps & daily movement.
+    // Resting metabolism (e.g. 841 kcal) is resting BMR. Total day burn is e.g. 1070 + TEF = 1279 kcal.
     dedicatedWorkoutCalories = 0;
     hasSignificantWorkout = false;
-    workoutSummary = `Total daily expenditure recorded by fitness tracker so far is ${totalBurned} kcal (combining resting basal metabolism and routine daytime movement). No dedicated high-intensity workout session was logged today.`;
-  } else if (rawActiveField >= 150) {
-    // Manual standalone mode where user specifically typed exercise calories into the workout field
-    dedicatedWorkoutCalories = rawActiveField;
+    workoutSummary = `Active movement recorded: ${trueActiveBurn} active kcal so far today (routine daily activity and steps from Health Connect / fitness tracker; resting metabolism: ${baseBmr} kcal). No dedicated high-intensity workout session was logged today. Total day expenditure (including resting BMR and TEF): ${totalBurned} kcal.`;
+  } else if (trueActiveBurn >= 150) {
+    // Manual standalone mode where user specifically typed workout calories (>= 150 kcal)
+    dedicatedWorkoutCalories = trueActiveBurn;
     hasSignificantWorkout = true;
-    workoutSummary = `Manual workout/exercise burn entered: ${dedicatedWorkoutCalories} active kcal today.`;
+    workoutSummary = `Manual workout/exercise burn entered: ${dedicatedWorkoutCalories} active kcal today. Total day expenditure: ${totalBurned} kcal.`;
   } else {
-    dedicatedWorkoutCalories = rawActiveField;
+    // Manual standalone mode with minimal or rest day activity (< 150 kcal)
+    dedicatedWorkoutCalories = trueActiveBurn;
     hasSignificantWorkout = false;
-    workoutSummary = `Baseline activity: ${rawActiveField > 0 ? `${rawActiveField} active kcal` : 'No heavy workouts logged today (rest/recovery day)'}. Total day expenditure: ${totalBurned} kcal.`;
+    workoutSummary = `Baseline activity: ${trueActiveBurn > 0 ? `${trueActiveBurn} active kcal` : 'No heavy workouts logged today (rest/recovery day)'}. Total day expenditure: ${totalBurned} kcal.`;
   }
 
   const primaryGoals = settings.goals.primaryGoals || [];
@@ -415,11 +461,11 @@ export function buildDailyCoachPayload(
 
   let workoutGuidance = '';
   if (hasSignificantWorkout) {
-    workoutGuidance = `WORKOUT & EXERCISE DETECTED: (${workoutSummary}). You MUST acknowledge and celebrate this specific workout in 'workoutAnalysis.encouragement' with genuine, high-energy praise. In 'workoutAnalysis.fuelingAdvice', explain how their diet should adjust to properly recover from this workout (protein for muscle synthesis, carbs for glycogen repletion, fluid/electrolytes), keeping their primary goals (${primaryGoals.join(', ') || 'fitness & health'}) in mind.`;
+    workoutGuidance = `WORKOUT & EXERCISE DETECTED: (${workoutSummary}). CRITICAL: You MUST acknowledge and celebrate this specific workout in 'workoutAnalysis.encouragement' citing ONLY the active workout burn (${dedicatedWorkoutCalories || trueActiveBurn} active kcal). NEVER cite resting BMR or total day burn as workout calories. In 'workoutAnalysis.fuelingAdvice', explain how their diet should adjust to properly recover from this workout (protein for muscle synthesis, carbs for glycogen repletion, fluid/electrolytes), keeping their primary goals (${primaryGoals.join(', ') || 'fitness & health'}) in mind.`;
   } else if (isTrackerMode) {
-    workoutGuidance = `FITNESS TRACKER DAY MONITORING (NO DEDICATED WORKOUT LOGGED): ${workoutSummary}. CRITICAL: Do NOT claim the user burned ${totalBurned} kcal in a single workout! The ${totalBurned} kcal is their entire day's cumulative expenditure (mostly resting BMR baseline + routine steps). In 'workoutAnalysis.activitySummary', state: 'Total day burn: ~${totalBurned} kcal (resting metabolism & daily movement)'. In 'workoutAnalysis.encouragement', provide positive reinforcement for their day-long active movement and consistency. In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for daily energy and goal support without claiming they ran a massive marathon workout.`;
+    workoutGuidance = `FITNESS TRACKER MONITORING (NO DEDICATED WORKOUT LOGGED): ${workoutSummary}. CRITICAL: Do NOT claim or hallucinate that the user burned ${totalBurned} kcal in a workout session! Their true active movement is ${trueActiveBurn} active kcal (from daily steps and routine movement). The remaining ${baseBmr} kcal is resting basal metabolism (energy burned at rest). When referring to physical activity, ONLY cite active movement (${trueActiveBurn} active kcal). In 'workoutAnalysis.activitySummary', state: 'Active movement: ~${trueActiveBurn} active kcal (daily activity/steps). Resting BMR: ~${baseBmr} kcal. Total day burn: ~${totalBurned} kcal.' In 'workoutAnalysis.encouragement', provide positive reinforcement for their active movement consistency (~${trueActiveBurn} active kcal) and steady pacing on a rest/recovery day. In 'workoutAnalysis.fuelingAdvice', explain baseline nutritional pacing for steady daily energy without suggesting heavy athletic refeeding.`;
   } else {
-    workoutGuidance = `REST / RECOVERY DAY: Active burn is low (${dedicatedWorkoutCalories} kcal). In 'workoutAnalysis', provide positive reinforcement for rest/recovery and explain baseline fueling for rest days.`;
+    workoutGuidance = `REST / RECOVERY DAY: Active burn is low (${trueActiveBurn} active kcal). In 'workoutAnalysis', provide positive reinforcement for rest/recovery and explain baseline fueling for rest days.`;
   }
 
   let fiberPacingGuidance = '';
@@ -488,9 +534,9 @@ export function buildDailyCoachPayload(
       tefCalories: summary.totals.tef
     },
     todayExpenditure: {
-      bmrCalories: summary.activity.baseBmrCalories || 0,
+      bmrCalories: baseBmr,
       neatCalories: summary.activity.neatCalories || 0,
-      activeCalories: dedicatedWorkoutCalories,
+      activeCalories: trueActiveBurn,
       tefCalories: summary.activity.tefCalories || 0,
       totalBurned,
       netEnergyBalance,

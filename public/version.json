@@ -1,5 +1,5 @@
 {
-  "version": "1.8.42",
+  "version": "1.8.43",
   "releaseDate": "2026-10-02",
-  "notes": "Removed legacy Google Fit calibration and calorie debug window; settings now save with in-menu toast feedback without exiting."
+  "notes": "Ensured AI Coach strictly isolates true active calories from resting BMR, preventing cumulative day burn from being cited as exercise or workouts."
 }

@@ -769,11 +769,17 @@ export function App() {
   const profileBmr = calculateBMR(settings.profile);
   const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
 
+  const trackingMode = getEffectiveTrackingMode(settings);
+  const effectiveSource = (settings.healthConnectConnected || activity.source === 'health_connect')
+    ? 'health_connect'
+    : (settings.googleFitConnected || activity.source === 'google_fit' ? 'google_fit' : (activity.source || 'manual'));
+
   const tdeeBreakdown = calculateTDEE({
     bmr: baseBmr,
     activeCalories: activity.activeCaloriesBurned || 0,
     meals,
-    source: activity.source,
+    source: effectiveSource,
+    trackingMode,
     isHealthConnectConnected: settings.healthConnectConnected,
     includeResting
   });
@@ -783,6 +789,13 @@ export function App() {
     meals,
     activity: {
       ...activity,
+      source: effectiveSource,
+      sensorActiveCalories: activity.sensorActiveCalories !== undefined
+        ? activity.sensorActiveCalories
+        : (effectiveSource !== 'manual' ? Math.max(0, (activity.activeCaloriesBurned || 0) - baseBmr) : undefined),
+      sensorRestingCalories: activity.sensorRestingCalories !== undefined
+        ? activity.sensorRestingCalories
+        : (effectiveSource !== 'manual' ? baseBmr : undefined),
       baseBmrCalories: baseBmr,
       neatCalories: tdeeBreakdown.neat,
       tefCalories: tdeeBreakdown.tef,
