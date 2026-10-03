@@ -58,7 +58,7 @@ import {
   clearStickyGeminiKey
 } from '../services/storageService';
 import { exportBackupFile } from '../services/backupExportService';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate, RemoteVersionInfo } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, RemoteVersionInfo } from '../services/updaterService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -180,34 +180,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         await applyAndroidOTAUpdate(availableVersionInfo.version, availableVersionInfo.checksum);
       } catch (e: any) {
         console.error('Failed to apply Android OTA update:', e);
-        alert(e?.message || 'Failed to download update bundle. Please try again.');
+        alert(e?.message || 'Failed to download in-app update. You can download the APK directly from the link below.');
         setIsCheckingUpdate(false);
       }
       return;
     }
 
+    let reloaded = false;
+    const reloadOnce = () => {
+      if (!reloaded) {
+        reloaded = true;
+        window.location.reload();
+      }
+    };
+
     if ('serviceWorker' in navigator) {
       try {
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
-        }, { once: true });
+        navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) {
           if (registration.waiting) {
             registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(reloadOnce, 1500);
+            return;
           }
+          if (registration.installing) {
+            const installing = registration.installing;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed') {
+                installing.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+            setTimeout(reloadOnce, 3000);
+            return;
+          }
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed') {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            }
+          }, { once: true });
+
           await registration.update().catch(() => {});
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          const postWaiting = (registration as any).waiting;
+          if (postWaiting) {
+            postWaiting.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(reloadOnce, 1500);
+            return;
           }
         }
       } catch (e) {
         console.warn('Service worker skip waiting error:', e);
       }
     }
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+
+    setTimeout(async () => {
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch {}
+      reloadOnce();
+    }, 2500);
   };
 
   const currentBMR = calculateBMR(formData.profile);
@@ -1452,7 +1491,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-cyan-500/20">
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-cyan-500/20 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setUpdateStatus('idle')}
@@ -1460,6 +1499,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       Keep Current v{APP_VERSION}
                     </button>
+                    {isNativeAndroid && availableVersionInfo?.version && (
+                      <a
+                        href={getDirectApkDownloadUrl(availableVersionInfo.version)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-slate-800/80 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                        title="Download APK directly from GitHub"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download APK</span>
+                      </a>
+                    )}
                     <button
                       type="button"
                       onClick={handleApplyUpdateNow}

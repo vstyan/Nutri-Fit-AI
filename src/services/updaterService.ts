@@ -96,3 +96,10 @@ export async function applyAndroidOTAUpdate(targetVersion: string, checksum?: st
     throw err;
   }
 }
+
+/**
+ * Returns the direct APK release download URL from GitHub.
+ */
+export function getDirectApkDownloadUrl(version: string): string {
+  return `https://github.com/vstyan/Nutri-Fit-AI/releases/download/v${version}/NutriFit-AI-v${version}.apk`;
+}

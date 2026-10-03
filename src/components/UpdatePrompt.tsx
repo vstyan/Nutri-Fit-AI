@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { RefreshCw, Sparkles, X, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Sparkles, X, ShieldCheck, Download } from 'lucide-react';
 import { APP_VERSION } from '../types';
 import { isNativeAndroid } from '../services/healthBridge';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl } from '../services/updaterService';
 
 interface VersionInfo {
   version: string;
@@ -46,6 +46,12 @@ const PWAUpdatePromptContent: React.FC = () => {
           const deferredVersion = localStorage.getItem('nutrifit_deferred_version');
           if (deferredVersion !== data.version) {
             setRemoteVersionInfo(data);
+            // Proactively trigger service worker update in background so it's ready on 1st click
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistration().then(reg => {
+                reg?.update().catch(() => {});
+              }).catch(() => {});
+            }
           }
         }
       } catch (e) {
@@ -72,21 +78,59 @@ const PWAUpdatePromptContent: React.FC = () => {
     setIsUpdating(true);
     localStorage.removeItem('nutrifit_deferred_version');
 
+    let reloaded = false;
+    const reloadOnce = () => {
+      if (!reloaded) {
+        reloaded = true;
+        window.location.reload();
+      }
+    };
+
     try {
       if ('serviceWorker' in navigator) {
-        // Reload as soon as the new service worker takes control
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
-        }, { once: true });
+        // Reload as soon as the new service worker activates and claims control
+        navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
 
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
+          // Case 1: Service worker is already waiting in background
           if (reg.waiting) {
             reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(reloadOnce, 1500);
+            return;
           }
+
+          // Case 2: Service worker is currently downloading/installing
+          if (reg.installing) {
+            const installing = reg.installing;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed') {
+                installing.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+            setTimeout(reloadOnce, 3000);
+            return;
+          }
+
+          // Case 3: Need to fetch update and wait for install
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed') {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            }
+          }, { once: true });
+
           await reg.update().catch(() => {});
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+          const postWaiting = (reg as any).waiting;
+          if (postWaiting) {
+            postWaiting.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(reloadOnce, 1500);
+            return;
           }
         }
       }
@@ -96,10 +140,16 @@ const PWAUpdatePromptContent: React.FC = () => {
       console.warn('Update trigger encountered an issue:', err);
     }
 
-    // Safety timeout: ensure page reloads to load the fresh bundle
-    setTimeout(() => {
-      window.location.reload();
-    }, 1200);
+    // Safety fallback: Clean caches and reload if controllerchange hasn't fired after 2.5s
+    setTimeout(async () => {
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch {}
+      reloadOnce();
+    }, 2500);
   };
 
   // Only show if user has not dismissed this version AND (remote update is detected OR service worker is waiting)
@@ -270,8 +320,17 @@ const NativeAndroidUpdatePromptContent: React.FC = () => {
         </div>
 
         {updateError && (
-          <div className="text-[11px] text-red-400 bg-red-950/40 border border-red-500/30 rounded-xl px-2.5 py-1.5">
-            {updateError}
+          <div className="text-[11px] text-red-400 bg-red-950/40 border border-red-500/30 rounded-xl p-2.5 space-y-2">
+            <div>{updateError}</div>
+            <a
+              href={getDirectApkDownloadUrl(targetVersion)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-xs transition cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download v{targetVersion} APK Directly</span>
+            </a>
           </div>
         )}
 
@@ -280,7 +339,7 @@ const NativeAndroidUpdatePromptContent: React.FC = () => {
           <span>You are on <strong>v{APP_VERSION}</strong>. NutriFit will apply updates seamlessly without reinstalling.</span>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-1">
+        <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
           <button
             type="button"
             onClick={handleDeferUpdate}
@@ -289,6 +348,16 @@ const NativeAndroidUpdatePromptContent: React.FC = () => {
           >
             Keep Current Version
           </button>
+          <a
+            href={getDirectApkDownloadUrl(targetVersion)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-slate-800/80 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+            title="Download APK directly from GitHub"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download APK</span>
+          </a>
           <button
             type="button"
             onClick={handleAcceptUpdate}
