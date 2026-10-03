@@ -1,5 +1,5 @@
 {
-  "version": "1.8.54",
+  "version": "1.8.55",
   "releaseDate": "2026-10-02",
-  "notes": "Streamlined PWA update prompt architecture with instant dismiss and zero reload ghosting."
+  "notes": "Enhanced Android update detection with multi-endpoint fallback and background resume listeners."
 }

@@ -9,7 +9,9 @@ export interface RemoteVersionInfo {
   checksum?: string;
 }
 
+const GITHUB_PAGES_VERSION_URL = 'https://vstyan.github.io/Nutri-Fit-AI/version.json';
 const GITHUB_RAW_VERSION_URL = 'https://raw.githubusercontent.com/vstyan/Nutri-Fit-AI/main/public/version.json';
+const GITHUB_RELEASES_LATEST_API = 'https://api.github.com/repos/vstyan/Nutri-Fit-AI/releases/latest';
 
 /**
  * Initializes the native updater layer.
@@ -25,29 +27,63 @@ export async function initAppUpdater(): Promise<void> {
 }
 
 /**
- * Checks GitHub repository for newer published version.
+ * Checks GitHub repository and GitHub Pages for newer published version with multi-endpoint fallback.
  */
 export async function checkForRemoteUpdate(): Promise<RemoteVersionInfo | null> {
-  try {
-    const url = isNativeAndroid()
-      ? `${GITHUB_RAW_VERSION_URL}?t=${Date.now()}`
-      : `./version.json?t=${Date.now()}`;
+  const urls = isNativeAndroid()
+    ? [
+        `${GITHUB_PAGES_VERSION_URL}?t=${Date.now()}`,
+        `${GITHUB_RAW_VERSION_URL}?t=${Date.now()}`
+      ]
+    : [
+        `./version.json?t=${Date.now()}`,
+        `${GITHUB_PAGES_VERSION_URL}?t=${Date.now()}`
+      ];
 
-    const res = await fetch(url, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json' }
-    });
-
-    if (!res.ok) return null;
-    const data: RemoteVersionInfo = await res.json();
-    if (data.version && data.version !== APP_VERSION) {
-      return data;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data: RemoteVersionInfo = await res.json();
+        if (data.version && data.version !== APP_VERSION) {
+          return data;
+        }
+        if (data.version && data.version === APP_VERSION) {
+          return null; // Confirmed already running latest
+        }
+      }
+    } catch {
+      // Continue to next endpoint
     }
-    return null;
-  } catch (err) {
-    console.warn('[NutriFit Updater] Check remote version notice:', err);
-    return null;
   }
+
+  // Authoritative fallback for native Android: GitHub Releases API
+  if (isNativeAndroid()) {
+    try {
+      const apiRes = await fetch(GITHUB_RELEASES_LATEST_API, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (apiRes.ok) {
+        const release = await apiRes.json();
+        const tag = (release.tag_name || '').replace(/^v/, '');
+        if (tag && tag !== APP_VERSION) {
+          return {
+            version: tag,
+            notes: release.body || release.name || 'Latest update from GitHub Releases',
+            releaseDate: release.published_at ? release.published_at.slice(0, 10) : undefined
+          };
+        }
+      }
+    } catch {
+      // Silently skip
+    }
+  }
+
+  return null;
 }
 
 /**

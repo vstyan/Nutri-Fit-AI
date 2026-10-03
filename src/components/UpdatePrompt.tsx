@@ -158,16 +158,39 @@ const NativeAndroidUpdatePromptContent: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    checkForRemoteUpdate().then(data => {
-      if (!isMounted || !data) return;
-      const deferredVersion = localStorage.getItem('nutrifit_deferred_version');
-      if (deferredVersion !== data.version) {
-        setRemoteVersionInfo(data);
+
+    const check = async () => {
+      try {
+        const data = await checkForRemoteUpdate();
+        if (!isMounted || !data) return;
+        const deferredVersion = localStorage.getItem('nutrifit_deferred_version');
+        if (deferredVersion !== data.version) {
+          setRemoteVersionInfo(data);
+        }
+      } catch (err) {
+        console.warn('[NutriFit Updater] Check failed:', err);
       }
-    });
+    };
+
+    check();
+
+    const handleResumeOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        check();
+      }
+    };
+
+    window.addEventListener('focus', handleResumeOrFocus);
+    document.addEventListener('visibilitychange', handleResumeOrFocus);
+
+    // Periodically re-check every 45s while in foreground
+    const intervalId = setInterval(check, 45000);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('focus', handleResumeOrFocus);
+      document.removeEventListener('visibilitychange', handleResumeOrFocus);
+      clearInterval(intervalId);
     };
   }, []);
 
