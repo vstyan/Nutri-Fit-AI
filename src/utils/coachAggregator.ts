@@ -369,8 +369,8 @@ export function buildDailyCoachPayload(
 
   // Workout detection & detailed expenditure analysis
   const rawWorkouts = summary.activity.workouts || [];
-  const workoutsLogged = rawWorkouts.map(w => ({
-    title: w.title,
+  const workoutsLogged = rawWorkouts.map((w: any) => ({
+    title: w.title || w.activityName || 'Workout',
     caloriesBurned: w.caloriesBurned,
     time: extractTimeFromTimestamp(w.timestamp),
     durationMinutes: w.durationMinutes,
