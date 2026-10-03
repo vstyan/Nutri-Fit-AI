@@ -1,5 +1,5 @@
 {
-  "version": "1.8.47",
+  "version": "1.8.48",
   "releaseDate": "2026-10-02",
-  "notes": "Added interactive 1-click Portion Size Scaler in Meal Review modal to instantaneously scale ingredients, macros, and calories mathematically."
+  "notes": "Fixed in-app OTA update check by removing CORS-blocked HEAD fetch, restoring seamless OTA downloads."
 }
