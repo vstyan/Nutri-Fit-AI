@@ -228,6 +228,13 @@ export function App() {
     isManual: boolean = false
   ) => {
     const activeSettings = currentSettings || settingsRef.current;
+    const isTracker = getEffectiveTrackingMode(activeSettings, isAndroidApp) === 'tracker';
+    if (!isTracker) {
+      if (isManual) {
+        alert('You are currently in Configuration 1 (Standalone Mode). Switch to Configuration 2 (Fitness Tracker) in Settings to sync total burn from Health Connect.');
+      }
+      return;
+    }
     if (!activeSettings.healthConnectConnected) {
       if (isManual) {
         alert('Health Connect is not connected. Please connect Health Connect first in Settings.');
@@ -362,21 +369,23 @@ export function App() {
           return;
         }
 
-        if (settingsRef.current.healthConnectConnected) {
+        const isTracker = getEffectiveTrackingMode(settingsRef.current, isAndroidApp) === 'tracker';
+        if (isTracker && settingsRef.current.healthConnectConnected) {
           handleSyncHealthConnect(selectedDate, settingsRef.current, false);
         }
       }
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedDate, handleSyncHealthConnect]);
+  }, [selectedDate, handleSyncHealthConnect, isAndroidApp]);
 
-  // Auto-sync Health Connect when date changes if connected
+  // Auto-sync Health Connect when date changes if connected in Tracker mode
   useEffect(() => {
-    if (settings.healthConnectConnected) {
+    const isTracker = getEffectiveTrackingMode(settings, isAndroidApp) === 'tracker';
+    if (isTracker && settings.healthConnectConnected) {
       handleSyncHealthConnect(selectedDate, settingsRef.current, false);
     }
-  }, [selectedDate, settings.healthConnectConnected, handleSyncHealthConnect]);
+  }, [selectedDate, settings, handleSyncHealthConnect, isAndroidApp]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {
@@ -399,9 +408,9 @@ export function App() {
     const isTracker = trackingMode === 'tracker';
     const includeResting = currentSettings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(currentSettings.profile);
-    const isFit = dayActivity.source === 'google_fit';
-    const isHC = dayActivity.source === 'health_connect' || !!currentSettings.healthConnectConnected;
-    const isSensor = isTracker || isFit || isHC;
+    const isFit = isTracker && dayActivity.source === 'google_fit';
+    const isHC = isTracker && (dayActivity.source === 'health_connect' || !!currentSettings.healthConnectConnected);
+    const isSensor = isTracker;
 
     const baseBmr = isSensor
       ? (dayActivity.sensorRestingCalories !== undefined 
@@ -409,13 +418,17 @@ export function App() {
           : (dayActivity.baseBmrCalories !== undefined ? dayActivity.baseBmrCalories : 0))
       : (includeResting ? profileBmr : 0);
 
+    const effectiveDaySource = isTracker
+      ? (isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual')))
+      : 'manual';
+
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: dayActivity.activeCaloriesBurned || 0,
       meals: dayMeals,
-      source: dayActivity.source,
+      source: effectiveDaySource,
       trackingMode,
-      isHealthConnectConnected: currentSettings.healthConnectConnected,
+      isHealthConnectConnected: isTracker && !!currentSettings.healthConnectConnected,
       includeResting
     });
 
@@ -425,7 +438,7 @@ export function App() {
       neatCalories: tdeeBreakdown.neat,
       tefCalories: dayTef,
       totalCaloriesBurned: tdeeBreakdown.totalBurned,
-      source: isHC ? 'health_connect' : (isFit ? 'google_fit' : (dayActivity.source || 'manual')),
+      source: effectiveDaySource,
       sensorActiveCalories: dayActivity.sensorActiveCalories !== undefined
         ? dayActivity.sensorActiveCalories
         : (isSensor ? Math.max(0, (dayActivity.activeCaloriesBurned || 0) - baseBmr) : undefined),
@@ -463,12 +476,14 @@ export function App() {
       const calIn = Math.round(mList.reduce((s, m) => s + (m.totalCalories || 0), 0));
 
       const pastBmr = includeResting ? calculateBMR(currentSettings.profile) : 0;
+      const pastEffectiveSource = isTracker ? act.source : 'manual';
       const pastBreakdown = calculateTDEE({
         bmr: pastBmr,
         activeCalories: act.activeCaloriesBurned || 0,
         meals: mList,
-        source: act.source,
-        isHealthConnectConnected: currentSettings.healthConnectConnected && dStr === date,
+        source: pastEffectiveSource,
+        trackingMode,
+        isHealthConnectConnected: isTracker && !!currentSettings.healthConnectConnected && dStr === date,
         includeResting
       });
 
@@ -590,17 +605,23 @@ export function App() {
     const includeResting = settings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(settings.profile);
     const baseBmr = includeResting ? profileBmr : 0;
+    const trackingMode = getEffectiveTrackingMode(settings, isAndroidApp);
+    const isTracker = trackingMode === 'tracker';
+    const effectiveSource = isTracker ? activity.source : 'manual';
+
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: activeKcal,
       meals,
-      source: activity.source,
-      isHealthConnectConnected: settings.healthConnectConnected,
+      source: effectiveSource,
+      trackingMode,
+      isHealthConnectConnected: isTracker && !!settings.healthConnectConnected,
       includeResting
     });
 
     const updatedActivity: DailyActivity = {
       ...activity,
+      source: effectiveSource,
       activeCaloriesBurned: activeKcal,
       baseBmrCalories: baseBmr,
       neatCalories: tdeeBreakdown.neat,
@@ -621,18 +642,23 @@ export function App() {
     const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
     const existingWorkouts = Array.isArray(activity.workouts) ? activity.workouts : [];
     const updatedWorkouts = [...existingWorkouts, workout];
+    const trackingMode = getEffectiveTrackingMode(settings, isAndroidApp);
+    const isTracker = trackingMode === 'tracker';
+    const effectiveSource = isTracker ? activity.source : 'manual';
 
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: newActiveKcal,
       meals,
-      source: activity.source,
-      isHealthConnectConnected: settings.healthConnectConnected,
+      source: effectiveSource,
+      trackingMode,
+      isHealthConnectConnected: isTracker && !!settings.healthConnectConnected,
       includeResting
     });
 
     const updatedActivity: DailyActivity = {
       ...activity,
+      source: effectiveSource,
       activeCaloriesBurned: newActiveKcal,
       baseBmrCalories: baseBmr,
       neatCalories: tdeeBreakdown.neat,
@@ -658,18 +684,23 @@ export function App() {
     const includeResting = settings.includeRestingCalories !== false;
     const baseBmr = includeResting ? calculateBMR(settings.profile) : 0;
     const updatedWorkouts = existingWorkouts.filter(w => w.id !== workoutId);
+    const trackingMode = getEffectiveTrackingMode(settings, isAndroidApp);
+    const isTracker = trackingMode === 'tracker';
+    const effectiveSource = isTracker ? activity.source : 'manual';
 
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: newActiveKcal,
       meals,
-      source: activity.source,
-      isHealthConnectConnected: settings.healthConnectConnected,
+      source: effectiveSource,
+      trackingMode,
+      isHealthConnectConnected: isTracker && !!settings.healthConnectConnected,
       includeResting
     });
 
     const updatedActivity: DailyActivity = {
       ...activity,
+      source: effectiveSource,
       activeCaloriesBurned: newActiveKcal,
       baseBmrCalories: baseBmr,
       neatCalories: tdeeBreakdown.neat,
@@ -699,18 +730,20 @@ export function App() {
       ? (activity.sensorRestingCalories !== undefined ? activity.sensorRestingCalories : (activity.baseBmrCalories || 0))
       : (includeResting ? profileBmr : 0);
 
+    const effectiveSettingsSource = isTracker ? activity.source : 'manual';
     const tdeeBreakdown = calculateTDEE({
       bmr: baseBmr,
       activeCalories: activity.activeCaloriesBurned || 0,
       meals,
-      source: activity.source,
+      source: effectiveSettingsSource,
       trackingMode: newTrackingMode,
-      isHealthConnectConnected: newSettings.healthConnectConnected,
+      isHealthConnectConnected: isTracker && !!newSettings.healthConnectConnected,
       includeResting
     });
 
     const updatedActivity: DailyActivity = {
       ...activity,
+      source: effectiveSettingsSource,
       baseBmrCalories: baseBmr,
       neatCalories: tdeeBreakdown.neat,
       tefCalories: tdeeBreakdown.tef,
@@ -776,9 +809,12 @@ export function App() {
   const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
 
   const trackingMode = getEffectiveTrackingMode(settings, isAndroidApp);
-  const effectiveSource = (settings.healthConnectConnected || activity.source === 'health_connect')
-    ? 'health_connect'
-    : (settings.googleFitConnected || activity.source === 'google_fit' ? 'google_fit' : (activity.source || 'manual'));
+  const isTracker = trackingMode === 'tracker';
+  const effectiveSource = isTracker
+    ? ((settings.healthConnectConnected || activity.source === 'health_connect')
+        ? 'health_connect'
+        : (settings.googleFitConnected || activity.source === 'google_fit' ? 'google_fit' : (activity.source || 'manual')))
+    : 'manual';
 
   const tdeeBreakdown = calculateTDEE({
     bmr: baseBmr,
@@ -786,7 +822,7 @@ export function App() {
     meals,
     source: effectiveSource,
     trackingMode,
-    isHealthConnectConnected: settings.healthConnectConnected,
+    isHealthConnectConnected: isTracker && !!settings.healthConnectConnected,
     includeResting
   });
 

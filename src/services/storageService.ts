@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
   storageLocation: 'local_indexeddb',
   storagePromptDismissed: false,
+  burnTrackingMode: 'standalone',
   includeRestingCalories: true,
   themeMode: 'pure_black',
   profile: DEFAULT_PROFILE,
@@ -218,6 +219,7 @@ export function getInitialSettingsSynchronous(): AppSettings {
           ? parsed.geminiApiKey.trim()
           : stickyKey,
         includeRestingCalories: parsed.includeRestingCalories !== undefined ? parsed.includeRestingCalories : true,
+        burnTrackingMode: parsed.burnTrackingMode || 'standalone',
         termsAcceptedVersion: parsed.termsAcceptedVersion || localStorage.getItem('nutrifit_terms_accepted_version') || undefined,
         termsAcceptedDate: parsed.termsAcceptedDate || localStorage.getItem('nutrifit_terms_accepted_date') || undefined,
         profile: { ...DEFAULT_PROFILE, ...(parsed.profile || {}) },

@@ -239,6 +239,14 @@ export function calculateNEAT(params: {
     includeResting = true
   } = params;
 
+  // In Standalone Mode (Configuration 1 - No Fitness Tracker):
+  // ALWAYS provides baseline sedentary NEAT floor (15% of BMR) as long as resting calories are included.
+  if (trackingMode === 'standalone') {
+    if (!includeResting) return 0;
+    return Math.max(0, Math.round(bmr * 0.15));
+  }
+
+  // In Tracker Mode (Configuration 2 - Fitness Tracker) or when sensor sources are explicitly passed without standalone mode:
   // External sensors (Google Fit, Health Connect) or tracker mode already measure NEAT in tracked data
   if (trackingMode === 'tracker' || source === 'google_fit' || source === 'health_connect' || isGoogleFitConnected || isHealthConnectConnected) {
     return 0;
@@ -279,23 +287,45 @@ export function calculateTDEE(params: {
   } = params;
 
   const effectiveMode = trackingMode || getEffectiveTrackingMode({
+    burnTrackingMode: trackingMode,
     healthConnectConnected: isHealthConnectConnected,
     googleFitConnected: isGoogleFitConnected,
     includeRestingCalories: includeResting
   });
 
-  const isGoogleFit = source === 'google_fit' || isGoogleFitConnected;
-  const isHealthConnect = source === 'health_connect' || isHealthConnectConnected;
-  const isSensorSource = effectiveMode === 'tracker' || isGoogleFit || isHealthConnect;
   const tef = calculateDailyTEF(meals);
 
-  if (isSensorSource) {
-    // Sensor devices already account for BMR, NEAT, and EAT in tracked total.
-    // NEAT is 0 added to prevent double counting.
-    // Total Burned = Sensor tracked burn + TEF.
-    const sensorTotal = Math.round(activeCalories);
+  // Configuration 1 — Standalone Mode (NutriFit 4-Pillar TDEE Engine):
+  // Total Burned = BMR + NEAT + EAT + TEF
+  // External tracker connections MUST NOT override or zero out BMR / NEAT in Configuration 1.
+  if (effectiveMode === 'standalone') {
+    const neat = includeResting ? Math.max(0, Math.round(bmr * 0.15)) : 0;
+    const eat = Math.max(0, Math.round(activeCalories));
+    const totalBurned = (includeResting ? bmr : 0) + neat + eat + tef;
+
     return {
       bmr: includeResting ? bmr : 0,
+      neat,
+      eat,
+      tef,
+      totalBurned,
+      isGoogleFit: false,
+      isHealthConnect: false
+    };
+  }
+
+  // Configuration 2 — Fitness Tracker Mode (External Wearable Total):
+  // Sensor devices already account for BMR, NEAT, and EAT in tracked total.
+  // NEAT is 0 added to prevent double counting.
+  // Total Burned = Sensor tracked burn + TEF.
+  const isGoogleFit = source === 'google_fit' || isGoogleFitConnected;
+  const isHealthConnect = source === 'health_connect' || isHealthConnectConnected;
+  const sensorTotal = Math.round(activeCalories);
+
+  if (!includeResting) {
+    // Manual external tracker mode (user logs single full-day burn from tracker with resting excluded)
+    return {
+      bmr: 0,
       neat: 0,
       eat: sensorTotal,
       tef,
@@ -305,30 +335,13 @@ export function calculateTDEE(params: {
     };
   }
 
-  if (!includeResting) {
-    // Manual external tracker mode (user logs single full-day burn from tracker)
-    const trackerTotal = Math.round(activeCalories);
-    return {
-      bmr: 0,
-      neat: 0,
-      eat: trackerTotal,
-      tef,
-      totalBurned: trackerTotal + tef,
-      isGoogleFit: false
-    };
-  }
-
-  // Standard manual mode: Total Burned = BMR + NEAT + EAT + TEF
-  const neat = Math.max(0, Math.round(bmr * 0.15)); // baseline sedentary NEAT floor (15% BMR)
-  const eat = Math.max(0, Math.round(activeCalories));
-  const totalBurned = bmr + neat + eat + tef;
-
   return {
-    bmr,
-    neat,
-    eat,
+    bmr: includeResting ? bmr : 0,
+    neat: 0,
+    eat: sensorTotal,
     tef,
-    totalBurned,
-    isGoogleFit: false
+    totalBurned: sensorTotal + tef,
+    isGoogleFit,
+    isHealthConnect
   };
 }

@@ -1,5 +1,5 @@
 {
-  "version": "1.8.55",
+  "version": "1.8.56",
   "releaseDate": "2026-10-02",
-  "notes": "Enhanced Android update detection with multi-endpoint fallback and background resume listeners."
+  "notes": "Fix Standalone Mode (Configuration 1) TDEE calculation to strictly include BMR and 15% NEAT floor without Health Connect override."
 }

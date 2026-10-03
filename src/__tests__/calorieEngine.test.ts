@@ -210,6 +210,35 @@ describe('Calorie Engine & TDEE Calculations (Baseline)', () => {
       expect(tdee.tef).toBe(0);
       expect(tdee.totalBurned).toBe(1586);
     });
+
+    it('preserves 15% NEAT floor and full BMR in Standalone Mode (Configuration 1) even if Health Connect is connected', () => {
+      const bmr = 1537;
+      const activeCalories = 82; // 1 workout
+      const neat = calculateNEAT({
+        bmr,
+        source: 'health_connect',
+        trackingMode: 'standalone',
+        isHealthConnectConnected: true
+      });
+      expect(neat).toBe(231); // 1537 * 0.15 = 230.55 -> 231
+
+      const tdee = calculateTDEE({
+        bmr,
+        activeCalories,
+        meals: dummyMeals, // TEF = 81
+        source: 'health_connect',
+        trackingMode: 'standalone',
+        isHealthConnectConnected: true,
+        includeResting: true
+      });
+
+      expect(tdee.bmr).toBe(1537);
+      expect(tdee.neat).toBe(231);
+      expect(tdee.eat).toBe(82);
+      expect(tdee.tef).toBe(81);
+      // Total Burned = BMR (1537) + NEAT (231) + EAT (82) + TEF (81) = 1931 kcal
+      expect(tdee.totalBurned).toBe(1931);
+    });
   });
 
   describe('getEffectiveTrackingMode', () => {

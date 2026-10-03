@@ -153,9 +153,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     bmr: baseBmr,
     activeCalories: activeKcalValue,
     meals: summary.meals,
-    source: activity.source,
+    source: isTrackerMode ? activity.source : 'manual',
     trackingMode,
-    isHealthConnectConnected: settings.healthConnectConnected,
+    isHealthConnectConnected: isTrackerMode && !!settings.healthConnectConnected,
     includeResting
   });
 
@@ -441,7 +441,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             )}
           </div>
-        ) : isNativeAndroid && onConnectHealthConnect ? (
+        ) : isNativeAndroid && isTrackerMode && onConnectHealthConnect ? (
           <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
             <div className="flex items-center space-x-2">
               <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
