@@ -157,7 +157,10 @@ export function App() {
   // Initial load of settings & automatic Google Fit startup sync
   useEffect(() => {
     getAppSettings().then(loaded => {
-      setSettings(loaded);
+      const sanitized = (!isAndroidApp && loaded.burnTrackingMode === 'tracker')
+        ? { ...loaded, burnTrackingMode: 'standalone' as const, includeRestingCalories: true }
+        : loaded;
+      setSettings(sanitized);
       const termsAccepted = loaded.termsAcceptedVersion === TERMS_VERSION;
       if (!termsAccepted) {
         setIsTermsBlocking(true);
@@ -392,7 +395,7 @@ export function App() {
     const dayTef = calculateDailyTEF(dayMeals);
 
     // Calculate TDEE breakdown: Total Burned = BMR + NEAT + EAT + TEF
-    const trackingMode = getEffectiveTrackingMode(currentSettings);
+    const trackingMode = getEffectiveTrackingMode(currentSettings, isAndroidApp);
     const isTracker = trackingMode === 'tracker';
     const includeResting = currentSettings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(currentSettings.profile);
@@ -683,9 +686,12 @@ export function App() {
 
   // Save settings
   const handleSaveSettings = async (newSettings: AppSettings, explicitKeyUpdate = true) => {
-    setSettings(newSettings);
-    await saveAppSettings(newSettings, explicitKeyUpdate);
-    const newTrackingMode = getEffectiveTrackingMode(newSettings);
+    const sanitizedSettings = (!isAndroidApp && newSettings.burnTrackingMode === 'tracker')
+      ? { ...newSettings, burnTrackingMode: 'standalone' as const, includeRestingCalories: true }
+      : newSettings;
+    setSettings(sanitizedSettings);
+    await saveAppSettings(sanitizedSettings, explicitKeyUpdate);
+    const newTrackingMode = getEffectiveTrackingMode(sanitizedSettings, isAndroidApp);
     const isTracker = newTrackingMode === 'tracker';
     const includeResting = newSettings.includeRestingCalories !== false;
     const profileBmr = calculateBMR(newSettings.profile);
@@ -769,7 +775,7 @@ export function App() {
   const profileBmr = calculateBMR(settings.profile);
   const baseBmr = includeResting ? (activity.baseBmrCalories || profileBmr) : 0;
 
-  const trackingMode = getEffectiveTrackingMode(settings);
+  const trackingMode = getEffectiveTrackingMode(settings, isAndroidApp);
   const effectiveSource = (settings.healthConnectConnected || activity.source === 'health_connect')
     ? 'health_connect'
     : (settings.googleFitConnected || activity.source === 'google_fit' ? 'google_fit' : (activity.source || 'manual'));

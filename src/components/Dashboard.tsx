@@ -135,7 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity.activeCaloriesBurned, summary.date]);
 
   const activeKcalValue = Number(inputActiveKcal) || 0;
-  const trackingMode = getEffectiveTrackingMode(settings);
+  const trackingMode = getEffectiveTrackingMode(settings, isNativeAndroid);
   const isTrackerMode = trackingMode === 'tracker';
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);

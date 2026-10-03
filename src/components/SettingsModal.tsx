@@ -118,7 +118,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Sync formData ONLY when modal transitions from closed to open
   useEffect(() => {
     if (isOpen) {
-      setFormData(settings);
+      setFormData(!isNativeAndroid && settings.burnTrackingMode === 'tracker'
+        ? { ...settings, burnTrackingMode: 'standalone', includeRestingCalories: true }
+        : settings);
       setCustomGoalInput('');
       setWeightLbs(kgToLbs(settings.profile.weightKg || 75));
       const { feet, inches } = cmToFeetInches(settings.profile.heightCm || 175);
@@ -209,7 +211,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const currentBMR = calculateBMR(formData.profile);
-  const activeTrackingMode = getEffectiveTrackingMode(formData);
+  const activeTrackingMode = getEffectiveTrackingMode(formData, isNativeAndroid);
   const isConfig1 = activeTrackingMode === 'standalone';
   const isConfig2 = activeTrackingMode === 'tracker';
 
@@ -406,7 +408,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings({ ...formData, storagePromptDismissed: true }, true);
+    const finalFormData = !isNativeAndroid
+      ? { ...formData, burnTrackingMode: 'standalone' as const, includeRestingCalories: true, storagePromptDismissed: true }
+      : { ...formData, storagePromptDismissed: true };
+    onSaveSettings(finalFormData, true);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -623,7 +628,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Health Connect.
+              {isNativeAndroid
+                ? "Choose how your total daily calories burned are tracked. Select either the app's standalone calculation or live synchronization from Health Connect."
+                : "Choose how your total daily calories burned are tracked. In web/PWA mode, the app uses standalone calculation with full manual and voice workout logging. Health Connect requires the Android app."}
             </p>
 
             <div className="grid grid-cols-1 gap-3 pt-1">
@@ -667,7 +674,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Standalone calculation using your body profile. The app automatically computes your full 24-hour burn from base metabolism (BMR: {currentBMR.toLocaleString()} kcal) + baseline daily movement (NEAT) + food thermics (TEF) + any workouts logged in the app. No external tracker required.
                 </p>
 
-                {(settings.healthConnectConnected) && isConfig1 && (
+                {isNativeAndroid && settings.healthConnectConnected && isConfig1 && (
                   <div className="mt-2.5 ml-6.5 p-2 bg-amber-950/40 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
                     <span>Tracker is connected, but Standalone mode is selected. Tracker data will not be added to your daily burn.</span>
                     <button
@@ -687,27 +694,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Configuration 2: Fitness Tracker (Health Connect) */}
               <div
                 onClick={() => {
+                  if (!isNativeAndroid) return;
                   setFormData(prev => ({ ...prev, burnTrackingMode: 'tracker' }));
                 }}
-                className={`p-3.5 rounded-xl border text-left cursor-pointer transition space-y-3 ${
-                  isConfig2
-                    ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
-                    : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800'
+                className={`p-3.5 rounded-xl border text-left transition space-y-3 ${
+                  !isNativeAndroid
+                    ? 'border-slate-800/80 bg-slate-900/40 opacity-60 cursor-not-allowed select-none'
+                    : isConfig2
+                    ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50 cursor-pointer'
+                    : 'border-slate-700 bg-slate-900/60 hover:bg-slate-800 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      isConfig2
+                      !isNativeAndroid
+                        ? 'border-slate-700 bg-slate-800'
+                        : isConfig2
                         ? 'border-cyan-400 bg-cyan-400'
                         : 'border-slate-600'
                     }`}>
-                      {isConfig2 && (
+                      {isNativeAndroid && isConfig2 && (
                         <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />
                       )}
                     </div>
                     <span className={`text-xs font-bold ${
-                      isConfig2
+                      !isNativeAndroid
+                        ? 'text-slate-400'
+                        : isConfig2
                         ? 'text-cyan-400'
                         : 'text-slate-300'
                     }`}>
@@ -715,20 +729,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {isConfig2 && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                        Active
+                    {!isNativeAndroid ? (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        Android App Only
                       </span>
+                    ) : (
+                      <>
+                        {isConfig2 && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                            Active
+                          </span>
+                        )}
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                          settings.healthConnectConnected
+                            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {settings.healthConnectConnected
+                            ? '✓ Health Connect'
+                            : 'Not Connected'}
+                        </span>
+                      </>
                     )}
-                    <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
-                      settings.healthConnectConnected
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}>
-                      {settings.healthConnectConnected
-                        ? '✓ Health Connect'
-                        : 'Not Connected'}
-                    </span>
                   </div>
                 </div>
 
@@ -805,7 +827,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {!isNativeAndroid && (
                   <div className="pl-6.5">
                     <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400">
-                      <p>Health Connect auto-sync is powered by Android on-device sensors. Install the NutriFit AI Android app to automatically sync with Google Fit, Pixel Watch, Galaxy Watch, or Samsung Health.</p>
+                      <p>Health Connect auto-sync is powered by Android on-device sensors. Install the <strong className="text-slate-200">NutriFit AI Android app (APK)</strong> to automatically sync with Google Fit, Pixel Watch, Galaxy Watch, or Samsung Health.</p>
                     </div>
                   </div>
                 )}

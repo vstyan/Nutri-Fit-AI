@@ -33,8 +33,9 @@ export function getEffectiveTrackingMode(settings?: {
   healthConnectConnected?: boolean;
   googleFitConnected?: boolean;
   includeRestingCalories?: boolean;
-}): BurnTrackingMode {
+}, isNative?: boolean): BurnTrackingMode {
   if (!settings) return 'standalone';
+  if (isNative === false) return 'standalone';
   if (settings.burnTrackingMode) {
     return settings.burnTrackingMode;
   }

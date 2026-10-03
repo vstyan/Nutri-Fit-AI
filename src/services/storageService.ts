@@ -12,6 +12,7 @@ import {
 } from '../types';
 import { calculateBMR } from '../utils/bmrCalculator';
 import { getEffectiveTrackingMode } from '../utils/calorieEngine';
+import { isNativeAndroid } from './healthBridge';
 import { getPastNDaysDateStrings } from '../utils/dateUtils';
 import { saveJsonToDrive, readJsonFromDrive } from './googleDriveService';
 
@@ -575,7 +576,7 @@ export async function getAllFavoriteMeals(): Promise<MealRecord[]> {
 
 export async function getActivityForDate(date: string, settings: AppSettings): Promise<DailyActivity> {
   const localKey = `${ACTIVITY_PREFIX}${date}`;
-  const trackingMode = getEffectiveTrackingMode(settings);
+  const trackingMode = getEffectiveTrackingMode(settings, isNativeAndroid());
   const isTrackerMode = trackingMode === 'tracker';
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);

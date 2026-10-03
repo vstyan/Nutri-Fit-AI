@@ -1,5 +1,5 @@
 {
-  "version": "1.8.45",
+  "version": "1.8.46",
   "releaseDate": "2026-10-02",
-  "notes": "Removed redundant top header save button in settings; verified remote bundle asset availability before prompting OTA updates."
+  "notes": "Grayed out Configuration 2 on web/PWA with Android App Only badge and enforced Standalone mode for full workout tracking."
 }

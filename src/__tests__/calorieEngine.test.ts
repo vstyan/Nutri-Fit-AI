@@ -3,7 +3,8 @@ import {
   calculateNEAT, 
   calculateTEFBreakdown, 
   calculateMealTEFBreakdown, 
-  calculateTDEE 
+  calculateTDEE,
+  getEffectiveTrackingMode
 } from '../utils/calorieEngine';
 import { MealRecord, FoodItem } from '../types';
 
@@ -208,6 +209,24 @@ describe('Calorie Engine & TDEE Calculations (Baseline)', () => {
       expect(tdee.neat).toBe(0);
       expect(tdee.tef).toBe(0);
       expect(tdee.totalBurned).toBe(1586);
+    });
+  });
+
+  describe('getEffectiveTrackingMode', () => {
+    it('defaults to standalone when no settings are provided', () => {
+      expect(getEffectiveTrackingMode(undefined)).toBe('standalone');
+    });
+
+    it('returns tracker mode when configured and running in native/unspecified environment', () => {
+      expect(getEffectiveTrackingMode({ burnTrackingMode: 'tracker' })).toBe('tracker');
+      expect(getEffectiveTrackingMode({ healthConnectConnected: true })).toBe('tracker');
+      expect(getEffectiveTrackingMode({ burnTrackingMode: 'tracker' }, true)).toBe('tracker');
+    });
+
+    it('forces standalone mode when running in web/PWA browser (isNative: false)', () => {
+      expect(getEffectiveTrackingMode({ burnTrackingMode: 'tracker' }, false)).toBe('standalone');
+      expect(getEffectiveTrackingMode({ healthConnectConnected: true }, false)).toBe('standalone');
+      expect(getEffectiveTrackingMode({ burnTrackingMode: 'tracker', healthConnectConnected: true }, false)).toBe('standalone');
     });
   });
 });
