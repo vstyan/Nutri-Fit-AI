@@ -585,10 +585,11 @@ export async function getActivityForDate(date: string, settings: AppSettings): P
 
   const parseActivityRecord = (parsed: any): DailyActivity => {
     const active = Number(parsed.activeCaloriesBurned ?? parsed.caloriesBurned) || 0;
-    const isSensorSource = isTrackerMode ||
+    const isSensorSource = isTrackerMode && (
       parsed.source === 'google_fit' ||
       parsed.source === 'health_connect' ||
-      settings.healthConnectConnected;
+      !!settings.healthConnectConnected
+    );
 
     const tef = Number(parsed.tefCalories) || 0;
 

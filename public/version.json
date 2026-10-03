@@ -1,5 +1,5 @@
 {
-  "version": "1.8.57",
+  "version": "1.8.58",
   "releaseDate": "2026-10-03",
-  "notes": "Fix infinite Health Connect sync loop on Android APK and add strict 60s background sync throttle to prevent battery drain."
+  "notes": "Strictly gate Health Connect UI card and sync status behind native Android and Configuration 2 (Tracker Mode) so PWA and Standalone Mode never display Health Connect."
 }

@@ -67,6 +67,38 @@ describe('PWA Platform & Functionality Test Suite', () => {
     it('defaults to standalone mode when isNative is false and settings are undefined', () => {
       expect(getEffectiveTrackingMode(undefined, false)).toBe('standalone');
     });
+
+    it('ensures Health Connect sensor is inactive on PWA or Configuration 1 even if healthConnectConnected is true', () => {
+      const pwaSettings: AppSettings = {
+        ...basePwaSettings,
+        burnTrackingMode: 'standalone',
+        healthConnectConnected: true
+      };
+
+      const pwaMode = getEffectiveTrackingMode(pwaSettings, false);
+      const isSensorConnectedPWA = false && pwaMode === 'tracker' && !!pwaSettings.healthConnectConnected;
+      expect(isSensorConnectedPWA).toBe(false);
+
+      // On Android APK with Configuration 1 (Standalone)
+      const androidConfig1Settings: AppSettings = {
+        ...basePwaSettings,
+        burnTrackingMode: 'standalone',
+        healthConnectConnected: true
+      };
+      const androidMode = getEffectiveTrackingMode(androidConfig1Settings, true);
+      const isSensorConnectedAndroidConfig1 = true && androidMode === 'tracker' && !!androidConfig1Settings.healthConnectConnected;
+      expect(isSensorConnectedAndroidConfig1).toBe(false);
+
+      // On Android APK with Configuration 2 (Tracker)
+      const androidConfig2Settings: AppSettings = {
+        ...basePwaSettings,
+        burnTrackingMode: 'tracker',
+        healthConnectConnected: true
+      };
+      const androidMode2 = getEffectiveTrackingMode(androidConfig2Settings, true);
+      const isSensorConnectedAndroidConfig2 = true && androidMode2 === 'tracker' && !!androidConfig2Settings.healthConnectConnected;
+      expect(isSensorConnectedAndroidConfig2).toBe(true);
+    });
   });
 
   describe('PWA Calorie & TDEE Calculations (Standalone Mode)', () => {

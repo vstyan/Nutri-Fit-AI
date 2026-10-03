@@ -139,8 +139,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const isTrackerMode = trackingMode === 'tracker';
   const includeResting = settings.includeRestingCalories !== false;
   const profileBmr = calculateBMR(settings.profile);
-  const isSensorConnected = isTrackerMode && !!settings.healthConnectConnected;
-  const sensorName = settings.healthConnectConnected ? 'Health Connect' : 'Tracker';
+  const isSensorConnected = isNativeAndroid && isTrackerMode && !!settings.healthConnectConnected;
+  const sensorName = isSensorConnected ? 'Health Connect' : 'Tracker';
 
   const baseBmr = isTrackerMode
     ? (activity.sensorRestingCalories !== undefined 
@@ -155,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     meals: summary.meals,
     source: isTrackerMode ? activity.source : 'manual',
     trackingMode,
-    isHealthConnectConnected: isTrackerMode && !!settings.healthConnectConnected,
+    isHealthConnectConnected: isSensorConnected,
     includeResting
   });
 
@@ -353,17 +353,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>{includeResting && !settings.healthConnectConnected ? 'Daily Energy Burn Breakdown (TDEE)' : 'Total Energy Burn (TDEE)'}</span>
+                <span>{includeResting && !isSensorConnected ? 'Daily Energy Burn Breakdown (TDEE)' : 'Total Energy Burn (TDEE)'}</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
                   TDEE Model
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                {includeResting && !settings.healthConnectConnected 
-                  ? 'Resting metabolic rate, active movement, and food digestion' 
-                  : settings.healthConnectConnected
+                {isSensorConnected
                   ? 'Health Connect tracked burn (Rest + NEAT + Exercise) + dynamic TEF from logged nutrition'
-                  : 'Combined resting, active, and food-induced thermogenesis'}
+                  : (includeResting 
+                      ? 'Resting metabolic rate, active movement, and food digestion' 
+                      : 'Combined resting, active, and food-induced thermogenesis')}
               </p>
             </div>
           </div>
@@ -379,7 +379,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Sensor Live Sync Widget (Health Connect on Android) */}
-        {settings.healthConnectConnected ? (
+        {isSensorConnected ? (
           <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-2.5 px-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center space-x-1.5 min-w-0">
@@ -426,20 +426,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               )}
             </div>
 
-            {isSensorConnected && (
-              <div className="flex flex-wrap items-center justify-between text-[10px] sm:text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80 gap-1">
-                <span className="flex items-center gap-1">
-                  <span>Burned so far:</span>
-                  <span className="text-emerald-300 font-bold">{burnEat} kcal</span>
-                  <span className="text-slate-500">({sensorActiveKcal} active + {sensorRestingKcal} rest)</span>
+            <div className="flex flex-wrap items-center justify-between text-[10px] sm:text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80 gap-1">
+              <span className="flex items-center gap-1">
+                <span>Burned so far:</span>
+                <span className="text-emerald-300 font-bold">{burnEat} kcal</span>
+                <span className="text-slate-500">({sensorActiveKcal} active + {sensorRestingKcal} rest)</span>
+              </span>
+              {activity.sensorProjectedTotal && activity.sensorProjectedTotal > burnEat && (
+                <span className="text-slate-400 font-medium">
+                  24h est: <span className="text-amber-300/90 font-semibold">{activity.sensorProjectedTotal} kcal</span>
                 </span>
-                {activity.sensorProjectedTotal && activity.sensorProjectedTotal > burnEat && (
-                  <span className="text-slate-400 font-medium">
-                    24h est: <span className="text-amber-300/90 font-semibold">{activity.sensorProjectedTotal} kcal</span>
-                  </span>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : isNativeAndroid && isTrackerMode && onConnectHealthConnect ? (
           <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 px-3">
