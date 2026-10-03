@@ -78,78 +78,36 @@ const PWAUpdatePromptContent: React.FC = () => {
     setIsUpdating(true);
     localStorage.removeItem('nutrifit_deferred_version');
 
-    let reloaded = false;
-    const reloadOnce = () => {
-      if (!reloaded) {
-        reloaded = true;
-        window.location.reload();
-      }
-    };
-
     try {
       if ('serviceWorker' in navigator) {
-        // Reload as soon as the new service worker activates and claims control
-        navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
-
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
-          // Case 1: Service worker is already waiting in background
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            setTimeout(reloadOnce, 1500);
-            return;
-          }
-
-          // Case 2: Service worker is currently downloading/installing
+          // If a new worker is currently installing, wait for it to finish installing/activating
           if (reg.installing) {
-            const installing = reg.installing;
-            installing.addEventListener('statechange', () => {
-              if (installing.state === 'installed') {
-                installing.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-            setTimeout(reloadOnce, 3000);
-            return;
-          }
-
-          // Case 3: Need to fetch update and wait for install
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed') {
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+            await new Promise<void>((resolve) => {
+              const worker = reg.installing;
+              if (!worker) return resolve();
+              worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed' || worker.state === 'activated') {
+                  resolve();
                 }
               });
-            }
-          }, { once: true });
-
-          await reg.update().catch(() => {});
-
-          const postWaiting = (reg as any).waiting;
-          if (postWaiting) {
-            postWaiting.postMessage({ type: 'SKIP_WAITING' });
-            setTimeout(reloadOnce, 1500);
-            return;
+              setTimeout(resolve, 2000);
+            });
+          }
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
           }
         }
       }
 
       await updateServiceWorker(true).catch(() => {});
     } catch (err) {
-      console.warn('Update trigger encountered an issue:', err);
+      console.warn('Update trigger notice:', err);
     }
 
-    // Safety fallback: Clean caches and reload if controllerchange hasn't fired after 2.5s
-    setTimeout(async () => {
-      try {
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
-        }
-      } catch {}
-      reloadOnce();
-    }, 2500);
+    // Single definitive reload to activate the new version immediately
+    window.location.reload();
   };
 
   // Only show if user has not dismissed this version AND (remote update is detected OR service worker is waiting)

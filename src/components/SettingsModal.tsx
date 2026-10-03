@@ -186,67 +186,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    let reloaded = false;
-    const reloadOnce = () => {
-      if (!reloaded) {
-        reloaded = true;
-        window.location.reload();
-      }
-    };
-
-    if ('serviceWorker' in navigator) {
-      try {
-        navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
+    try {
+      if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) {
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            setTimeout(reloadOnce, 1500);
-            return;
-          }
           if (registration.installing) {
-            const installing = registration.installing;
-            installing.addEventListener('statechange', () => {
-              if (installing.state === 'installed') {
-                installing.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-            setTimeout(reloadOnce, 3000);
-            return;
-          }
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed') {
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+            await new Promise<void>((resolve) => {
+              const worker = registration.installing;
+              if (!worker) return resolve();
+              worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed' || worker.state === 'activated') {
+                  resolve();
                 }
               });
-            }
-          }, { once: true });
-
-          await registration.update().catch(() => {});
-          const postWaiting = (registration as any).waiting;
-          if (postWaiting) {
-            postWaiting.postMessage({ type: 'SKIP_WAITING' });
-            setTimeout(reloadOnce, 1500);
-            return;
+              setTimeout(resolve, 2000);
+            });
+          }
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
           }
         }
-      } catch (e) {
-        console.warn('Service worker skip waiting error:', e);
       }
+    } catch (e) {
+      console.warn('Service worker skip waiting error:', e);
     }
 
-    setTimeout(async () => {
-      try {
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => caches.delete(k)));
-        }
-      } catch {}
-      reloadOnce();
-    }, 2500);
+    // Single definitive reload to activate the new version immediately
+    window.location.reload();
   };
 
   const currentBMR = calculateBMR(formData.profile);

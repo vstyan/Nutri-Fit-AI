@@ -1,5 +1,5 @@
 {
-  "version": "1.8.50",
+  "version": "1.8.51",
   "releaseDate": "2026-10-02",
-  "notes": "Streamlined PWA update to 1-click instant reload with background service worker prefetching, and added direct APK download fallbacks for Android."
+  "notes": "Enabled clientsClaim, skipWaiting, and cleanupOutdatedCaches in Workbox, ensuring seamless 1-click PWA updates."
 }
