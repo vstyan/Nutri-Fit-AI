@@ -81,6 +81,13 @@ export function App() {
     settingsRef.current = settings;
   }, [settings]);
 
+  const selectedDateRef = useRef<string>(selectedDate);
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  const lastHealthConnectSyncMsRef = useRef<number>(0);
+  const lastHealthConnectDateRef = useRef<string>(selectedDate);
   const isSyncingHealthConnectRef = useRef(false);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const offlineTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -168,8 +175,9 @@ export function App() {
       } else if (!loaded.storagePromptDismissed) {
         setIsStoragePromptOpen(true);
       }
-      if (loaded.healthConnectConnected) {
-        handleSyncHealthConnect(selectedDate, loaded, false);
+      const isTracker = getEffectiveTrackingMode(sanitized, isAndroidApp) === 'tracker';
+      if (isTracker && sanitized.healthConnectConnected) {
+        handleSyncHealthConnect(selectedDate, sanitized, false);
       }
     });
   }, []);
@@ -223,10 +231,11 @@ export function App() {
 
   // Health Connect Sync Calories for a Date
   const handleSyncHealthConnect = useCallback(async (
-    date: string = selectedDate,
+    targetDate?: string,
     currentSettings?: AppSettings,
     isManual: boolean = false
   ) => {
+    const date = targetDate || selectedDateRef.current;
     const activeSettings = currentSettings || settingsRef.current;
     const isTracker = getEffectiveTrackingMode(activeSettings, isAndroidApp) === 'tracker';
     if (!isTracker) {
@@ -242,8 +251,15 @@ export function App() {
       return;
     }
 
+    // Cooldown check: automated / background syncs cannot run more than once every 60 seconds
+    // Manual sync button clicks bypass this cooldown for instant user feedback
+    if (!isManual && Date.now() - lastHealthConnectSyncMsRef.current < 60 * 1000) {
+      return;
+    }
+
     if (isSyncingHealthConnectRef.current) return;
     isSyncingHealthConnectRef.current = true;
+    lastHealthConnectSyncMsRef.current = Date.now();
     setIsSyncingHealthConnect(true);
     try {
       const healthResult = await syncHealthConnectDaily(date);
@@ -307,7 +323,7 @@ export function App() {
       isSyncingHealthConnectRef.current = false;
       setIsSyncingHealthConnect(false);
     }
-  }, [selectedDate]);
+  }, [isAndroidApp]);
 
   // Listen for visibility change / pageshow to automatically advance date and auto-sync Fit / Health Connect (with 5-minute cooldown)
   useEffect(() => {
@@ -317,12 +333,12 @@ export function App() {
         const elapsedMinutes = (Date.now() - lastActiveTimeRef.current) / (60 * 1000);
         lastActiveTimeRef.current = Date.now();
 
-        let targetDate = selectedDate;
+        let targetDate = selectedDateRef.current;
         // If viewing a past date and either:
         // 1. App was inactive/backgrounded for > 15 minutes (or resumed from previous session days ago)
         // 2. The previous date was yesterday (overnight midnight rollover)
         // Automatically advance to today
-        if (selectedDate < todayStr && (elapsedMinutes > 15 || selectedDate === addDaysToDateString(todayStr, -1))) {
+        if (selectedDateRef.current < todayStr && (elapsedMinutes > 15 || selectedDateRef.current === addDaysToDateString(todayStr, -1))) {
           targetDate = todayStr;
           setSelectedDate(todayStr);
         }
@@ -336,7 +352,8 @@ export function App() {
           return;
         }
 
-        if (settingsRef.current.healthConnectConnected) {
+        const isTracker = getEffectiveTrackingMode(settingsRef.current, isAndroidApp) === 'tracker';
+        if (isTracker && settingsRef.current.healthConnectConnected) {
           handleSyncHealthConnect(targetDate, settingsRef.current, false);
         }
       }
@@ -356,7 +373,7 @@ export function App() {
       window.removeEventListener('pageshow', handleActiveState);
       window.removeEventListener('online', handleOnline);
     };
-  }, [selectedDate, handleSyncHealthConnect]);
+  }, [handleSyncHealthConnect, isAndroidApp]);
 
   // Periodic background sync every 5 minutes while app is open and visible
   useEffect(() => {
@@ -364,28 +381,34 @@ export function App() {
       if (document.visibilityState === 'visible') {
         const todayStr = getLocalDateString();
         // If midnight rolled over while app was continuously open, advance to today
-        if (selectedDate === addDaysToDateString(todayStr, -1)) {
+        if (selectedDateRef.current === addDaysToDateString(todayStr, -1)) {
           setSelectedDate(todayStr);
           return;
         }
 
         const isTracker = getEffectiveTrackingMode(settingsRef.current, isAndroidApp) === 'tracker';
         if (isTracker && settingsRef.current.healthConnectConnected) {
-          handleSyncHealthConnect(selectedDate, settingsRef.current, false);
+          handleSyncHealthConnect(selectedDateRef.current, settingsRef.current, false);
         }
       }
     }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedDate, handleSyncHealthConnect, isAndroidApp]);
+  }, [handleSyncHealthConnect, isAndroidApp]);
 
-  // Auto-sync Health Connect when date changes if connected in Tracker mode
+  // Auto-sync Health Connect when date genuinely changes if connected in Tracker mode
   useEffect(() => {
-    const isTracker = getEffectiveTrackingMode(settings, isAndroidApp) === 'tracker';
-    if (isTracker && settings.healthConnectConnected) {
-      handleSyncHealthConnect(selectedDate, settingsRef.current, false);
+    if (lastHealthConnectDateRef.current === selectedDate) {
+      return;
     }
-  }, [selectedDate, settings, handleSyncHealthConnect, isAndroidApp]);
+    lastHealthConnectDateRef.current = selectedDate;
+
+    const current = settingsRef.current;
+    const isTracker = getEffectiveTrackingMode(current, isAndroidApp) === 'tracker';
+    if (isTracker && current.healthConnectConnected) {
+      handleSyncHealthConnect(selectedDate, current, false);
+    }
+  }, [selectedDate, handleSyncHealthConnect, isAndroidApp]);
 
   // Load day data
   const loadDayData = useCallback(async (date: string, currentSettings: AppSettings) => {

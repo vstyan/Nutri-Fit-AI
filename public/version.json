@@ -1,5 +1,5 @@
 {
-  "version": "1.8.56",
-  "releaseDate": "2026-10-02",
-  "notes": "Fix Standalone Mode (Configuration 1) TDEE calculation to strictly include BMR and 15% NEAT floor without Health Connect override."
+  "version": "1.8.57",
+  "releaseDate": "2026-10-03",
+  "notes": "Fix infinite Health Connect sync loop on Android APK and add strict 60s background sync throttle to prevent battery drain."
 }
