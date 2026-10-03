@@ -1,5 +1,5 @@
 {
-  "version": "1.8.52",
+  "version": "1.8.53",
   "releaseDate": "2026-10-02",
-  "notes": "Seamless 1-click PWA updates with active service worker verification and instant controller claiming."
+  "notes": "Seamless 1-click PWA update without transient ghost toast on reload."
 }

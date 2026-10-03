@@ -174,6 +174,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleApplyUpdateNow = async () => {
     localStorage.removeItem('nutrifit_deferred_version');
 
+    if (availableVersionInfo?.version) {
+      sessionStorage.setItem('nutrifit_just_updated_version', availableVersionInfo.version);
+    }
+
     if (isNativeAndroid && availableVersionInfo?.version) {
       setIsCheckingUpdate(true);
       try {
