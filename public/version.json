@@ -1,5 +1,5 @@
 {
-  "version": "1.8.53",
+  "version": "1.8.54",
   "releaseDate": "2026-10-02",
-  "notes": "Seamless 1-click PWA update without transient ghost toast on reload."
+  "notes": "Streamlined PWA update prompt architecture with instant dismiss and zero reload ghosting."
 }

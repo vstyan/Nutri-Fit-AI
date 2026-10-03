@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw, Sparkles, X, ShieldCheck, Download } from 'lucide-react';
 import { APP_VERSION } from '../types';
 import { isNativeAndroid } from '../services/healthBridge';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, applyPWAUpdate } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, applyPWAUpdate, RemoteVersionInfo } from '../services/updaterService';
 
 interface VersionInfo {
   version: string;
@@ -13,75 +12,60 @@ interface VersionInfo {
 }
 
 const PWAUpdatePromptContent: React.FC = () => {
-  const [remoteVersionInfo, setRemoteVersionInfo] = useState<VersionInfo | null>(null);
+  const [remoteVersionInfo, setRemoteVersionInfo] = useState<RemoteVersionInfo | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
-  const checkRemoteVersion = useCallback(async () => {
-    try {
-      const res = await fetch('./version.json?t=' + Date.now(), { 
-        cache: 'no-store',
-        headers: { 'Accept': 'application/json' }
-      });
-      if (!res.ok) return;
-      const data: VersionInfo = await res.json();
-
-      // If remote version is different from currently running build
-      if (data.version && data.version !== APP_VERSION) {
-        const deferredVersion = localStorage.getItem('nutrifit_deferred_version');
-        const justUpdatedVersion = sessionStorage.getItem('nutrifit_just_updated_version');
-
-        if (deferredVersion !== data.version && justUpdatedVersion !== data.version) {
-          setRemoteVersionInfo(data);
-          // Proactively trigger service worker update in background so it's ready on 1st click
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistration().then(reg => {
-              reg?.update().catch(() => {});
-            }).catch(() => {});
-          }
-        }
-      } else {
-        // Running latest version, ensure prompt stays hidden
-        setRemoteVersionInfo(null);
-      }
-    } catch (e) {
-      // Offline or network error - silently skip
-    }
-  }, []);
-
-  const {
-    needRefresh: [, setNeedRefresh],
-  } = useRegisterSW({
-    onNeedRefresh() {
-      // When Workbox signals a waiting worker, verify with version.json rather than showing unverified banner
-      checkRemoteVersion();
-    },
-    onRegisterError(error) {
-      console.error('[NutriFit PWA] Service worker registration error:', error);
-    },
-  });
-
-  // Check version.json safely on mount
   useEffect(() => {
-    checkRemoteVersion();
-  }, [checkRemoteVersion]);
+    let isMounted = true;
+
+    const check = async () => {
+      const data = await checkForRemoteUpdate();
+      if (!isMounted || !data) return;
+
+      const deferredVersion = localStorage.getItem('nutrifit_deferred_version');
+      const justUpdatedVersion = sessionStorage.getItem('nutrifit_just_updated_version');
+
+      if (deferredVersion !== data.version && justUpdatedVersion !== data.version) {
+        setRemoteVersionInfo(data);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistration().then(reg => {
+            reg?.update().catch(() => {});
+          }).catch(() => {});
+        }
+      }
+    };
+
+    check();
+
+    // Re-check whenever service worker registration discovers an update
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        reg?.addEventListener('updatefound', check);
+      }).catch(() => {});
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleDeferUpdate = () => {
     if (remoteVersionInfo?.version) {
       localStorage.setItem('nutrifit_deferred_version', remoteVersionInfo.version);
     }
     setIsDismissed(true);
-    setNeedRefresh(false);
   };
 
   const handleAcceptUpdate = async () => {
+    if (!remoteVersionInfo?.version) return;
+    const updateVersion = remoteVersionInfo.version;
+
+    // Immediately dismiss prompt from DOM so it doesn't linger or flash during reload
+    setIsDismissed(true);
     setIsUpdating(true);
     localStorage.removeItem('nutrifit_deferred_version');
-
-    const updateVersion = remoteVersionInfo?.version;
-    if (updateVersion) {
-      sessionStorage.setItem('nutrifit_just_updated_version', updateVersion);
-    }
+    sessionStorage.setItem('nutrifit_just_updated_version', updateVersion);
 
     try {
       await applyPWAUpdate();
@@ -91,19 +75,7 @@ const PWAUpdatePromptContent: React.FC = () => {
     }
   };
 
-  // Only show if user has not dismissed this version AND remote update is verified to be newer than running build
-  const justUpdatedVersion = sessionStorage.getItem('nutrifit_just_updated_version');
-  const isJustUpdated = Boolean(justUpdatedVersion && justUpdatedVersion === APP_VERSION);
-
-  const hasNewerVersion = Boolean(
-    remoteVersionInfo?.version &&
-    remoteVersionInfo.version !== APP_VERSION &&
-    remoteVersionInfo.version !== justUpdatedVersion
-  );
-
-  const shouldShow = !isDismissed && !isJustUpdated && hasNewerVersion;
-
-  if (!shouldShow || !remoteVersionInfo) {
+  if (isDismissed || !remoteVersionInfo) {
     return null;
   }
 
