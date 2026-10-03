@@ -242,11 +242,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-xl sm:text-3xl font-black text-white mt-1">
               {totalBurned} <span className="text-[10px] sm:text-xs font-normal text-slate-400">kcal</span>
             </div>
-            <div className="text-[9px] sm:text-[10px] text-emerald-400 mt-0.5 font-medium truncate">
-              {!isTrackerMode 
-                ? 'Rest + Active' 
-                : `${sensorName} + TEF`}
-            </div>
           </div>
 
           {/* Net Balance */}

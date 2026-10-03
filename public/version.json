@@ -1,5 +1,5 @@
 {
-  "version": "1.8.48",
+  "version": "1.8.49",
   "releaseDate": "2026-10-02",
-  "notes": "Fixed in-app OTA update check by removing CORS-blocked HEAD fetch, restoring seamless OTA downloads."
+  "notes": "Streamlined Total Burned dashboard card by removing redundant bottom labels for both PWA and Android."
 }
