@@ -1,5 +1,5 @@
 {
-  "version": "1.8.46",
+  "version": "1.8.47",
   "releaseDate": "2026-10-02",
-  "notes": "Grayed out Configuration 2 on web/PWA with Android App Only badge and enforced Standalone mode for full workout tracking."
+  "notes": "Added interactive 1-click Portion Size Scaler in Meal Review modal to instantaneously scale ingredients, macros, and calories mathematically."
 }

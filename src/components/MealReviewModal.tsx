@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Check, 
   Edit3, 
   Plus, 
+  Minus,
   Trash2, 
   Sparkles, 
+  Scale,
   X, 
   ChevronDown, 
   ChevronUp, 
@@ -19,6 +21,7 @@ import { analyzeFoodText } from '../services/geminiService';
 import { getStickyGeminiKeySynchronous } from '../services/storageService';
 import { calculateTEFBreakdown } from '../utils/calorieEngine';
 import { getDefaultMealTypeByTime } from '../utils/dateUtils';
+import { scaleFoodItem, scaleFoodItems } from '../utils/portionScaler';
 
 interface MealReviewModalProps {
   isOpen: boolean;
@@ -50,12 +53,15 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [portionScale, setPortionScale] = useState<number>(1.0);
+  const baseItemsRef = useRef<FoodItem[]>([]);
+
   const [items, setItems] = useState<FoodItem[]>(() => {
+    let initialItems: FoodItem[] = [];
     if (editingMeal && Array.isArray(editingMeal.items)) {
-      return editingMeal.items;
-    }
-    if (initialResult && Array.isArray(initialResult.items)) {
-      return initialResult.items.map((item, idx) => ({
+      initialItems = editingMeal.items;
+    } else if (initialResult && Array.isArray(initialResult.items)) {
+      initialItems = initialResult.items.map((item, idx) => ({
         id: `item-${Date.now()}-${idx}`,
         name: item.name || 'Ingredient',
         portion: item.portion || `${item.grams || 100}g`,
@@ -68,66 +74,68 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         confidence: item.confidence || 'medium'
       }));
     }
-    return [];
+    baseItemsRef.current = JSON.parse(JSON.stringify(initialItems));
+    return initialItems;
   });
 
   // Sync state whenever modal opens or props change
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
       setSaveError(null);
+      setPortionScale(1.0);
       if (editingMeal) {
         setTitle(editingMeal.title || '');
         setMealType(editingMeal.mealType || 'lunch');
         setNotes(editingMeal.notes || '');
         setIsFavorite(!!editingMeal.isFavorite);
         setIsEditing(true);
-        setItems(
-          Array.isArray(editingMeal.items)
-            ? editingMeal.items.map((item, idx) => ({
-                id: item.id || `item-${Date.now()}-${idx}`,
-                name: item.name || 'Ingredient',
-                portion: item.portion || `${item.grams || 100}g`,
-                grams: Number(item.grams) || 100,
-                carbs: Number(item.carbs) || 0,
-                fiber: Number(item.fiber) || 0,
-                protein: Number(item.protein) || 0,
-                fat: Number(item.fat) || 0,
-                unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
-                saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
-                transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
-                cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
-                calories: Number(item.calories) || 0,
-                confidence: item.confidence || 'high'
-              }))
-            : []
-        );
+        const mappedItems = Array.isArray(editingMeal.items)
+          ? editingMeal.items.map((item, idx) => ({
+              id: item.id || `item-${Date.now()}-${idx}`,
+              name: item.name || 'Ingredient',
+              portion: item.portion || `${item.grams || 100}g`,
+              grams: Number(item.grams) || 100,
+              carbs: Number(item.carbs) || 0,
+              fiber: Number(item.fiber) || 0,
+              protein: Number(item.protein) || 0,
+              fat: Number(item.fat) || 0,
+              unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
+              saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
+              transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
+              cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
+              calories: Number(item.calories) || 0,
+              confidence: item.confidence || 'high'
+            }))
+          : [];
+        setItems(mappedItems);
+        baseItemsRef.current = JSON.parse(JSON.stringify(mappedItems));
       } else if (initialResult) {
         setTitle(initialResult.title || '');
         setMealType(getDefaultMealTypeByTime());
         setNotes(initialResult.dietaryNotes || '');
         setIsFavorite(false);
         setIsEditing(false);
-        setItems(
-          Array.isArray(initialResult.items)
-            ? initialResult.items.map((item, idx) => ({
-                id: `item-${Date.now()}-${idx}`,
-                name: item.name || 'Ingredient',
-                portion: item.portion || `${item.grams || 100}g`,
-                grams: Number(item.grams) || 100,
-                carbs: Number(item.carbs) || 0,
-                fiber: Number(item.fiber) || 0,
-                protein: Number(item.protein) || 0,
-                fat: Number(item.fat) || 0,
-                unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
-                saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
-                transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
-                cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
-                calories: Number(item.calories) || 0,
-                confidence: item.confidence || 'high'
-              }))
-            : []
-        );
+        const mappedItems = Array.isArray(initialResult.items)
+          ? initialResult.items.map((item, idx) => ({
+              id: `item-${Date.now()}-${idx}`,
+              name: item.name || 'Ingredient',
+              portion: item.portion || `${item.grams || 100}g`,
+              grams: Number(item.grams) || 100,
+              carbs: Number(item.carbs) || 0,
+              fiber: Number(item.fiber) || 0,
+              protein: Number(item.protein) || 0,
+              fat: Number(item.fat) || 0,
+              unsaturatedFat: item.unsaturatedFat !== undefined ? Number(item.unsaturatedFat) : undefined,
+              saturatedFat: item.saturatedFat !== undefined ? Number(item.saturatedFat) : undefined,
+              transFat: item.transFat !== undefined ? Number(item.transFat) : undefined,
+              cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
+              calories: Number(item.calories) || 0,
+              confidence: item.confidence || 'high'
+            }))
+          : [];
+        setItems(mappedItems);
+        baseItemsRef.current = JSON.parse(JSON.stringify(mappedItems));
       }
     }
   }, [isOpen, editingMeal, initialResult]);
@@ -164,24 +172,25 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       const descriptionToAnalyze = notes.trim() ? `${title.trim()}, ${notes.trim()}` : title.trim();
       const result = await analyzeFoodText(descriptionToAnalyze, activeApiKey);
       if (result.items && result.items.length > 0) {
-        setItems(
-          result.items.map((item, idx) => ({
-            id: `item-${Date.now()}-${idx}`,
-            name: item.name,
-            portion: item.portion,
-            grams: item.grams,
-            carbs: item.carbs,
-            fiber: item.fiber || 0,
-            protein: item.protein,
-            fat: item.fat,
-            unsaturatedFat: item.unsaturatedFat,
-            saturatedFat: item.saturatedFat,
-            transFat: item.transFat,
-            cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
-            calories: item.calories,
-            confidence: item.confidence
-          }))
-        );
+        const reanalyzedItems = result.items.map((item, idx) => ({
+          id: `item-${Date.now()}-${idx}`,
+          name: item.name,
+          portion: item.portion,
+          grams: item.grams,
+          carbs: item.carbs,
+          fiber: item.fiber || 0,
+          protein: item.protein,
+          fat: item.fat,
+          unsaturatedFat: item.unsaturatedFat,
+          saturatedFat: item.saturatedFat,
+          transFat: item.transFat,
+          cholesterol: item.cholesterol !== undefined ? Number(item.cholesterol) : 0,
+          calories: item.calories,
+          confidence: item.confidence
+        }));
+        setItems(reanalyzedItems);
+        baseItemsRef.current = JSON.parse(JSON.stringify(reanalyzedItems));
+        setPortionScale(1.0);
       }
       if (result.title) setTitle(result.title);
       if (result.mealType) setMealType(result.mealType);
@@ -192,6 +201,19 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
     } finally {
       setIsReanalyzing(false);
     }
+  };
+
+  const handleScalePortion = (newScale: number) => {
+    if (newScale <= 0 || isNaN(newScale)) return;
+    const targetScale = Math.round(Math.min(Math.max(newScale, 0.1), 10) * 100) / 100;
+
+    if (baseItemsRef.current.length === 0 && items.length > 0) {
+      baseItemsRef.current = JSON.parse(JSON.stringify(items));
+    }
+
+    const scaled = scaleFoodItems(baseItemsRef.current, targetScale);
+    setItems(scaled);
+    setPortionScale(targetScale);
   };
 
   const handleUpdateItem = (id: string, field: keyof FoodItem, value: any) => {
@@ -220,6 +242,16 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
         return updated;
       })
     );
+
+    baseItemsRef.current = baseItemsRef.current.map(baseIt => {
+      if (baseIt.id !== id) return baseIt;
+      if (portionScale === 1) return { ...baseIt, [field]: value };
+      if (['carbs', 'protein', 'fat', 'fiber', 'grams', 'cholesterol', 'calories'].includes(field)) {
+        const num = Number(value) || 0;
+        return { ...baseIt, [field]: Math.round((num / portionScale) * 10) / 10 };
+      }
+      return { ...baseIt, [field]: value };
+    });
   };
 
   const handleAddItem = () => {
@@ -238,11 +270,14 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
       calories: 78,
       confidence: 'medium'
     };
-    setItems(prev => [...prev, newItem]);
+    const scaledNew = portionScale !== 1 ? scaleFoodItem(newItem, portionScale) : newItem;
+    setItems(prev => [...prev, scaledNew]);
+    baseItemsRef.current.push(newItem);
   };
 
   const handleRemoveItem = (id: string) => {
     setItems(prev => prev.filter(it => it.id !== id));
+    baseItemsRef.current = baseItemsRef.current.filter(it => it.id !== id);
   };
 
   const handleQuickSave = async () => {
@@ -409,6 +444,82 @@ export const MealReviewModal: React.FC<MealReviewModalProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Portion Size Scaler */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Scale className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span className="text-xs font-semibold text-slate-200">Scale Portion Size</span>
+                {portionScale !== 1 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-in fade-in">
+                    {portionScale}x ({Math.round(portionScale * 100)}%)
+                  </span>
+                )}
+              </div>
+              {portionScale !== 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleScalePortion(1.0)}
+                  className="text-[11px] text-cyan-400 hover:text-cyan-300 underline font-medium transition"
+                >
+                  Reset (1x)
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { label: '¼x', value: 0.25 },
+                { label: '⅓x', value: 0.33 },
+                { label: '½x', value: 0.5 },
+                { label: '¾x', value: 0.75 },
+                { label: '1x', value: 1.0 },
+                { label: '1¼x', value: 1.25 },
+                { label: '1½x', value: 1.5 },
+                { label: '2x', value: 2.0 },
+              ].map(preset => {
+                const isActive = Math.abs(portionScale - preset.value) < 0.01;
+                return (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => handleScalePortion(preset.value)}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition ${
+                      isActive
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/30'
+                        : 'bg-slate-900 border-slate-700/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+
+              {/* Stepper for custom adjustments */}
+              <div className="flex items-center ml-auto bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => handleScalePortion(Math.max(0.1, Math.round((portionScale - 0.1) * 10) / 10))}
+                  className="px-2 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition text-xs"
+                  title="Decrease portion by 0.1x"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <div className="px-2 text-xs font-mono font-bold text-cyan-300 min-w-[3.2rem] text-center select-none">
+                  {portionScale.toFixed(2)}x
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleScalePortion(Math.min(10, Math.round((portionScale + 0.1) * 10) / 10))}
+                  className="px-2 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition text-xs"
+                  title="Increase portion by 0.1x"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
               </div>
             </div>
           </div>
