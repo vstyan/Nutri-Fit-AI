@@ -3,7 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, Sparkles, X, ShieldCheck, Download } from 'lucide-react';
 import { APP_VERSION } from '../types';
 import { isNativeAndroid } from '../services/healthBridge';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, applyPWAUpdate } from '../services/updaterService';
 
 interface VersionInfo {
   version: string;
@@ -79,35 +79,11 @@ const PWAUpdatePromptContent: React.FC = () => {
     localStorage.removeItem('nutrifit_deferred_version');
 
     try {
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          // If a new worker is currently installing, wait for it to finish installing/activating
-          if (reg.installing) {
-            await new Promise<void>((resolve) => {
-              const worker = reg.installing;
-              if (!worker) return resolve();
-              worker.addEventListener('statechange', () => {
-                if (worker.state === 'installed' || worker.state === 'activated') {
-                  resolve();
-                }
-              });
-              setTimeout(resolve, 2000);
-            });
-          }
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-        }
-      }
-
-      await updateServiceWorker(true).catch(() => {});
+      await applyPWAUpdate();
     } catch (err) {
       console.warn('Update trigger notice:', err);
+      window.location.reload();
     }
-
-    // Single definitive reload to activate the new version immediately
-    window.location.reload();
   };
 
   // Only show if user has not dismissed this version AND (remote update is detected OR service worker is waiting)

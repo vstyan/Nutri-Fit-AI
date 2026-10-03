@@ -58,7 +58,7 @@ import {
   clearStickyGeminiKey
 } from '../services/storageService';
 import { exportBackupFile } from '../services/backupExportService';
-import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, RemoteVersionInfo } from '../services/updaterService';
+import { checkForRemoteUpdate, applyAndroidOTAUpdate, getDirectApkDownloadUrl, applyPWAUpdate, RemoteVersionInfo } from '../services/updaterService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -187,32 +187,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     try {
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
-          if (registration.installing) {
-            await new Promise<void>((resolve) => {
-              const worker = registration.installing;
-              if (!worker) return resolve();
-              worker.addEventListener('statechange', () => {
-                if (worker.state === 'installed' || worker.state === 'activated') {
-                  resolve();
-                }
-              });
-              setTimeout(resolve, 2000);
-            });
-          }
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-        }
-      }
+      setIsCheckingUpdate(true);
+      await applyPWAUpdate();
     } catch (e) {
-      console.warn('Service worker skip waiting error:', e);
+      console.warn('Service worker update error:', e);
+      window.location.reload();
     }
-
-    // Single definitive reload to activate the new version immediately
-    window.location.reload();
   };
 
   const currentBMR = calculateBMR(formData.profile);

@@ -103,3 +103,102 @@ export async function applyAndroidOTAUpdate(targetVersion: string, checksum?: st
 export function getDirectApkDownloadUrl(version: string): string {
   return `https://github.com/vstyan/Nutri-Fit-AI/releases/download/v${version}/NutriFit-AI-v${version}.apk`;
 }
+
+/**
+ * Triggers and awaits service worker installation and activation for PWA,
+ * ensuring the new service worker has taken control BEFORE reloading the page.
+ * This completely eliminates the double-click / premature reload bug.
+ */
+export async function applyPWAUpdate(): Promise<void> {
+  if (!('serviceWorker' in navigator)) {
+    window.location.reload();
+    return;
+  }
+
+  let hasReloaded = false;
+  const doReload = () => {
+    if (!hasReloaded) {
+      hasReloaded = true;
+      window.location.reload();
+    }
+  };
+
+  // Controllerchange fires as soon as the new service worker activates and claims the client
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    doReload();
+  });
+
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      doReload();
+      return;
+    }
+
+    // 1. Worker is already waiting to activate
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      setTimeout(doReload, 1500);
+      return;
+    }
+
+    // 2. Worker is currently installing
+    if (reg.installing) {
+      const installingWorker = reg.installing;
+      await new Promise<void>((resolve) => {
+        const onStateChange = () => {
+          if (installingWorker.state === 'installed') {
+            installingWorker.postMessage({ type: 'SKIP_WAITING' });
+            resolve();
+          } else if (installingWorker.state === 'activated' || installingWorker.state === 'redundant') {
+            resolve();
+          }
+        };
+        installingWorker.addEventListener('statechange', onStateChange);
+        setTimeout(resolve, 8000);
+      });
+
+      setTimeout(doReload, 1500);
+      return;
+    }
+
+    // 3. Worker check has not yet yielded installing/waiting worker
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+
+      const onUpdateFound = () => {
+        const newWorker = reg.installing;
+        if (!newWorker) {
+          finish();
+          return;
+        }
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed') {
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+            finish();
+          } else if (newWorker.state === 'activated' || newWorker.state === 'redundant') {
+            finish();
+          }
+        });
+      };
+
+      reg.addEventListener('updatefound', onUpdateFound, { once: true });
+      reg.update().catch(() => finish());
+
+      // Safety timeout: don't hang indefinitely if network fails
+      setTimeout(finish, 8000);
+    });
+
+    setTimeout(doReload, 1500);
+  } catch (err) {
+    console.warn('[NutriFit Updater] applyPWAUpdate encountered error:', err);
+    doReload();
+  }
+}
+
